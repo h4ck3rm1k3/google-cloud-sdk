@@ -1,0 +1,29 @@
+NAME
+       gcloud-compute-addresses-delete - Release reserved IP addresses
+
+SYNOPSIS
+       gcloud compute addresses delete
+         NAME [NAME ...]
+         [--help]
+         [--region REGION]
+         [-h]
+
+DESCRIPTION
+       gcloud compute addresses delete releases one or more Google Compute
+       Engine IP addresses.
+
+POSITIONAL ARGUMENTS
+       NAME [NAME ...]
+           The resources to delete.
+
+FLAGS
+       --help
+           Display detailed help.
+
+       --region REGION
+           The region of the resources to delete. If omitted and the arguments
+           are not all URIs, you will be prompted to select a region.
+
+       -h
+           Print a summary help and exit.
+

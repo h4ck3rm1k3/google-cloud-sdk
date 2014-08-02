@@ -1,0 +1,38 @@
+NAME
+       gcloud-compute-backend-services-remove-backend - Remove a backend from
+       a backend service
+
+SYNOPSIS
+       gcloud compute backend-services remove-backend
+         NAME
+         --group GROUP
+         [--help]
+         --zone ZONE
+         [-h]
+
+DESCRIPTION
+       gcloud compute backend-services remove-backend is used to remove a
+       backend from a backend service.
+
+       Before removing a backend, it is a good idea to "drain" the backend
+       first. A backend can be drained by setting its capacity scaler to zero
+       through gcloud compute backend-services edit.
+
+POSITIONAL ARGUMENTS
+       NAME
+           The name of the backend service.
+
+FLAGS
+       --group GROUP
+           The name of a Google Cloud Resource View used by the backend to be
+           removed.
+
+       --help
+           Display detailed help.
+
+       --zone ZONE
+           The zone of the backend to be removed.
+
+       -h
+           Print a summary help and exit.
+

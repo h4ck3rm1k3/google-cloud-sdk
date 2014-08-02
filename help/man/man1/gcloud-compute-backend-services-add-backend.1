@@ -1,0 +1,89 @@
+'\" t
+.TH "GCLOUD\-COMPUTE\-BACKEND\-SERVICES\-ADD\-BACKEND" "1"
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.nh
+.ad l
+.SH "NAME"
+gcloud-compute-backend-services-add-backend \- Add a backend to a backend service
+.SH "SYNOPSIS"
+.sp
+.nf
+\fBgcloud compute backend\-services add\-backend\fR
+  NAME
+  [\-\-balancing\-mode BALANCING_MODE]
+  [\-\-capacity\-scaler CAPACITY_SCALER]
+  [\-\-description DESCRIPTION]
+  \-\-group GROUP
+  [\-\-help]
+  [\-\-max\-rate MAX_RATE | \-\-max\-rate\-per\-instance MAX_RATE_PER_INSTANCE]
+  [\-\-max\-utilization MAX_UTILIZATION]
+  \-\-zone ZONE
+  [\-h]
+.fi
+.SH "DESCRIPTION"
+.sp
+\fBgcloud compute backend\-services add\-backend\fR is used to add a backend to a backend service\&. A backend is a group of tasks that can handle requests sent to a backend service\&. Currently, the group of tasks can be one or more Google Compute Engine virtual machine instances grouped together using a resource view\&.
+.sp
+Traffic is spread across the backends using waterfall\-by\-location\&. That is, a request is routed to the closest backend that has capacity\&. If the closest backend has reached its capacity, the second closest backend is chosen, and so on\&.
+.sp
+To modify the parameters of a backend after it has been added to the backend service, use \fIgcloud compute backend\-services edit\fR\&.
+.SH "POSITIONAL ARGUMENTS"
+.PP
+\fINAME\fR
+.RS 4
+The name of the backend service\&.
+.RE
+.SH "FLAGS"
+.PP
+\fB\-\-balancing\-mode\fR \fIBALANCING_MODE\fR
+.RS 4
+Defines the strategy for balancing load\&. \(lqUTILIZATION\(rq will rely on the CPU utilization of the tasks in the group when balancing load\&. When using \(lqUTILIZATION\(rq, \(lq\-\-max\-utilization\(rq can be used to set a maximum, target CPU utilization for each task\&. \(lqRATE\(rq will spread load based on how many queries per second (QPS) the group can handle\&. There are two ways to specify max QPS: \(lq\-\-max\-rate\(rq which defines the max QPS for the whole group or \(lq\-\-max\-rate\-per\-task\(rq which defines the max QPS on a per\-task basis\&.
+.sp
+In \(lqUTILIZATION\(rq, by default, the group may receive more requests than it can handle\&. To start dropping requests when the max utilization is reached, specify \(lq\-\-max\-rate\(rq or \(lq\-\-max\-rate\-per\-task\(rq\&.
+.RE
+.PP
+\fB\-\-capacity\-scaler\fR \fICAPACITY_SCALER\fR
+.RS 4
+A float in the range [0\&.0, 1\&.0] that scales the maximum parameters for the group (e\&.g\&., max rate)\&. A value of 0\&.0 will cause no requests to be sent to the group (i\&.e\&., it adds the group in a \(lqdrained\(rq state)\&. The default is 1\&.0\&.
+.RE
+.PP
+\fB\-\-description\fR \fIDESCRIPTION\fR
+.RS 4
+An optional, textual description for the backend\&.
+.RE
+.PP
+\fB\-\-group\fR \fIGROUP\fR
+.RS 4
+The name of a Google Cloud Resource View that can receive traffic\&.
+.RE
+.PP
+\fB\-\-help\fR
+.RS 4
+Display detailed help\&.
+.RE
+.PP
+\fB\-\-max\-rate\fR \fIMAX_RATE\fR
+.RS 4
+Maximum queries per second (QPS) that the group can handle\&.
+.RE
+.PP
+\fB\-\-max\-rate\-per\-instance\fR \fIMAX_RATE_PER_INSTANCE\fR
+.RS 4
+The maximum per\-instance queries per second (QPS)\&.
+.RE
+.PP
+\fB\-\-max\-utilization\fR \fIMAX_UTILIZATION\fR
+.RS 4
+The target CPU utilization for the group as a float in the range [0\&.0, 1\&.0]\&. This flag can only be provided when the balancing mode is \(lqUTILIZATION\(rq\&.
+.RE
+.PP
+\fB\-\-zone\fR \fIZONE\fR
+.RS 4
+The zone of the Resource View\&.
+.RE
+.PP
+\fB\-h\fR
+.RS 4
+Print a summary help and exit\&.
+.RE

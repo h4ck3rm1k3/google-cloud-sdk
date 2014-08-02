@@ -1,0 +1,85 @@
+'\" t
+.TH "GCLOUD\-COMPUTE\-DISK\-TYPES\-GET" "1"
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.nh
+.ad l
+.SH "NAME"
+gcloud-compute-disk-types-get \- Get Google Compute Engine disk types
+.SH "SYNOPSIS"
+.sp
+.nf
+\fBgcloud compute disk\-types get\fR
+  [NAME_REGEX \&...]
+  [\-\-fields FIELDS [FIELDS \&...]]
+  [\-\-help]
+  [\-\-limit LIMIT]
+  [\-\-sort\-by SORT_BY]
+  [\-\-zones ZONE [ZONE \&...]]
+  [\-h]
+.fi
+.SH "DESCRIPTION"
+.sp
+\fBgcloud compute disk\-types get\fR displays all data associated with Google Compute Engine disk types in a project\&.
+.sp
+By default, disk types from all zones are fetched\&. The results can be narrowed down by providing \(lq\-\-zone\(rq\&.
+.SH "POSITIONAL ARGUMENTS"
+.PP
+\fI[NAME_REGEX \&...]\fR
+.RS 4
+Name regular expressions used to filter the resources fetched\&. The regular expressions must conform to the re2 syntax (see
+https://code\&.google\&.com/p/re2/wiki/Syntax)\&.
+.RE
+.SH "FLAGS"
+.PP
+\fB\-\-fields\fR \fIFIELDS [FIELDS \&...]\fR
+.RS 4
+Fields to display\&. Possible values are:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+creationTimestamp
+deprecated\&.deleted
+deprecated\&.deprecated
+deprecated\&.obsolete
+deprecated\&.replacement
+deprecated\&.state
+description
+id
+kind
+name
+selfLink
+validDiskSize
+zone
+.fi
+.if n \{\
+.RE
+.\}
+.RE
+.PP
+\fB\-\-help\fR
+.RS 4
+Display detailed help\&.
+.RE
+.PP
+\fB\-\-limit\fR \fILIMIT\fR
+.RS 4
+The maximum number of results\&.
+.RE
+.PP
+\fB\-\-sort\-by\fR \fISORT_BY\fR
+.RS 4
+A field to sort by\&. To perform a descending\-order sort, prefix the value of this flag with a tilde (\(lq~\(rq)\&.
+.RE
+.PP
+\fB\-\-zones\fR \fIZONE [ZONE \&...]\fR
+.RS 4
+If provided, only resources from the given zones are queried\&.
+.RE
+.PP
+\fB\-h\fR
+.RS 4
+Print a summary help and exit\&.
+.RE

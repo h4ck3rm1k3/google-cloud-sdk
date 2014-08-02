@@ -1,0 +1,26 @@
+NAME
+       gcloud-compute-disk-types - Read Google Compute Engine virtual disk
+       types
+
+SYNOPSIS
+       gcloud compute disk-types
+         COMMAND
+         [--help]
+         [-h]
+
+FLAGS
+       --help
+           Display detailed help.
+
+       -h
+           Print a summary help and exit.
+
+COMMANDS
+       COMMAND is one of the following.
+
+       get
+           Get Google Compute Engine disk types.
+
+       list
+           List Google Compute Engine disk types.
+

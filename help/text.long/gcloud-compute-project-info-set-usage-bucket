@@ -1,0 +1,52 @@
+NAME
+       gcloud-compute-project-info-set-usage-bucket - Set the usage reporting
+       bucket for a project
+
+SYNOPSIS
+       gcloud compute project-info set-usage-bucket
+         --bucket [BUCKET]
+         [--help]
+         [--prefix PREFIX]
+         [-h]
+
+DESCRIPTION
+       gcloud compute project-info set-usage-bucket is used to configure usage
+       reporting for projects.
+
+       Setting usage reporting will cause a log of usage per resource to be
+       written to a specified Google Cloud Storage bucket daily. For example,
+
+           $ gcloud compute project-info set-usage-bucket \
+               --bucket gs://my-bucket
+
+       will cause logs of the form usage_gce_YYYYMMDD.csv to be written daily
+       to the bucket "my-bucket". To disable this feature, issue the command:
+
+           $ gcloud compute project-info set-usage-bucket --clear
+
+FLAGS
+       --bucket [BUCKET]
+           The URI of a Google Cloud Storage bucket where the usage report
+           object should be stored. The Google Service Account for performing
+           usage reporting is granted write access to this bucket. The user
+           running this command must be an owner of the bucket.
+
+           To clear the usage bucket, specify this flag without an argument:
+
+               $ gcloud compute project-info set-usage-bucket --bucket
+
+       --help
+           Display detailed help.
+
+       --prefix PREFIX
+           An optional prefix for the name of the usage report object stored
+           in the bucket. If not supplied, then this defaults to "usage_". The
+           report is stored as a CSV file named PREFIX_gce_YYYYMMDD.csv where
+           YYYYMMDD is the day of the usage according to Pacific Time. The
+           prefix should conform to Google Cloud Storage object naming
+           conventions. This flag must not be provided if "--clear" is
+           provided.
+
+       -h
+           Print a summary help and exit.
+

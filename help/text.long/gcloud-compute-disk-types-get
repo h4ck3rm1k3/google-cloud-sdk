@@ -1,0 +1,60 @@
+NAME
+       gcloud-compute-disk-types-get - Get Google Compute Engine disk types
+
+SYNOPSIS
+       gcloud compute disk-types get
+         [NAME_REGEX ...]
+         [--fields FIELDS [FIELDS ...]]
+         [--help]
+         [--limit LIMIT]
+         [--sort-by SORT_BY]
+         [--zones ZONE [ZONE ...]]
+         [-h]
+
+DESCRIPTION
+       gcloud compute disk-types get displays all data associated with Google
+       Compute Engine disk types in a project.
+
+       By default, disk types from all zones are fetched. The results can be
+       narrowed down by providing "--zone".
+
+POSITIONAL ARGUMENTS
+       [NAME_REGEX ...]
+           Name regular expressions used to filter the resources fetched. The
+           regular expressions must conform to the re2 syntax (see
+           https://code.google.com/p/re2/wiki/Syntax).
+
+FLAGS
+       --fields FIELDS [FIELDS ...]
+           Fields to display. Possible values are:
+
+               creationTimestamp
+               deprecated.deleted
+               deprecated.deprecated
+               deprecated.obsolete
+               deprecated.replacement
+               deprecated.state
+               description
+               id
+               kind
+               name
+               selfLink
+               validDiskSize
+               zone
+
+       --help
+           Display detailed help.
+
+       --limit LIMIT
+           The maximum number of results.
+
+       --sort-by SORT_BY
+           A field to sort by. To perform a descending-order sort, prefix the
+           value of this flag with a tilde ("~").
+
+       --zones ZONE [ZONE ...]
+           If provided, only resources from the given zones are queried.
+
+       -h
+           Print a summary help and exit.
+

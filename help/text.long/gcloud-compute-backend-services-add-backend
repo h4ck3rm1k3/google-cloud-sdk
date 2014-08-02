@@ -1,0 +1,84 @@
+NAME
+       gcloud-compute-backend-services-add-backend - Add a backend to a
+       backend service
+
+SYNOPSIS
+       gcloud compute backend-services add-backend
+         NAME
+         [--balancing-mode BALANCING_MODE]
+         [--capacity-scaler CAPACITY_SCALER]
+         [--description DESCRIPTION]
+         --group GROUP
+         [--help]
+         [--max-rate MAX_RATE | --max-rate-per-instance MAX_RATE_PER_INSTANCE]
+         [--max-utilization MAX_UTILIZATION]
+         --zone ZONE
+         [-h]
+
+DESCRIPTION
+       gcloud compute backend-services add-backend is used to add a backend to
+       a backend service. A backend is a group of tasks that can handle
+       requests sent to a backend service. Currently, the group of tasks can
+       be one or more Google Compute Engine virtual machine instances grouped
+       together using a resource view.
+
+       Traffic is spread across the backends using waterfall-by-location. That
+       is, a request is routed to the closest backend that has capacity. If
+       the closest backend has reached its capacity, the second closest
+       backend is chosen, and so on.
+
+       To modify the parameters of a backend after it has been added to the
+       backend service, use gcloud compute backend-services edit.
+
+POSITIONAL ARGUMENTS
+       NAME
+           The name of the backend service.
+
+FLAGS
+       --balancing-mode BALANCING_MODE
+           Defines the strategy for balancing load. "UTILIZATION" will rely on
+           the CPU utilization of the tasks in the group when balancing load.
+           When using "UTILIZATION", "--max-utilization" can be used to set a
+           maximum, target CPU utilization for each task. "RATE" will spread
+           load based on how many queries per second (QPS) the group can
+           handle. There are two ways to specify max QPS: "--max-rate" which
+           defines the max QPS for the whole group or "--max-rate-per-task"
+           which defines the max QPS on a per-task basis.
+
+           In "UTILIZATION", by default, the group may receive more requests
+           than it can handle. To start dropping requests when the max
+           utilization is reached, specify "--max-rate" or
+           "--max-rate-per-task".
+
+       --capacity-scaler CAPACITY_SCALER
+           A float in the range [0.0, 1.0] that scales the maximum parameters
+           for the group (e.g., max rate). A value of 0.0 will cause no
+           requests to be sent to the group (i.e., it adds the group in a
+           "drained" state). The default is 1.0.
+
+       --description DESCRIPTION
+           An optional, textual description for the backend.
+
+       --group GROUP
+           The name of a Google Cloud Resource View that can receive traffic.
+
+       --help
+           Display detailed help.
+
+       --max-rate MAX_RATE
+           Maximum queries per second (QPS) that the group can handle.
+
+       --max-rate-per-instance MAX_RATE_PER_INSTANCE
+           The maximum per-instance queries per second (QPS).
+
+       --max-utilization MAX_UTILIZATION
+           The target CPU utilization for the group as a float in the range
+           [0.0, 1.0]. This flag can only be provided when the balancing mode
+           is "UTILIZATION".
+
+       --zone ZONE
+           The zone of the Resource View.
+
+       -h
+           Print a summary help and exit.
+

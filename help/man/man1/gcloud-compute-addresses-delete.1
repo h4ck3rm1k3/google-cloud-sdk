@@ -1,0 +1,42 @@
+'\" t
+.TH "GCLOUD\-COMPUTE\-ADDRESSES\-DELETE" "1"
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.nh
+.ad l
+.SH "NAME"
+gcloud-compute-addresses-delete \- Release reserved IP addresses
+.SH "SYNOPSIS"
+.sp
+.nf
+\fBgcloud compute addresses delete\fR
+  NAME [NAME \&...]
+  [\-\-help]
+  [\-\-region REGION]
+  [\-h]
+.fi
+.SH "DESCRIPTION"
+.sp
+\fBgcloud compute addresses delete\fR releases one or more Google Compute Engine IP addresses\&.
+.SH "POSITIONAL ARGUMENTS"
+.PP
+\fINAME [NAME \&...]\fR
+.RS 4
+The resources to delete\&.
+.RE
+.SH "FLAGS"
+.PP
+\fB\-\-help\fR
+.RS 4
+Display detailed help\&.
+.RE
+.PP
+\fB\-\-region\fR \fIREGION\fR
+.RS 4
+The region of the resources to delete\&. If omitted and the arguments are not all URIs, you will be prompted to select a region\&.
+.RE
+.PP
+\fB\-h\fR
+.RS 4
+Print a summary help and exit\&.
+.RE
