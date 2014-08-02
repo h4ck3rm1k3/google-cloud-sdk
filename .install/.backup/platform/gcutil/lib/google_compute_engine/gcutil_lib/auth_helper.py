@@ -120,7 +120,8 @@ def GetCredentialFromStore(desired_scopes,
       vm_scopes = metadata.GetServiceAccountScopes()
       # Only use gce auth if there is a compute scope in there.
       if (scopes.COMPUTE_RW_SCOPE in vm_scopes or
-          scopes.COMPUTE_RO_SCOPE in vm_scopes):
+          scopes.COMPUTE_RO_SCOPE in vm_scopes or
+          scopes.CLOUD_PLATFORM_SCOPE in vm_scopes):
         try:
           credentials = oauth2_gce.AppAssertionCredentials([])
           credentials.refresh(utils.GetHttp())

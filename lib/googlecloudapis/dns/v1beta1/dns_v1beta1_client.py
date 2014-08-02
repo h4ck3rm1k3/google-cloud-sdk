@@ -21,7 +21,8 @@ class DnsV1beta1(base_api.BaseApiClient):
   def __init__(self, url='', credentials=None,
                get_credentials=True, http=None, model=None,
                log_request=False, log_response=False,
-               credentials_args=None, default_global_params=None):
+               credentials_args=None, default_global_params=None,
+               additional_http_headers=None):
     """Create a new dns handle."""
     url = url or u'https://www.googleapis.com/dns/v1beta1/'
     super(DnsV1beta1, self).__init__(
@@ -29,7 +30,8 @@ class DnsV1beta1(base_api.BaseApiClient):
         get_credentials=get_credentials, http=http, model=model,
         log_request=log_request, log_response=log_response,
         credentials_args=credentials_args,
-        default_global_params=default_global_params)
+        default_global_params=default_global_params,
+        additional_http_headers=additional_http_headers)
     self.changes = self.ChangesService(self)
     self.managedZones = self.ManagedZonesService(self)
     self.projects = self.ProjectsService(self)
@@ -37,6 +39,8 @@ class DnsV1beta1(base_api.BaseApiClient):
 
   class ChangesService(base_api.BaseApiService):
     """Service class for the changes resource."""
+
+    _NAME = u'changes'
 
     def __init__(self, client):
       super(DnsV1beta1.ChangesService, self).__init__(client)
@@ -123,6 +127,8 @@ class DnsV1beta1(base_api.BaseApiClient):
 
   class ManagedZonesService(base_api.BaseApiService):
     """Service class for the managedZones resource."""
+
+    _NAME = u'managedZones'
 
     def __init__(self, client):
       super(DnsV1beta1.ManagedZonesService, self).__init__(client)
@@ -235,6 +241,8 @@ class DnsV1beta1(base_api.BaseApiClient):
   class ProjectsService(base_api.BaseApiService):
     """Service class for the projects resource."""
 
+    _NAME = u'projects'
+
     def __init__(self, client):
       super(DnsV1beta1.ProjectsService, self).__init__(client)
       self._method_configs = {
@@ -270,6 +278,8 @@ class DnsV1beta1(base_api.BaseApiClient):
 
   class ResourceRecordSetsService(base_api.BaseApiService):
     """Service class for the resourceRecordSets resource."""
+
+    _NAME = u'resourceRecordSets'
 
     def __init__(self, client):
       super(DnsV1beta1.ResourceRecordSetsService, self).__init__(client)

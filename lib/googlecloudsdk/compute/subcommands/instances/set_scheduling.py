@@ -2,6 +2,7 @@
 """Command for setting scheduling for virtual machine instances."""
 from googlecloudapis.compute.v1 import compute_v1_messages as messages
 from googlecloudsdk.compute.lib import base_classes
+from googlecloudsdk.compute.lib import utils
 
 MIGRATION_OPTIONS = sorted(
     messages.Scheduling.OnHostMaintenanceValueValuesEnum.to_dict().keys())
@@ -55,10 +56,10 @@ class SetSchedulingInstances(base_classes.BaseAsyncMutator):
         metavar='INSTANCE',
         help='The name of the instance for which to change scheduling options.')
 
-    parser.add_argument(
-        '--zone',
-        help='The zone of the instance.',
-        required=True)
+    utils.AddZoneFlag(
+        parser,
+        resource_type='instance',
+        operation_type='set scheduling settings for')
 
   @property
   def service(self):
@@ -69,11 +70,13 @@ class SetSchedulingInstances(base_classes.BaseAsyncMutator):
     return 'SetScheduling'
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'instances'
 
   def CreateRequests(self, args):
     """Returns a list of request necessary for setting scheduling options."""
+    instance_ref = self.CreateZonalReference(args.name, args.zone)
+
     scheduling_options = messages.Scheduling()
 
     if args.restart_on_failure:
@@ -87,10 +90,10 @@ class SetSchedulingInstances(base_classes.BaseAsyncMutator):
               args.maintenance_policy))
 
     request = messages.ComputeInstancesSetSchedulingRequest(
-        instance=args.name,
+        instance=instance_ref.Name(),
         project=self.context['project'],
         scheduling=scheduling_options,
-        zone=args.zone)
+        zone=instance_ref.zone)
 
     return [request]
 

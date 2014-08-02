@@ -94,6 +94,7 @@ class ApiContextParser(object):
         'v1': {
             'addresses': '{project}/regions/{region}/addresses/{address}',
             'disks': '{project}/zones/{zone}/disks/{disk}',
+            'diskTypes': '{project}/zones/{zone}/diskTypes/{diskType}',
             'firewalls': '{project}/global/firewalls/{firewall}',
             'forwardingRules': (
                 '{project}/regions/{region}/forwardingRules/{forwardingRule}'),
@@ -121,6 +122,7 @@ class ApiContextParser(object):
         'v2beta1': {
             'addresses': '{project}/regions/{region}/addresses/{address}',
             'disks': '{project}/zones/{zone}/disks/{disk}',
+            'diskTypes': '{project}/zones/{zone}/diskTypes/{diskType}',
             'firewalls': '{project}/global/firewalls/{firewall}',
             'forwardingRules': (
                 '{project}/regions/{region}/forwardingRules/{forwardingRule}'),

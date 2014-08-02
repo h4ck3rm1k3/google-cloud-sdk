@@ -14,6 +14,7 @@ from oauth2client import gce as oauth2client_gce
 from oauth2client import multistore_file
 
 from googlecloudsdk.core import config
+from googlecloudsdk.core import exceptions
 from googlecloudsdk.core import properties
 from googlecloudsdk.core.credentials import flow
 from googlecloudsdk.core.credentials import gce as c_gce
@@ -27,7 +28,7 @@ GOOGLE_OAUTH2_PROVIDER_TOKEN_URI = (
     'https://accounts.google.com/o/oauth2/token')
 
 
-class Error(Exception):
+class Error(exceptions.Error):
   """Exceptions for the credentials module."""
 
 
@@ -95,7 +96,7 @@ def _StorageForAccount(account):
   storage_key = {
       'type': 'google-cloud-sdk',
       'account': account,
-      'clientId': config.CLOUDSDK_CLIENT_ID,
+      'clientId': properties.VALUES.auth.client_id.Get(required=True),
       'scope': ' '.join(config.CLOUDSDK_SCOPES),
   }
 
@@ -123,7 +124,8 @@ def AvailableAccounts():
   for key in all_keys:
     if key.get('type') != 'google-cloud-sdk':
       continue
-    if key.get('clientId') != config.CLOUDSDK_CLIENT_ID:
+    if key.get('clientId') != properties.VALUES.auth.client_id.Get(
+        required=True):
       continue
     if key.get('scope') != ' '.join(config.CLOUDSDK_SCOPES):
       continue
@@ -147,6 +149,23 @@ def ActiveAccount():
   return account
 
 
+def LoadIfValid(account=None):
+  """Gets the credentials associated with the provided account if valid.
+
+  Args:
+    account: str, The account address for the credentials being fetched. If
+        None, the account stored in the core.account property is used.
+
+  Returns:
+    oauth2client.client.Credentials, The credentials if they were found and
+    valid, or None otherwise.
+  """
+  try:
+    return Load(account=account)
+  except Error:
+    return None
+
+
 def Load(account=None):
   """Get the credentials associated with the provided account.
 
@@ -164,6 +183,7 @@ def Load(account=None):
         available for the provided or active account.
     c_gce.CannotConnectToMetadataServerException: If the metadata server cannot
         be reached.
+    RefreshError: If the credentials fail to refresh.
   """
   if not account:
     account = properties.VALUES.core.account.Get()
@@ -195,6 +215,9 @@ def Refresh(creds, http=None):
   Args:
     creds: oauth2client.client.Credentials, The credentials to refresh.
     http: httplib2.Http, The http transport to refresh with.
+
+  Raises:
+    RefreshError: If the credentials fail to refresh.
   """
   # TODO(user): Remove this function when oauth2client does not hang while
   # refreshing SignedJwtAssertionCredentials.
@@ -202,7 +225,7 @@ def Refresh(creds, http=None):
                 type(creds) != client.SignedJwtAssertionCredentials):
     try:
       creds.refresh(http or httplib2.Http())
-    except client.AccessTokenRefreshError as e:
+    except (client.AccessTokenRefreshError, httplib2.ServerNotFoundError) as e:
       raise RefreshError(e)
 
 
@@ -275,8 +298,8 @@ def Revoke(account=None):
 
 
 def AcquireFromWebFlow(launch_browser=True,
-                       auth_uri=GOOGLE_OAUTH2_PROVIDER_AUTHORIZATION_URI,
-                       token_uri=GOOGLE_OAUTH2_PROVIDER_TOKEN_URI):
+                       auth_uri=None,
+                       token_uri=None):
   """Get credentials via a web flow.
 
   Args:
@@ -290,16 +313,26 @@ def AcquireFromWebFlow(launch_browser=True,
   Raises:
     FlowError: If there is a problem with the web flow.
   """
+  if auth_uri is None:
+    auth_uri = properties.VALUES.auth.auth_host.Get(required=True)
+  if token_uri is None:
+    token_uri = properties.VALUES.auth.token_host.Get(required=True)
+
   webflow = client.OAuth2WebServerFlow(
-      client_id=config.CLOUDSDK_CLIENT_ID,
-      client_secret=config.CLOUDSDK_CLIENT_NOTSOSECRET,
+      client_id=properties.VALUES.auth.client_id.Get(required=True),
+      client_secret=properties.VALUES.auth.client_secret.Get(required=True),
       scope=config.CLOUDSDK_SCOPES,
       user_agent=config.CLOUDSDK_USER_AGENT,
       auth_uri=auth_uri,
-      token_uri=token_uri)
+      token_uri=token_uri,
+      prompt='select_account')
+
+  no_validate = properties.VALUES.auth.disable_ssl_validation.GetBool()
 
   try:
-    cred = flow.Run(webflow, launch_browser=launch_browser)
+    cred = flow.Run(
+        webflow, launch_browser=launch_browser,
+        http=httplib2.Http(disable_ssl_certificate_validation=no_validate))
   except flow.Error as e:
     raise FlowError(e)
   return cred
@@ -318,8 +351,8 @@ def AcquireFromToken(refresh_token,
   """
   cred = client.OAuth2Credentials(
       access_token=None,
-      client_id=config.CLOUDSDK_CLIENT_ID,
-      client_secret=config.CLOUDSDK_CLIENT_NOTSOSECRET,
+      client_id=properties.VALUES.auth.client_id.Get(required=True),
+      client_secret=properties.VALUES.auth.client_secret.Get(required=True),
       refresh_token=refresh_token,
       # always start expired
       token_expiry=datetime.datetime.utcnow(),
@@ -339,7 +372,8 @@ def AcquireFromGCE(account=None):
 
   Raises:
     c_gce.CannotConnectToMetadataServerException: If the metadata server cannot
-        be reached.
+      be reached.
+    RefreshError: If the credentials fail to refresh.
     Error: If a non-default service account is used.
   """
   default_account = c_gce.Metadata().DefaultAccount()
@@ -351,10 +385,6 @@ def AcquireFromGCE(account=None):
   # inability is not currently a problem, because the metadata server does not
   # yet provide multiple service accounts.
 
-  cred = oauth2client_gce.AppAssertionCredentials(config.CLOUDSDK_SCOPES)
-  try:
-    cred.refresh(httplib2.Http())
-  except httplib2.ServerNotFoundError:
-    raise c_gce.CannotConnectToMetadataServerException()
-
-  return cred
+  creds = oauth2client_gce.AppAssertionCredentials(config.CLOUDSDK_SCOPES)
+  Refresh(creds)
+  return creds

@@ -8,12 +8,13 @@ SYNOPSIS
          [--check-interval CHECK_INTERVAL; default="5s"]
          [--description DESCRIPTION]
          [--healthy-threshold HEALTHY_THRESHOLD; default="2"]
+         [--help]
          [--host HOST]
          [--port PORT; default="80"]
          [--request-path REQUEST_PATH; default="/"]
          [--timeout TIMEOUT; default="5s"]
          [--unhealthy-threshold UNHEALTHY_THRESHOLD; default="2"]
-         [-h, --help]
+         [-h]
 
 DESCRIPTION
        gcloud compute http-health-checks create is used to create an HTTP
@@ -40,6 +41,9 @@ FLAGS
        --healthy-threshold HEALTHY_THRESHOLD
            The number of consecutive successful health checks before an
            unhealthy instance is marked as healthy. The default is 2.
+
+       --help
+           Display detailed help.
 
        --host HOST
            The value of the host header used in this HTTP health check
@@ -69,6 +73,6 @@ FLAGS
            The number of consecutive health check failures before a healthy
            instance is marked as unhealthy. The default is 2.
 
-       --help
+       -h
            Print a summary help and exit.
 

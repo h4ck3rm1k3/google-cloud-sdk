@@ -99,11 +99,11 @@ def _OperationHttpStatusToCell(operation):
     return ''
 
 
-def _ImageSelfLinkToCell(image):
-  """Shortens the image's self link."""
-  self_link = image.get('selfLink')
+def _ProjectToCell(resource):
+  """Returns the project name of the given resource."""
+  self_link = resource.get('selfLink')
   if self_link:
-    return path_simplifier.ProjectSuffix(self_link)
+    return path_simplifier.ProjectSuffix(self_link).split('/')[0]
   else:
     return ''
 
@@ -181,12 +181,28 @@ _SPECS = {
         message_class=compute_v1_messages.Disk,
         table_cols=[
             ('name', 'name'),
+            ('zone', 'zone'),
             ('status', 'status'),
             ('sizeGb', 'sizeGb'),
-            ('zone', 'zone'),
+            ('type', 'type'),
         ],
         transformations=[
             ('sourceSnapshot', path_simplifier.Name),
+            ('type', path_simplifier.Name),
+            ('zone', path_simplifier.Name),
+        ],
+        editables=None,
+    ),
+
+    'diskTypes': _InternalSpec(
+        message_class=compute_v1_messages.DiskType,
+        table_cols=[
+            ('name', 'name'),
+            ('zone', 'zone'),
+            ('validDiskSize', 'validDiskSize'),
+            ('deprecated.state', 'deprecated.state'),
+        ],
+        transformations=[
             ('zone', path_simplifier.Name),
         ],
         editables=None,
@@ -240,7 +256,8 @@ _SPECS = {
     'images': _InternalSpec(
         message_class=compute_v1_messages.Image,
         table_cols=[
-            ('uri', _ImageSelfLinkToCell),
+            ('name', 'name'),
+            ('project', _ProjectToCell),
             ('status', 'status'),
             ('deprecated.state', 'deprecated.state'),
         ],

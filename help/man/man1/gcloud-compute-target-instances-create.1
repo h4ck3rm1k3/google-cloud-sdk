@@ -12,9 +12,10 @@ gcloud-compute-target-instances-create \- Create a target instance for handling 
 \fBgcloud compute target\-instances create\fR
   NAME
   [\-\-description DESCRIPTION]
+  [\-\-help]
   \-\-instance INSTANCE
   \-\-zone ZONE
-  [\-h, \-\-help]
+  [\-h]
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -32,6 +33,11 @@ The name of the target instance\&.
 An optional, textual description of the target instance\&.
 .RE
 .PP
+\fB\-\-help\fR
+.RS 4
+Display detailed help\&.
+.RE
+.PP
 \fB\-\-instance\fR \fIINSTANCE\fR
 .RS 4
 The name of the virtual machine instance that will handle the traffic\&.
@@ -42,7 +48,7 @@ The name of the virtual machine instance that will handle the traffic\&.
 The zone of the target instance (i\&.e\&., where the instance resides)\&.
 .RE
 .PP
-\fB\-\-help\fR
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE

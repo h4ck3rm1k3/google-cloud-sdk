@@ -33,6 +33,7 @@ from gslib.cs_api_map import ApiSelector
 from gslib.exception import CommandException
 from gslib.hashing_helper import CalculateB64EncodedCrc32cFromContents
 from gslib.hashing_helper import CalculateB64EncodedMd5FromContents
+from gslib.hashing_helper import SLOW_CRCMOD_WARNING
 from gslib.plurality_checkable_iterator import PluralityCheckableIterator
 from gslib.storage_url import StorageUrlFromString
 from gslib.util import GetCloudApiInstance
@@ -42,13 +43,8 @@ from gslib.util import UsingCrcmodExtension
 from gslib.util import UTF8
 from gslib.wildcard_iterator import CreateWildcardIterator
 
-SLOW_CRCMOD_WARNING = """
-WARNING: You have requested checksumming but your crcmod installation isn't
-using the module's C extension, so checksumming will run very slowly. For help
-installing the extension, please see:
-  $ gsutil help crcmod"""
 
-_detailed_help_text = ("""
+_DETAILED_HELP_TEXT = ("""
 <B>SYNOPSIS</B>
   gsutil rsync [-c] [-C] [-d] [-e] [-n] [-p] [-R] src_url dst_url
 
@@ -108,7 +104,13 @@ _detailed_help_text = ("""
   workstation.
 
 
-<B>FAILURE HANDLING</B>
+<B>CHECKSUM VALIDATION AND FAILURE HANDLING</B>
+  At the end of every upload or download, the gsutil rsync command validates
+  that the checksum of the local file matches that of the checksum of the object
+  stored in GCS. If it does not, gsutil will delete the invalid copy and print a
+  warning message. This very rarely happens. If it does, please contact
+  gs-team@google.com.
+
   The rsync command will retry when failures occur, but if enough failures
   happen during a particular copy or delete operation the command will skip that
   object and move on. At the end of the synchronization run if any failures were
@@ -119,6 +121,9 @@ _detailed_help_text = ("""
   Note that there are cases where retrying will never succeed, such as if you
   don't have write permission to the destination bucket or if the destination
   path for some objects is longer than the maximum allowed length.
+
+  For more details about gsutil's retry handling, please see
+  "gsutil help retries".
 
 
 <B>CHANGE DETECTION ALGORITHM</B>
@@ -192,7 +197,10 @@ _detailed_help_text = ("""
   -C            If an error occurs, continue to attempt to copy the remaining
                 files. If errors occurred, gsutil's exit status will be non-zero
                 even if this flag is set. This option is implicitly set when
-                running "gsutil -m rsync...".
+                running "gsutil -m rsync...".  Note: -C only applies to the
+                actual copying operation. If an error occurs while iterating
+                over the files in the local directory (e.g., invalid Unicode
+                file name) gsutil will print an error message and abort.
 
   -d            Delete extra files under dst_url not found under src_url. By
                 default extra files are not deleted.
@@ -327,7 +335,7 @@ def _ListUrlRootFunc(cls, args_tuple, thread_state=None):
   (url_str, out_file_name, desc) = args_tuple
   # We sort while iterating over url_str, allowing parallelism of batched
   # sorting with collecting the listing.
-  out_file = open(out_file_name, 'w')
+  out_file = open(out_file_name, 'wb')
   _BatchSort(_FieldedListingIterator(cls, gsutil_api, url_str, desc), out_file)
   out_file.close()
 
@@ -487,8 +495,8 @@ class _DiffIterator(object):
                       parallel_operations_override=True,
                       fail_on_error=True)
 
-    self.sorted_list_src_file = open(self.sorted_list_src_file_name, 'r')
-    self.sorted_list_dst_file = open(self.sorted_list_dst_file_name, 'r')
+    self.sorted_list_src_file = open(self.sorted_list_src_file_name, 'rb')
+    self.sorted_list_dst_file = open(self.sorted_list_dst_file_name, 'rb')
 
     # Wrap iterators in PluralityCheckableIterator so we can check emptiness.
     self.sorted_src_urls_it = PluralityCheckableIterator(
@@ -736,7 +744,7 @@ class RsyncCommand(Command):
       help_name_aliases=['sync', 'synchronize'],
       help_type='command_help',
       help_one_line_summary='Synchronize content of two buckets/directories',
-      help_text=_detailed_help_text,
+      help_text=_DETAILED_HELP_TEXT,
       subcommand_help_text={},
   )
   total_bytes_transferred = 0

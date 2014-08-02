@@ -11,14 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Additional help about contributing code to gsutil."""
 
-from gslib.help_provider import HELP_NAME
-from gslib.help_provider import HELP_NAME_ALIASES
-from gslib.help_provider import HELP_ONE_LINE_SUMMARY
 from gslib.help_provider import HelpProvider
-from gslib.help_provider import HELP_TEXT
-from gslib.help_provider import HelpType
-from gslib.help_provider import HELP_TYPE
 
 _detailed_help_text = ("""
 <B>OVERVIEW</B>
@@ -134,20 +129,17 @@ _detailed_help_text = ("""
 """)
 
 
-
 class CommandOptions(HelpProvider):
   """Additional help about contributing code to gsutil."""
+  # TODO: gsutil-beta: Add lint .rc file and linting instructions.
 
-  help_spec = {
-    # Name of command or auxiliary help info for which this help applies.
-    HELP_NAME : 'dev',
-    # List of help name aliases.
-    HELP_NAME_ALIASES : ['development', 'developer', 'code', 'mods',
-                         'software'],
-    # Type of help:
-    HELP_TYPE : HelpType.ADDITIONAL_HELP,
-    # One line summary of this help.
-    HELP_ONE_LINE_SUMMARY : 'Contributing Code to gsutil',
-    # The full help text.
-    HELP_TEXT : _detailed_help_text,
-  }
+  # Help specification. See help_provider.py for documentation.
+  help_spec = HelpProvider.HelpSpec(
+      help_name = 'dev',
+      help_name_aliases = [
+          'development', 'developer', 'code', 'mods', 'software'],
+      help_type = 'additional_help',
+      help_one_line_summary = 'Contributing Code to gsutil',
+      help_text = _detailed_help_text,
+      subcommand_help_text = {},
+  )

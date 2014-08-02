@@ -5,13 +5,13 @@ SYNOPSIS
        gcloud compute operations list
          [NAME_REGEX ...]
          [--global]
+         [--help]
          [--limit LIMIT]
-         [--raw-links]
          [--regions [REGION ...]]
          [--sort-by SORT_BY]
          [--uri]
          [--zones [ZONE ...]]
-         [-h, --help]
+         [-h]
 
 POSITIONAL ARGUMENTS
        [NAME_REGEX ...]
@@ -23,16 +23,11 @@ FLAGS
        --global
            If provided, operations from the global scope are queried.
 
+       --help
+           Display detailed help.
+
        --limit LIMIT
            The maximum number of results.
-
-       --raw-links
-           If provided, resource references in output from the server will not
-           be condensed for readability. For example, when listing operations,
-           if a targetLink is
-           "https://www.googleapis.com/compute/v1/projects/my-project/zones/us-central2-a/instances/my-instance",
-           "us-central2-a/instances/my-instance" is shown for brevity. This
-           behavior can be turned off using this flag.
 
        --regions [REGION ...]
            If provided, operations from the given regions are queried.
@@ -49,6 +44,6 @@ FLAGS
        --zones [ZONE ...]
            If provided, operations from the given zones are queried.
 
-       --help
+       -h
            Print a summary help and exit.
 

@@ -3,7 +3,7 @@
 from googlecloudsdk.compute.lib import base_classes
 
 
-class GetFirewalls(base_classes.GlobalGetter):
+class Get(base_classes.GlobalGetter):
   """Get Google Compute Engine firewall rules."""
 
   @staticmethod
@@ -16,11 +16,11 @@ class GetFirewalls(base_classes.GlobalGetter):
     return self.context['compute'].firewalls
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'firewalls'
 
 
-GetFirewalls.detailed_help = {
+Get.detailed_help = {
     'brief': 'Get Google Compute Engine firewall rules',
     'DESCRIPTION': """\
         *{command}* displays all data associated with Google Compute

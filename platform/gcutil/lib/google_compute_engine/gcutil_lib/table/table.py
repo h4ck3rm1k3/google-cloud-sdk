@@ -57,6 +57,7 @@ import csv
 import itertools
 import numbers
 import os
+import re
 import StringIO
 import subprocess
 import sys
@@ -83,20 +84,40 @@ _CONTROL_CHARS = set(unichr(c) for c in range(32) + [127])
 
 def _GetTerminalWidth():
   """Returns the terminal width or None if width cannot be determined."""
-  try:
-    output = subprocess.check_output(['stty', 'size'])
-    width = int(output.split()[1])
-    return width
-  except BaseException:
-    pass
+  if sys.platform == 'win32':
+    try:
+      # Redirect stderr to stdout which is ignored anyway if cmd or mode fail.
+      output = subprocess.check_output(['cmd', '/R', 'mode', 'con:'],
+                                       stderr=subprocess.STDOUT)
+      # The second integer value is the console window width. Literal strings
+      # are avoided in the parse in case they are localized.
+      width = int(re.sub(r'\D+\d+\D+(\d+).*', r'\1', output,
+                         count=1, flags=re.DOTALL))
+      return width
+    except BaseException:
+      pass
+  else:
+    try:
+      # Redirect stderr to stdout which is ignored anyway if stty fails.
+      output = subprocess.check_output(['stty', 'size'],
+                                       stderr=subprocess.STDOUT)
+      width = int(output.split()[1])
+      return width
+    except BaseException:
+      pass
 
-  # stty failed, so let's try COLUMNS.
+    # ``stty size'' is non-standard -- try ``stty -a'' and hope its not
+    # localized.
+    try:
+      # Redirect stderr to stdout which is ignored anyway if stty fails.
+      output = subprocess.check_output(['stty', '-a'], stderr=subprocess.STDOUT)
+      width = int(re.sub(r'.*columns *(\d+).*', r'\1', output,
+                         count=1, flags=re.DOTALL))
+      return width
+    except BaseException:
+      pass
 
-  # TODO(user): stty is part of the POSIX.2 standard, so it
-  # encompasses a large class of platforms in use today. However,
-  # there are likely platforms that do not support it so it will be
-  # worth exploring other fallbacks to stty.
-
+  # Native commands failed, default to COLUMNS.
   return os.environ.get('COLUMNS', None)
 
 

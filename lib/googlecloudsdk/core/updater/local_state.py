@@ -15,43 +15,50 @@ import shutil
 import sys
 import time
 
+from googlecloudsdk.core import exceptions
 from googlecloudsdk.core.updater import installers
 from googlecloudsdk.core.updater import snapshots
 from googlecloudsdk.core.util import files as file_utils
 
 
-class Error(Exception):
+class Error(exceptions.Error):
   """Base exception for the local_state module."""
   pass
 
 
 class InvalidSDKRootError(Error):
   """Error for when the root of the Cloud SDK is invalid or cannot be found."""
-  pass
 
-
-class URLFetchError(Error):
-  """Exception for problems fetching via HTTP."""
-  pass
+  def __init__(self):
+    super(InvalidSDKRootError, self).__init__(
+        'The update action could not be performed because the installation root'
+        ' of the Cloud SDK could not be located.  Please re-install the Cloud '
+        'SDK and try again.')
 
 
 class InvalidDownloadError(Error):
   """Exception for when the SDK that was download was invalid."""
-  pass
+
+  def __init__(self):
+    super(InvalidDownloadError, self).__init__(
+        'The Cloud SDK download was invalid.')
 
 
 class PermissionsError(Error):
   """Error for when a file operation cannot complete due to permissions."""
 
-  def __init__(self, path):
+  def __init__(self, message, path):
     """Initialize a PermissionsError.
 
     Args:
+      message: str, The message from the underlying error.
       path: str, The absolute path to a file or directory that needs to be
-          operated on, but can't because of insufficient permssions.
+          operated on, but can't because of insufficient permissions.
     """
     super(PermissionsError, self).__init__(
-        'Insufficient permission to access: {path}'.format(path=path))
+        '{message}: [{path}]\n\nEnsure you have the permissions to access the '
+        'file and that the file is not in use.'
+        .format(message=message, path=path))
 
 
 def _RaisesPermissionsError(func):
@@ -73,7 +80,10 @@ def _RaisesPermissionsError(func):
       return func(*args, **kwargs)
     except (OSError, IOError) as e:
       if e.errno == errno.EACCES:
-        raise PermissionsError(os.path.abspath(e.filename))
+        new_exc = PermissionsError(
+            message=e.strerror, path=os.path.abspath(e.filename))
+        # Maintain original stack trace.
+        raise new_exc, None, sys.exc_info()[2]
       raise
     except shutil.Error as e:
       args = e.args[0][0]
@@ -81,7 +91,10 @@ def _RaisesPermissionsError(func):
       # Looking for this substring is looking for errno.EACCES, which has
       # a numeric value of 13.
       if args[2].startswith('[Errno 13]'):
-        raise PermissionsError(os.path.abspath(args[0]))
+        new_exc = PermissionsError(
+            message=args[2], path=os.path.abspath(args[0]))
+        # Maintain original stack trace.
+        raise new_exc, None, sys.exc_info()[2]
       raise
   return _TryFunc
 
@@ -124,8 +137,7 @@ class InstallationState(object):
     """
     sdk_root = InstallationState.FindSDKInstallRoot(os.path.dirname(__file__))
     if not sdk_root:
-      raise InvalidSDKRootError(
-          'Could not locate the install root of the Cloud SDK.')
+      raise InvalidSDKRootError()
     return InstallationState(os.path.realpath(sdk_root))
 
   @staticmethod
@@ -279,7 +291,7 @@ class InstallationState(object):
       An InstallationState object for the new install.
 
     Raises:
-      URLFetchError: If the new SDK could not be downloaded.
+      installers.URLFetchError: If the new SDK could not be downloaded.
       InvalidDownloadError: If the new SDK was malformed.
     """
     if os.path.exists(self.__sdk_staging_root):
@@ -288,14 +300,11 @@ class InstallationState(object):
     with file_utils.TemporaryDirectory() as t:
       download_dir = os.path.join(t, '.download')
       extract_dir = os.path.join(t, '.extract')
-      try:
-        installers.ComponentInstaller.DownloadAndExtractTar(
-            url, download_dir, extract_dir)
-      except installers.URLFetchError as e:
-        raise URLFetchError(e)
+      installers.ComponentInstaller.DownloadAndExtractTar(
+          url, download_dir, extract_dir)
       files = os.listdir(extract_dir)
       if len(files) != 1:
-        raise InvalidDownloadError('The downloaded SDK was invalid')
+        raise InvalidDownloadError()
       sdk_root = os.path.join(extract_dir, files[0])
       file_utils.MoveDir(sdk_root, self.__sdk_staging_root)
     return InstallationState(self.__sdk_staging_root)
@@ -536,6 +545,7 @@ class LastUpdateCheck(object):
 
   LAST_UPDATE_CHECK_FILE = 'last_update_check.json'
   DATE = 'date'
+  LAST_NAG_DATE = 'last_nag_date'
   REVISION = 'revision'
   UPDATES_AVAILABLE = 'updates_available'
 
@@ -544,25 +554,39 @@ class LastUpdateCheck(object):
     # pylint: disable=protected-access, These classes work together
     self.__last_update_check_file = os.path.join(
         install_state._state_directory, LastUpdateCheck.LAST_UPDATE_CHECK_FILE)
-    (self.__last_update_check_date,
-     self.__last_update_check_revision,
-     self.__updates_available) = self._LoadData()
+    self._LoadData()
 
   def _LoadData(self):
+    """Deserializes data from the json file."""
+    self.__dirty = False
     if not os.path.isfile(self.__last_update_check_file):
-      return (0, 0, False)
-    with open(self.__last_update_check_file) as fp:
-      data = json.loads(fp.read())
-      return (data[LastUpdateCheck.DATE],
-              data[LastUpdateCheck.REVISION],
-              data[LastUpdateCheck.UPDATES_AVAILABLE])
+      data = {}
+    else:
+      with open(self.__last_update_check_file) as fp:
+        data = json.loads(fp.read())
+    self.__last_update_check_date = data.get(LastUpdateCheck.DATE, 0)
+    self.__last_nag_date = data.get(LastUpdateCheck.LAST_NAG_DATE, 0)
+    self.__last_update_check_revision = data.get(LastUpdateCheck.REVISION, 0)
+    self.__updates_available = data.get(LastUpdateCheck.UPDATES_AVAILABLE,
+                                        False)
 
   def _SaveData(self):
+    """Serializes data to the json file."""
+    if not self.__dirty:
+      return
     data = {LastUpdateCheck.DATE: self.__last_update_check_date,
+            LastUpdateCheck.LAST_NAG_DATE: self.__last_nag_date,
             LastUpdateCheck.REVISION: self.__last_update_check_revision,
             LastUpdateCheck.UPDATES_AVAILABLE: self.__updates_available}
     with open(self.__last_update_check_file, 'w') as fp:
       fp.write(json.dumps(data))
+    self.__dirty = False
+
+  def __enter__(self):
+    return self
+
+  def __exit__(self, *args):
+    self._SaveData()
 
   def UpdatesAvailable(self):
     """Returns whether we already know about updates that are available.
@@ -588,6 +612,14 @@ class LastUpdateCheck(object):
     """
     return self.__last_update_check_date
 
+  def LastNagDate(self):
+    """Gets the time when the last nag was printed as seconds since the epoch.
+
+    Returns:
+      int, The time of the last nag.
+    """
+    return self.__last_nag_date
+
   def SecondsSinceLastUpdateCheck(self):
     """Gets the number of seconds since we last did an update check.
 
@@ -596,6 +628,14 @@ class LastUpdateCheck(object):
     """
     return time.time() - self.__last_update_check_date
 
+  def SecondsSinceLastNag(self):
+    """Gets the number of seconds since we last printed that there were updates.
+
+    Returns:
+      int, The amount of time in seconds.
+    """
+    return time.time() - self.__last_nag_date
+
   @_RaisesPermissionsError
   def SetFromSnapshot(self, snapshot, force=False):
     """Sets that we just did an update check and found the given snapshot.
@@ -603,6 +643,8 @@ class LastUpdateCheck(object):
     If the given snapshot is different that the last one we saw, this will also
     diff the new snapshot with the current install state to refresh whether
     there are components available for update.
+
+    You must call Save() to persist these changes.
 
     Args:
       snapshot: snapshots.ComponentSnapshot, The snapshot pulled from the
@@ -619,12 +661,24 @@ class LastUpdateCheck(object):
       self.__last_update_check_revision = snapshot.revision
 
     self.__last_update_check_date = time.time()
-    self._SaveData()
+    self.__dirty = True
     return self.__updates_available
 
   def SetFromIncompatibleSchema(self):
-    """Sets that we just did an update check and found a new schema version."""
+    """Sets that we just did an update check and found a new schema version.
+
+    You must call Save() to persist these changes.
+    """
     self.__updates_available = True
     self.__last_update_check_revision = 0  # Doesn't matter
     self.__last_update_check_date = time.time()
+    self.__dirty = True
+
+  def SetNagged(self):
+    """Sets that we printed the update nag."""
+    self.__last_nag_date = time.time()
+    self.__dirty = True
+
+  def Save(self):
+    """Saves the changes we made to this object."""
     self._SaveData()

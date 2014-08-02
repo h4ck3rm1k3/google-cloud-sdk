@@ -294,6 +294,12 @@ class CommandBaseTest(gcutil_unittest.GcutilTestCase):
                     BuildMockImage('centos-6-v20130103'),
                 ]
             }),
+            'coreos-cloud': old_mock_api.MockRequest({
+                'kind': 'compute#image',
+                'items': [
+                    BuildMockImage('coreos-alpha-367-0-0-v20140703'),
+                    BuildMockImage('coreos-beta-353-0-0-v20140625'),
+                ]}),
             'debian-cloud': old_mock_api.MockRequest({
                 'kind': 'compute#image',
                 'items': [
@@ -379,6 +385,11 @@ class CommandBaseTest(gcutil_unittest.GcutilTestCase):
     self.assertTrue(
         resolver(self._images, 'userproject', 'opensuse',
                  presenter).endswith('/opensuse131-v20140417'))
+
+    # CoreOS is prefixed on coreos instead of coreos-beta-353-0-0.
+    self.assertTrue(
+        resolver(self._images, 'userproject', 'coreos-beta',
+                 presenter).endswith('/coreos-beta-353-0-0-v20140625'))
 
   def testWarnAboutErrors(self):
     class MockCommand(command_base.GoogleComputeCommand):
@@ -687,13 +698,6 @@ class CommandBaseTest(gcutil_unittest.GcutilTestCase):
             None,
             'machineTypes',
             '/projects/google/machineTypes/dual-cpu/'))
-    self.assertEqual(
-        '%s/projects/google/kernels/default' % prefix,
-        command.NormalizeResourceName(
-            'my-project',
-            None,
-            'kernels',
-            'projects/google/kernels/default'))
 
   def testNormalizeScopedResourceName(self):
     class MockCommand(command_base.GoogleComputeCommand):
@@ -712,14 +716,6 @@ class CommandBaseTest(gcutil_unittest.GcutilTestCase):
                                                set_flags)
 
     prefix = 'https://www.googleapis.com/compute/%s' % self.version
-
-    # Validate scope is ignored downlevel
-    if self.version == 'v1beta16':
-      expected = '%s/projects/my-project/scope/objects/foo-bar' % prefix
-      self.assertEqual(
-          expected,
-          command.NormalizeResourceName('my-project', 'scope', 'objects',
-                                        'foo-bar'))
 
     # Validate helper wrappers
     expected = '%s/projects/my-project/objects/foo-bar' % prefix
@@ -1608,59 +1604,27 @@ class CommandBaseTest(gcutil_unittest.GcutilTestCase):
                                                self.version,
                                                set_flags)
 
-    if command._IsUsingAtLeastApiVersion('v1beta16'):
-      listcall = self.mock.Respond(
-          'compute.instances.aggregatedList', {
-              'items': {
-                  'zones/somewhere': {
-                      'instances': [{
-                          'name': 'test-instance',
-                          'kind': 'compute#instance'
-                      }]
-                  }
-              },
-              'kind': 'compute#aggregatedlist'
-          })
+    listcall = self.mock.Respond(
+        'compute.instances.aggregatedList', {
+            'items': {
+                'zones/somewhere': {
+                    'instances': [{
+                        'name': 'test-instance',
+                        'kind': 'compute#instance'
+                    }]
+                }
+            },
+            'kind': 'compute#aggregatedlist'
+        })
 
-      unused_result = command.Handle()
+    unused_result = command.Handle()
 
-      request = listcall.GetRequest()
-      self.assertEquals('GET', request.method)
-      self.assertEquals(None, request.body)
-      parameters = request.parameters
-      self.assertTrue('project' in parameters)
-      self.assertEquals('foo', parameters['project'])
-    else:
-      zonecall = mock_lists.GetSampleZoneListCall(command, self.mock, 2)
-      listcall_1 = mock_lists.GetSampleInstanceListCall(command, self.mock, 2)
-      listcall_2 = mock_lists.GetSampleInstanceListCall(command, self.mock, 2)
-
-      unused_result = command.Handle()
-
-      request = zonecall.GetRequest()
-      self.assertEquals('GET', request.method)
-      self.assertEquals(None, request.body)
-      parameters = request.parameters
-      self.assertTrue('project' in parameters)
-      self.assertEquals('foo', parameters['project'])
-
-      request = listcall_1.GetRequest()
-      self.assertEquals('GET', request.method)
-      self.assertEquals(None, request.body)
-      parameters = request.parameters
-      self.assertTrue('project' in parameters)
-      self.assertEquals('foo', parameters['project'])
-      self.assertTrue('zone' in parameters)
-      self.assertEquals('test-zone-0', parameters['zone'])
-
-      request = listcall_2.GetRequest()
-      self.assertEquals('GET', request.method)
-      self.assertEquals(None, request.body)
-      parameters = request.parameters
-      self.assertTrue('project' in parameters)
-      self.assertEquals('foo', parameters['project'])
-      self.assertTrue('zone' in parameters)
-      self.assertEquals('test-zone-1', parameters['zone'])
+    request = listcall.GetRequest()
+    self.assertEquals('GET', request.method)
+    self.assertEquals(None, request.body)
+    parameters = request.parameters
+    self.assertTrue('project' in parameters)
+    self.assertEquals('foo', parameters['project'])
 
 
 class OldCommandBaseTest(unittest.TestCase):
@@ -1896,7 +1860,7 @@ class OldCommandBaseTest(unittest.TestCase):
     flag_values = copy.deepcopy(FLAGS)
     flag_values.sleep_between_polls = 1
     flag_values.max_wait_time = 30
-    flag_values.service_version = 'v1beta16'
+    flag_values.service_version = 'v1'
     flag_values.synchronous_mode = False
     flag_values.project = 'test'
 
@@ -1940,7 +1904,7 @@ class OldCommandBaseTest(unittest.TestCase):
     flag_values = copy.deepcopy(FLAGS)
     expected_project = 'foo'
     flag_values.project = expected_project
-    flag_values.service_version = 'v1beta16'
+    flag_values.service_version = 'v1'
 
     object_a = {'description': 'Object A',
                 'id': 'projects/user/zones/a/objects/my-object-a',
@@ -2032,7 +1996,7 @@ class OldCommandBaseTest(unittest.TestCase):
     flag_values = copy.deepcopy(FLAGS)
 
     command = MockCommand('mock_command', flag_values)
-    command.supported_versions = ['v1beta16']
+    command.supported_versions = ['v1']
 
     command.SetFlags(flag_values)
     command.api = old_mock_api.CreateMockApi()
@@ -2041,7 +2005,7 @@ class OldCommandBaseTest(unittest.TestCase):
     flag_values = copy.deepcopy(FLAGS)
     expected_project = 'foo'
     flag_values.project = expected_project
-    flag_values.service_version = 'v1beta16'
+    flag_values.service_version = 'v1'
 
     def CreateObjects(scope):
       return (
@@ -2158,7 +2122,7 @@ class OldCommandBaseTest(unittest.TestCase):
       flag_values[name].value = flag_values[name].default
       flag_values[name].present = 0
 
-    command.api.version = version.v1beta16
+    command.api.version = version.v1
     self.assertEqual(
         {'kind': 'cloud#objectList',
          'items': [zone_m_object_a, zone_m_object_b,
@@ -2266,13 +2230,13 @@ class OldCommandBaseTest(unittest.TestCase):
     command.SetFlags(flag_values)
 
     tests = (
-        (base + 'v1beta16/projects/my-project/global/networks/net',
+        (base + 'v1/projects/my-project/global/networks/net',
          ('global', '')),
 
-        (base + 'v1beta16/projects/my-project/zones/zone1/instances/inst',
+        (base + 'v1/projects/my-project/zones/zone1/instances/inst',
          ('zones', 'zone1')),
 
-        (base + 'v1beta16/projects/my-project/zones/zone2',
+        (base + 'v1/projects/my-project/zones/zone2',
          ('zones', 'zone2')),
 
         # No suffix
@@ -2284,18 +2248,18 @@ class OldCommandBaseTest(unittest.TestCase):
          (None, None)),
 
         # missing projects
-        (base + 'v1beta16/global/networks/net',
+        (base + 'v1/global/networks/net',
          (None, None)),
 
         # missing project
-        (base + 'v1beta16/projects/global/networks/network',
+        (base + 'v1/projects/global/networks/network',
          (None, None)),
 
-        (base + 'v1beta16/projects/my-project/regions/region1/ips/ip',
+        (base + 'v1/projects/my-project/regions/region1/ips/ip',
          ('regions', 'region1')),
 
         # bad regions
-        (base + 'v1beta16/projects/my-project/regins/region1/ips/ip',
+        (base + 'v1/projects/my-project/regins/region1/ips/ip',
          (None, None)),
     )
 
@@ -2326,7 +2290,7 @@ class OldCommandBaseTest(unittest.TestCase):
         'name': 'my-operation',
         'operationType': 'insert',
         'progress': 100,
-        'selfLink': ('https://www.googleapis.com/compute/v1beta16/projects/'
+        'selfLink': ('https://www.googleapis.com/compute/v1/projects/'
                      'project/zones/my-zone/operations/my-operation'),
         'status': 'DONE'
         }
@@ -2341,7 +2305,7 @@ class OldCommandBaseTest(unittest.TestCase):
         'name': 'my-operation',
         'operationType': 'insert',
         'progress': 100,
-        'selfLink': ('https://www.googleapis.com/compute/v1beta16/projects/'
+        'selfLink': ('https://www.googleapis.com/compute/v1/projects/'
                      'my-project/zones/my-zone/operations/my-operation'),
         'status': 'DONE',
         'error': {
@@ -2373,7 +2337,7 @@ class OldCommandBaseTest(unittest.TestCase):
     flag_values = copy.deepcopy(FLAGS)
     flag_values.project = 'myproject'
     flag_values.api_host = 'https://www.googleapis.com/'
-    flag_values.service_version = 'v1beta16'
+    flag_values.service_version = 'v1'
 
     command = MockCommand('mock_command', flag_values)
     command.SetFlags(flag_values)
@@ -2382,7 +2346,7 @@ class OldCommandBaseTest(unittest.TestCase):
     self.assertEquals(
         'us-central1-a/machineTypes/n1-standard-2-d',
         presenter.PresentElement(
-            'https://www.googleapis.com/compute/v1beta16/projects/myproject'
+            'https://www.googleapis.com/compute/v1/projects/myproject'
             '/zones/us-central1-a/machineTypes/n1-standard-2-d'))
 
     #
@@ -2391,7 +2355,7 @@ class OldCommandBaseTest(unittest.TestCase):
     self.assertEquals(
         'europe-west1-a',
         presenter.PresentElement(
-            'https://www.googleapis.com/compute/v1beta16/projects/myproject'
+            'https://www.googleapis.com/compute/v1/projects/myproject'
             '/zones/europe-west1-a'))
 
     #
@@ -2402,14 +2366,14 @@ class OldCommandBaseTest(unittest.TestCase):
     self.assertEquals(
         'imagename',
         presenter.PresentElement(
-            'https://www.googleapis.com/compute/v1beta16/projects/myproject'
+            'https://www.googleapis.com/compute/v1/projects/myproject'
             '/global/images/imagename'))
 
     # Image in some other project returns reasonable path.
     self.assertEquals(
         'projects/yourproject/global/images/imagename',
         presenter.PresentElement(
-            'https://www.googleapis.com/compute/v1beta16/projects/yourproject'
+            'https://www.googleapis.com/compute/v1/projects/yourproject'
             '/global/images/imagename'))
 
     #
@@ -2422,32 +2386,32 @@ class OldCommandBaseTest(unittest.TestCase):
     self.assertEquals(
         'us-central1-a/machineTypes/n1-standard-2-d',
         presenter.PresentElement(
-            'https://www.googleapis.com/compute/v1beta16/projects/myproject'
+            'https://www.googleapis.com/compute/v1/projects/myproject'
             '/zones/us-central1-a/machineTypes/n1-standard-2-d'))
 
     self.assertEquals(
         'us-central1-a',
         presenter.PresentElement(
-            'https://www.googleapis.com/compute/v1beta16/projects/myproject'
+            'https://www.googleapis.com/compute/v1/projects/myproject'
             '/zones/us-central1-a'))
 
     # Truncate the zone if zone is specified.
     self.assertEquals(
         'machineTypes/n1-standard-2-d',
         presenter.PresentElement(
-            'https://www.googleapis.com/compute/v1beta16/projects/myproject'
+            'https://www.googleapis.com/compute/v1/projects/myproject'
             '/zones/europe-west1-a/machineTypes/n1-standard-2-d'))
 
     # If the user specifies a long-form zone, it still works.
     flag_values.zone = (
-        'https://www.googleapis.com/compute/v1beta16/projects/myproject'
+        'https://www.googleapis.com/compute/v1/projects/myproject'
         '/zones/europe-west1-a')
     command.SetFlags(flag_values)
 
     self.assertEquals(
         'machineTypes/n1-standard-2-d',
         presenter.PresentElement(
-            'https://www.googleapis.com/compute/v1beta16/projects/myproject'
+            'https://www.googleapis.com/compute/v1/projects/myproject'
             '/zones/europe-west1-a/machineTypes/n1-standard-2-d'))
 
   def testPresenterPresentRegionElement(self):
@@ -2465,7 +2429,7 @@ class OldCommandBaseTest(unittest.TestCase):
     flag_values = copy.deepcopy(FLAGS)
     flag_values.project = 'myproject'
     flag_values.api_host = 'https://www.googleapis.com/'
-    flag_values.service_version = 'v1beta16'
+    flag_values.service_version = 'v1'
 
     command = MockCommand('mock_command', flag_values)
     command.SetFlags(flag_values)
@@ -2474,7 +2438,7 @@ class OldCommandBaseTest(unittest.TestCase):
     self.assertEquals(
         'my-region/addresses/my-address',
         presenter.PresentElement(
-            'https://www.googleapis.com/compute/v1beta16/projects/myproject'
+            'https://www.googleapis.com/compute/v1/projects/myproject'
             '/regions/my-region/addresses/my-address'))
 
     #
@@ -2483,7 +2447,7 @@ class OldCommandBaseTest(unittest.TestCase):
     self.assertEquals(
         'europe-west',
         presenter.PresentElement(
-            'https://www.googleapis.com/compute/v1beta16/projects/myproject'
+            'https://www.googleapis.com/compute/v1/projects/myproject'
             '/regions/europe-west'))
 
     #
@@ -2496,32 +2460,32 @@ class OldCommandBaseTest(unittest.TestCase):
     self.assertEquals(
         'us-central/addresses/my-address',
         presenter.PresentElement(
-            'https://www.googleapis.com/compute/v1beta16/projects/myproject'
+            'https://www.googleapis.com/compute/v1/projects/myproject'
             '/regions/us-central/addresses/my-address'))
 
     self.assertEquals(
         'us-central',
         presenter.PresentElement(
-            'https://www.googleapis.com/compute/v1beta16/projects/myproject'
+            'https://www.googleapis.com/compute/v1/projects/myproject'
             '/regions/us-central'))
 
     # Truncate the region if region is specified.
     self.assertEquals(
         'addresses/my-address',
         presenter.PresentElement(
-            'https://www.googleapis.com/compute/v1beta16/projects/myproject'
+            'https://www.googleapis.com/compute/v1/projects/myproject'
             '/regions/europe-west/addresses/my-address'))
 
     # If the user specifies a long-form region, it still works.
     flag_values.region = (
-        'https://www.googleapis.com/compute/v1beta16/projects/myproject'
+        'https://www.googleapis.com/compute/v1/projects/myproject'
         '/regions/europe-west')
     command.SetFlags(flag_values)
 
     self.assertEquals(
         'addresses/my-address',
         presenter.PresentElement(
-            'https://www.googleapis.com/compute/v1beta16/projects/myproject'
+            'https://www.googleapis.com/compute/v1/projects/myproject'
             '/regions/europe-west/addresses/my-address'))
 
 

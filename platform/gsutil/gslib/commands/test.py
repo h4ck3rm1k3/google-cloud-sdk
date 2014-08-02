@@ -50,7 +50,7 @@ DEFAULT_TEST_PARALLEL_PROCESSES = 15
 DEFAULT_S3_TEST_PARALLEL_PROCESSES = 50
 
 
-_detailed_help_text = ("""
+_DETAILED_HELP_TEXT = ("""
 <B>SYNOPSIS</B>
   gsutil test [-l] [-u] [-f] [command command...]
 
@@ -253,7 +253,7 @@ def CreateTestProcesses(parallel_tests, test_index, process_list, process_done,
     Index of last created test.
   """
   orig_test_index = test_index
-  executable_prefix = [sys.executable] if sys.executable else []
+  executable_prefix = [sys.executable] if sys.executable and IS_WINDOWS else []
   s3_argument = ['-s'] if tests.util.RUN_S3_TESTS else []
 
   process_create_start_time = time.time()
@@ -297,7 +297,7 @@ class TestCommand(Command):
       help_name_aliases=[],
       help_type='command_help',
       help_one_line_summary='Run gsutil tests',
-      help_text=_detailed_help_text,
+      help_text=_DETAILED_HELP_TEXT,
       subcommand_help_text={},
   )
 

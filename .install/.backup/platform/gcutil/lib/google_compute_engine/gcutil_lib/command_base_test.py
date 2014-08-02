@@ -319,6 +319,12 @@ class CommandBaseTest(gcutil_unittest.GcutilTestCase):
                 'items': [
                     BuildMockImage('sles11-sp3-v20131209'),
                 ]}),
+            'opensuse-cloud': old_mock_api.MockRequest({
+                'kind': 'compute#image',
+                'items': [
+                    BuildMockImage('opensuse131-20140227'),
+                    BuildMockImage('opensuse131-v20140417'),
+                ]}),
             'windows-cloud': old_mock_api.MockRequest({
                 'kind': 'compute#image',
                 'items': [
@@ -368,6 +374,11 @@ class CommandBaseTest(gcutil_unittest.GcutilTestCase):
     self.assertEquals(
         'debian',
         resolver(self._images, 'userproject', 'debian', presenter))
+
+    # Opensuse's naming inconsistency is accounted for. (missing -v in date).
+    self.assertTrue(
+        resolver(self._images, 'userproject', 'opensuse',
+                 presenter).endswith('/opensuse131-v20140417'))
 
   def testWarnAboutErrors(self):
     class MockCommand(command_base.GoogleComputeCommand):
@@ -1098,6 +1109,30 @@ class CommandBaseTest(gcutil_unittest.GcutilTestCase):
         | description | Object C    |
         | additional  | foo         |
         +-------------+-------------+
+        """)
+
+    with gcutil_unittest.CaptureStandardIO() as stdio:
+      result = command.Handle()
+      command.PrintResult(result)
+      self.assertEqual(stdio.stdout.getvalue(), expected_output)
+
+  def testDetailOutputYaml(self):
+    set_flags = {
+        'project': 'user',
+        'format': 'yaml',
+        }
+
+    command = self._CreateAndInitializeCommand(
+        CommandBaseTest.MockDetailCommand, 'mock_command', self.version,
+        set_flags)
+
+    expected_output = textwrap.dedent("""\
+        ---
+        description: Object C
+        id: projects/user/objects/my-object-c
+        kind: cloud#object
+        moreStuff: foo
+        number: 123
         """)
 
     with gcutil_unittest.CaptureStandardIO() as stdio:

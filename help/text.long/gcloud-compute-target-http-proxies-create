@@ -5,8 +5,9 @@ SYNOPSIS
        gcloud compute target-http-proxies create
          NAME
          [--description DESCRIPTION]
+         [--help]
          --url-map URL_MAP
-         [-h, --help]
+         [-h]
 
 DESCRIPTION
        gcloud compute target-http-proxies create is used to create target HTTP
@@ -24,11 +25,14 @@ FLAGS
        --description DESCRIPTION
            An optional, textual description for the target HTTP proxy.
 
+       --help
+           Display detailed help.
+
        --url-map URL_MAP
            A reference to a URL map resource that defines the mapping of URLs
            to backend services. The URL map must exist and cannot be deleted
            while referenced by a target HTTP proxy.
 
-       --help
+       -h
            Print a summary help and exit.
 

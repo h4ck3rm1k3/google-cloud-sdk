@@ -4,7 +4,6 @@
 import collections
 import getpass
 import logging
-import subprocess
 
 from googlecloudsdk.calliope import exceptions
 from googlecloudsdk.compute.lib import ssh_utils
@@ -16,17 +15,12 @@ LocalFile = collections.namedtuple(
     'LocalFile', ['file_path'])
 
 
-class CopyFiles(ssh_utils.BaseSSHCommand):
+class CopyFiles(ssh_utils.BaseSSHCLICommand):
   """Copy files to and from Google Compute Engine virtual machines."""
 
   @staticmethod
   def Args(parser):
-    ssh_utils.BaseSSHCommand.Args(parser)
-
-    parser.add_argument(
-        '--zone',
-        help='The zone of the instance.',
-        required=True)
+    ssh_utils.BaseSSHCLICommand.Args(parser)
 
     parser.add_argument(
         'sources',
@@ -38,6 +32,13 @@ class CopyFiles(ssh_utils.BaseSSHCommand):
         'destination',
         help='Specifies a destination for the source files.',
         metavar='[[USER@]INSTANCE:]DEST')
+
+    zone = parser.add_argument(
+        '--zone',
+        help='The zone of the instance to copy files to/from.')
+    zone.detailed_help = (
+        'The zone of the instance to copy files to/from. If omitted, '
+        'you will be prompted to select a zone.')
 
   def Run(self, args):
     super(CopyFiles, self).Run(args)
@@ -77,15 +78,15 @@ class CopyFiles(ssh_utils.BaseSSHCommand):
       for source in sources:
         if isinstance(source, LocalFile):
           raise exceptions.ToolException(
-              'all sources must be remote files when the destination '
-              'is local')
+              'All sources must be remote files when the destination '
+              'is local.')
 
     else:  # RemoteFile
       for source in sources:
         if isinstance(source, RemoteFile):
           raise exceptions.ToolException(
-              'all sources must be local files when the destination '
-              'is remote')
+              'All sources must be local files when the destination '
+              'is remote.')
 
     instances = set()
     for file_spec in file_specs:
@@ -94,23 +95,19 @@ class CopyFiles(ssh_utils.BaseSSHCommand):
 
     if len(instances) > 1:
       raise exceptions.ToolException(
-          'copies must involve exactly one virtual machine instance; '
-          'your invocation refers to {0} instances: {1}'.format(
+          'Copies must involve exactly one virtual machine instance; '
+          'your invocation refers to [{0}] instances: [{1}].'.format(
               len(instances), ', '.join(sorted(instances))))
 
-    self.EnsureSSHKeyIsInProject(user)
-
-    instance_resource = self.GetInstance(instances.pop(), args.zone)
-    external_ip_address = ssh_utils.GetExternalIPAddress(instance_resource)
-
-    self.WaitUntilSSHable(user, external_ip_address)
+    instance_ref = self.CreateZonalReference(instances.pop(), args.zone)
+    external_ip_address = self.GetInstanceExternalIpAddress(instance_ref)
 
     # Builds the scp command.
-    scp_args = [
-        self.scp_executable,
-        '-i', self.ssh_key_file,
-        '-r',
-    ]
+    scp_args = [self.scp_executable]
+    if not args.plain:
+      scp_args.extend(self.GetDefaultFlags())
+      scp_args.append('-r')
+
     for file_spec in file_specs:
       if isinstance(file_spec, LocalFile):
         scp_args.append(file_spec.file_path)
@@ -120,16 +117,7 @@ class CopyFiles(ssh_utils.BaseSSHCommand):
             ssh_utils.UserHost(file_spec.user, external_ip_address),
             file_spec.file_path))
 
-    logging.debug('scp command: %s', ' '.join(scp_args))
-    try:
-      subprocess.check_call(scp_args)
-    except OSError as e:
-      raise exceptions.ToolException(
-          '{0}: {1}'.format(e.strerror, ' '.join(scp_args)))
-    except subprocess.CalledProcessError as e:
-      raise exceptions.ToolException(
-          'exit code {0}: {1}'.format(e.returncode, ' '.join(scp_args)))
-
+    self.ActuallyRun(args, scp_args, user, external_ip_address)
 
 CopyFiles.detailed_help = {
     'brief': 'Copy files to and from Google Compute Engine virtual machines',

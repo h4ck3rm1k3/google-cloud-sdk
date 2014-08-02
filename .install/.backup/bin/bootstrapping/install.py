@@ -46,6 +46,13 @@ def ParseArgs():
                             ' profile.'))
   parser.add_argument('--disable-installation-options', action='store_true',
                       help='Do not ask about special installation options.')
+  parser.add_argument('--override-components', nargs='*',
+                      help='Override the components that would be installed by '
+                      'default and install these instead.')
+  parser.add_argument('--additional-components', nargs='+',
+                      help='Additional components to install by default.  These'
+                      ' components will either be added to the default install '
+                      'list, or to the override-components (if provided).')
 
   return parser.parse_args()
 
@@ -157,7 +164,11 @@ def UpdateRC(bash_completion, path_update, rc_path, bin_path):
 
   host_os = platforms.OperatingSystem.Current()
   if host_os == platforms.OperatingSystem.WINDOWS:
-    UpdatePathForWindows(bin_path)
+    if path_update is None:
+      path_update = console_io.PromptContinue(
+          prompt_string='Update %PATH% to include Cloud SDK binaries?')
+    if path_update:
+      UpdatePathForWindows(bin_path)
     return
 
   if not rc_path:
@@ -206,7 +217,7 @@ def UpdateRC(bash_completion, path_update, rc_path, bin_path):
     path_subre = re.compile(r'\n*'+path_comment+r'\n.*$',
                             re.MULTILINE)
 
-    path_line = '{comment}\nsource {path_rc_path}\n'.format(
+    path_line = "{comment}\nsource '{path_rc_path}'\n".format(
         comment=path_comment, path_rc_path=path_rc_path)
     filtered_data = path_subre.sub('', rc_data)
     rc_data = '{filtered_data}\n{path_line}'.format(
@@ -230,7 +241,7 @@ in your profile to add the Google Cloud SDK command line tools to your $PATH.
     complete_subre = re.compile(r'\n*'+complete_comment+r'\n.*$',
                                 re.MULTILINE)
 
-    complete_line = '{comment}\nsource {rc_path}\n'.format(
+    complete_line = "{comment}\nsource '{rc_path}'\n".format(
         comment=complete_comment, rc_path=completion_rc_path)
     filtered_data = complete_subre.sub('', rc_data)
     rc_data = '{filtered_data}\n{complete_line}'.format(
@@ -265,11 +276,15 @@ Start a new shell for the changes to take effect.
 """.format(rc_path=rc_path)
 
 
-def Install(disable_installation_options):
+def Install(disable_installation_options, override_components,
+            additional_components):
   """Do the normal installation of the Cloud SDK."""
   # Install the OS specific wrapper scripts for gcloud and any pre-configured
   # components for the SDK.
-  to_install = bootstrapping.GetDefaultInstalledComponents()
+  to_install = (override_components if override_components is not None
+                else bootstrapping.GetDefaultInstalledComponents())
+  if additional_components:
+    to_install.extend(additional_components)
 
   print """
 This will install all the core command line tools necessary for working with
@@ -327,7 +342,8 @@ def main():
       Prompts(pargs.usage_reporting)
       bootstrapping.CommandStart('INSTALL', component_id='core')
       if not config.INSTALLATION_CONFIG.disable_updater:
-        Install(pargs.disable_installation_options)
+        Install(pargs.disable_installation_options, pargs.override_components,
+                pargs.additional_components)
 
       UpdateRC(
           bash_completion=pargs.bash_completion,

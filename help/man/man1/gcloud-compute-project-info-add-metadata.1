@@ -10,9 +10,10 @@ gcloud-compute-project-info-add-metadata \- Add or update project\-wide metadata
 .sp
 .nf
 \fBgcloud compute project\-info add\-metadata\fR
+  [\-\-help]
   [\-\-metadata KEY=VALUE [KEY=VALUE \&...]]
   [\-\-metadata\-from\-file KEY=LOCAL_FILE_PATH [KEY=LOCAL_FILE_PATH \&...]]
-  [\-h, \-\-help]
+  [\-h]
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -20,6 +21,11 @@ gcloud-compute-project-info-add-metadata \- Add or update project\-wide metadata
 .sp
 Only metadata keys that are provided are mutated\&. Existing metadata entries will remain unaffected\&.
 .SH "FLAGS"
+.PP
+\fB\-\-help\fR
+.RS 4
+Display detailed help\&.
+.RE
 .PP
 \fB\-\-metadata\fR \fIKEY=VALUE [KEY=VALUE \&...]\fR
 .RS 4
@@ -45,7 +51,7 @@ Same as \(lqstartup\-script\(rq except that the script contents are pulled from 
 Same as \(lq\-\-metadata\(rq except that the value for the entry will be read from a local file\&. This is useful for values that are too large such as \(lqstartup\-script\(rq contents\&.
 .RE
 .PP
-\fB\-\-help\fR
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE

@@ -6,10 +6,13 @@ SYNOPSIS
        gcloud compute disks create
          NAME [NAME ...]
          [--description DESCRIPTION]
+         [--help]
+         [--image IMAGE | --source-snapshot SOURCE_SNAPSHOT]
+         [--image-project IMAGE_PROJECT]
          [--size SIZE]
-         [--source-image SOURCE_IMAGE | --source-snapshot SOURCE_SNAPSHOT]
-         --zone ZONE
-         [-h, --help]
+         [--type TYPE]
+         [--zone ZONE]
+         [-h]
 
 DESCRIPTION
        gcloud compute disks create creates one or more Google Compute Engine
@@ -22,7 +25,10 @@ DESCRIPTION
        their entire lifetime. The contents of a disk can be moved to a
        different zone by snapshotting the disk (using gcloud compute disks
        snapshot) and creating a new disk using "--source-snapshot" in the
-       desired zone.
+       desired zone. The contents of a disk can also be moved across project
+       or zone by creating an image (using gcloud compute images create) and
+       creating a new disk using "--source-image" in the desired project
+       and/or zone.
 
        When creating disks, be sure to include the "--zone" option:
 
@@ -36,39 +42,51 @@ FLAGS
        --description DESCRIPTION
            An optional, textual description for the disks being created.
 
+       --help
+           Display detailed help.
+
+       --image IMAGE
+           An image to apply to the disks being created. When using this
+           option, the size of the disks must be at least as large as the
+           image size. Use "--size" to adjust the size of the disks.
+
+           The value for this option can be the name of an image or an alias
+           from the table below.
+
+           Alias                Project          Image Name
+           centos-6             centos-cloud     centos-6
+           coreos               coreos-cloud     coreos-beta
+           debian-7             debian-cloud     debian-7-wheezy
+           debian-7-backports   debian-cloud     backports-debian-7-wheezy
+           opensuse-13          opensuse-cloud   opensuse-13-1
+
+           rhel-6               rhel-cloud       rhel-6
+           sles-11              suse-cloud       sles-11
+
+           When the value is an alias, this tool will query the public image
+           project that contains the image type to find the latest image
+           matching the alias. The user's project is also queried for an image
+           with the same name as the alias. If a conflict exists, the user
+           will be prompted to resolve the conflict.
+
+           To specify an image in another project for which there is no alias,
+           use "--image-project". When "--image-project" is present, no API
+           calls are made to resolve the image. This property is useful for
+           scripts.
+
+           This flag is mutually exclusive with "--source-snapshot".
+
+       --image-project IMAGE_PROJECT
+           The project against which all image references will be resolved.
+           See "--image" for more details.
+
        --size SIZE
            Indicates the size of the disks. The value must be a whole number
            followed by a size unit of "KB" for kilobyte, "MB" for megabyte,
            "GB" for gigabyte, or "TB" for terabyte. For example, "10GB" will
-           produce 10 gigabyte disks. If omitted, a default size of 200 GB is
-           used. The minimum size a disk can have is 1 GB. Disk size must be a
-           multiple of 1 GB.
-
-       --source-image SOURCE_IMAGE
-           A source image to apply to the disks being created.
-
-           The value for this option can be the name of an image in the
-           current project, a URI when referring to an image in another
-           project, or an alias from the table below.
-
-           Alias                Project        Image Name
-           centos-6             centos-cloud   centos-6-v20140415
-           debian-7             debian-cloud   debian-7-wheezy-v20140415
-           debian-7-backports   debian-cloud   backports-debian-7-wheezy-v20140415
-           rhel-6               rhel-cloud     rhel-6-v20140415
-           sles-11              suse-cloud     sles-11-sp3-v20140306
-
-           As new images are released, these aliases will be updated. If using
-           this tool in a script where depending on a specific version of an
-           image is necessary, then do not use the aliases. Instead, use the
-           URI of the desired image.
-
-           Aliases are expanded first, so avoid creating images in your
-           project whose names are in the set of aliases. If you do create an
-           image whose name matches an alias, you can refer to it by using its
-           URI.
-
-           This flag is mutually exclusive with "--source-snapshot".
+           produce 10 gigabyte disks. If omitted, a default size of 500 GB is
+           used for standard disks and 200GB for SSD disks. The minimum size a
+           disk can have is 1 GB. Disk size must be a multiple of 10 GB.
 
        --source-snapshot SOURCE_SNAPSHOT
            A source snapshot used to create the disks. It is safe to delete a
@@ -77,11 +95,21 @@ FLAGS
            get a list of snapshots in your current project, run gcloud compute
            snapshots list. A snapshot from an existing disk can be created
            using the gcloud compute disks snapshot command. This flag is
-           mutually exclusive with "--source-image".
+           mutually exclusive with "--image".
+
+           When using this option, the size of the disks must be at least as
+           large as the snapshot size. Use "--size" to adjust the size of the
+           disks.
+
+       --type TYPE
+           Specifies the type of disk to create. To get a list of available
+           disk types, run gcloud compute disk-types list. The default disk
+           type is pd-standard.
 
        --zone ZONE
-           The zone to create the disks in.
+           The zone of the disks to create. If omitted and the arguments are
+           not all URIs, you will be prompted to select a zone.
 
-       --help
+       -h
            Print a summary help and exit.
 

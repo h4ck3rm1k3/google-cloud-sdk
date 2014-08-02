@@ -230,6 +230,8 @@ class MoveInstancesTest(gcutil_unittest.GcutilTestCase):
                 expected_source_zone)
         })
 
+    disks_call = mock_lists.GetSampleDiskListCall(command, self.mock, 0)
+
     # There are no disks to move, so finally a call to CreateInstances
     # recreates the instances in the destination zone.
     create_call = self.mock.Respond(
@@ -495,6 +497,8 @@ class MoveInstancesTest(gcutil_unittest.GcutilTestCase):
 
     destination_zone_region_call = self.mock.Respond(
         'compute.zones.get', dest_zone_response)
+
+    disks_call = mock_lists.GetSampleDiskListCall(command, self.mock, 0)
 
     # Next a call to DeleteInstances wipes out the instance to move
     # on the source zone.

@@ -5,12 +5,11 @@ SYNOPSIS
        gcloud compute disks get
          [NAME_REGEX ...]
          [--fields FIELDS [FIELDS ...]]
-         [--format FORMAT; default="yaml"]
+         [--help]
          [--limit LIMIT]
-         [--raw-links]
          [--sort-by SORT_BY]
          [--zones ZONE [ZONE ...]]
-         [-h, --help]
+         [-h]
 
 DESCRIPTION
        gcloud compute disks get displays all data associated with Google
@@ -46,23 +45,11 @@ FLAGS
                type
                zone
 
-       --format FORMAT
-           Specifies the display format. By default, resources are printed in
-           YAML format. The "text" and "yaml" formats print data as they are
-           fetched from the server, so these formats feel more responsive. The
-           "json" format delays printing until all data is collected into a
-           single list, so it may feel less responsive.
+       --help
+           Display detailed help.
 
        --limit LIMIT
            The maximum number of results.
-
-       --raw-links
-           If provided, resource references in output from the server will not
-           be condensed for readability. For example, when listing operations,
-           if a targetLink is
-           "https://www.googleapis.com/compute/v1/projects/my-project/zones/us-central2-a/instances/my-instance",
-           "us-central2-a/instances/my-instance" is shown for brevity. This
-           behavior can be turned off using this flag.
 
        --sort-by SORT_BY
            A field to sort by. To perform a descending-order sort, prefix the
@@ -71,6 +58,6 @@ FLAGS
        --zones ZONE [ZONE ...]
            If provided, only resources from the given zones are queried.
 
-       --help
+       -h
            Print a summary help and exit.
 

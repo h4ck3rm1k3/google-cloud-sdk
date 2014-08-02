@@ -7,8 +7,9 @@ SYNOPSIS
          NAME
          --backup-pool [BACKUP_POOL]
          [--failover-ratio FAILOVER_RATIO]
-         --region REGION
-         [-h, --help]
+         [--help]
+         [--region REGION]
+         [-h]
 
 DESCRIPTION
        gcloud compute target-pools set-backup is used to set a backup target
@@ -31,10 +32,15 @@ FLAGS
            The new failover ratio value for the target pool. This must be a
            float in the range of [0, 1].
 
-       --region REGION
-           The region of the target pool.
-
        --help
+           Display detailed help.
+
+       --region REGION
+           The region of the target pool to set a backup pool for. If omitted
+           and the arguments are not all URIs, you will be prompted to select
+           a region.
+
+       -h
            Print a summary help and exit.
 
 EXAMPLES

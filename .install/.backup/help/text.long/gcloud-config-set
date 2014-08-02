@@ -3,8 +3,11 @@ NAME
        tools can use them as configuration.
 
 SYNOPSIS
-       gcloud config set PROPERTY VALUE [--global-only] [--section SECTION, -s
-       SECTION; default="core"] [-h, --help]
+       gcloud config set
+         PROPERTY
+         VALUE
+         [--global-only]
+         [-h, --help]
 
 POSITIONAL ARGUMENTS
        PROPERTY
@@ -16,9 +19,6 @@ POSITIONAL ARGUMENTS
 FLAGS
        --global-only
            Set the option in the global properties file.
-
-       --section SECTION
-           The section containing the option to be set.
 
        --help
            Print a summary help and exit.

@@ -132,6 +132,10 @@ class _ConsoleWriter(object):
     if self.__filter.enabled:
       self.__stream_wrapper.stream.flush()
 
+  def isatty(self):
+    isatty = getattr(self.__stream_wrapper.stream, 'isatty', None)
+    return isatty() if isatty else False
+
 
 class _ConsoleFormatter(logging.Formatter):
   """A formatter for the console logger, handles colorizing messages."""
@@ -404,6 +408,10 @@ out = _log_manager.stdout_writer
 # strings will also be logged at INFO level to any registered log files.
 err = _log_manager.stderr_writer
 
+# Status output writer. For things that are useful to know for someone watching
+# a command run, but aren't normally scraped.
+status = err
+
 
 # Gets a logger object that logs only to a file and never to the console.
 # You usually don't want to use this logger directly.  All normal logging will
@@ -541,6 +549,21 @@ def GetLogFileName(suffix):
   log_filename = os.path.basename(log_file)
   log_file_root_name = log_filename[:-len(LOG_FILE_EXTENSION)]
   return log_file_root_name + suffix
+
+
+def CreatedResource(r):
+  """Print a status message indicating that a resource was created."""
+  status.write('Created [{r}].'.format(r=str(r)))
+
+
+def DeletedResource(r):
+  """Print a status message indicating that a resource was deleted."""
+  status.write('Deleted [{r}].'.format(r=str(r)))
+
+
+def UpdatedResource(r):
+  """Print a status message indicating that a resource was updated."""
+  status.write('Updated [{r}].'.format(r=str(r)))
 
 
 # pylint: disable=invalid-name

@@ -3,7 +3,7 @@
 from googlecloudsdk.compute.lib import base_classes
 
 
-class GetAddresses(base_classes.RegionalGetter):
+class Get(base_classes.RegionalGetter):
   """Get Google Compute Engine static addresses."""
 
   @staticmethod
@@ -16,11 +16,11 @@ class GetAddresses(base_classes.RegionalGetter):
     return self.context['compute'].addresses
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'addresses'
 
 
-GetAddresses.detailed_help = {
+Get.detailed_help = {
     'brief': 'Get Google Compute Engine static addresses',
     'DESCRIPTION': """\
         *{command}* displays all data associated with Google Compute

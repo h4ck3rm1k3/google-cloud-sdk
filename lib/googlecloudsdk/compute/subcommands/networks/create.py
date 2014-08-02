@@ -2,6 +2,7 @@
 """Command for creating networks."""
 from googlecloudapis.compute.v1 import compute_v1_messages as messages
 from googlecloudsdk.compute.lib import base_classes
+from googlecloudsdk.core import resources
 
 
 class CreateNetwork(base_classes.BaseAsyncMutator):
@@ -37,14 +38,17 @@ class CreateNetwork(base_classes.BaseAsyncMutator):
     return 'Insert'
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'networks'
 
   def CreateRequests(self, args):
     """Returns the request necessary for adding the network."""
+
+    network_ref = resources.Parse(args.name, collection='compute.networks')
+
     request = messages.ComputeNetworksInsertRequest(
         network=messages.Network(
-            name=args.name,
+            name=network_ref.Name(),
             IPv4Range=args.range,
             description=args.description),
         project=self.context['project'])

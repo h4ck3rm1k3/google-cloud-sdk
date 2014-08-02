@@ -7,7 +7,6 @@ platform/gcutil/lib/
 platform/gcutil/lib/google_compute_engine/
 platform/gcutil/lib/google_compute_engine/gcutil_lib/
 platform/gcutil/lib/google_compute_engine/gcutil_lib/compute/
-platform/gcutil/lib/google_compute_engine/gcutil_lib/compute/v1beta16.json
 platform/gcutil/lib/google_compute_engine/gcutil_lib/compute/v1.json
 platform/gcutil/lib/google_compute_engine/gcutil_lib/table/
 platform/gcutil/lib/google_compute_engine/gcutil_lib/table/table.py
@@ -67,8 +66,6 @@ platform/gcutil/lib/google_compute_engine/gcutil_lib/metadata_lib.py
 platform/gcutil/lib/google_compute_engine/gcutil_lib/metadata.py
 platform/gcutil/lib/google_compute_engine/gcutil_lib/machine_type_cmds_test.py
 platform/gcutil/lib/google_compute_engine/gcutil_lib/machine_type_cmds.py
-platform/gcutil/lib/google_compute_engine/gcutil_lib/kernel_cmds_test.py
-platform/gcutil/lib/google_compute_engine/gcutil_lib/kernel_cmds.py
 platform/gcutil/lib/google_compute_engine/gcutil_lib/instance_cmds_test.py
 platform/gcutil/lib/google_compute_engine/gcutil_lib/instance_cmds.py
 platform/gcutil/lib/google_compute_engine/gcutil_lib/image_cmds_test.py

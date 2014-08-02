@@ -5,8 +5,9 @@ SYNOPSIS
        gcloud compute instances remove-metadata
          NAME
          [--all | --keys KEY [KEY ...]]
-         --zone ZONE
-         [-h, --help]
+         [--help]
+         [--zone ZONE]
+         [-h]
 
 DESCRIPTION
        gcloud compute instances remove-metadata can be used to remove instance
@@ -20,12 +21,16 @@ FLAGS
        --all
            If provided, all metadata entries are removed.
 
+       --help
+           Display detailed help.
+
        --keys KEY [KEY ...]
            The keys of the entries to remove.
 
        --zone ZONE
-           The zone of the instance.
+           The zone of the instance to set metadata on. If omitted and the
+           arguments are not all URIs, you will be prompted to select a zone.
 
-       --help
+       -h
            Print a summary help and exit.
 

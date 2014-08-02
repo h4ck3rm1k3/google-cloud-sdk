@@ -6,7 +6,8 @@ SYNOPSIS
        gcloud config list
          [PROPERTY]
          [--all]
-         [-h, --help]
+         [--help]
+         [-h]
 
 POSITIONAL ARGUMENTS
        [PROPERTY]
@@ -17,5 +18,8 @@ FLAGS
            List all set and unset properties that match the arguments.
 
        --help
+           Display detailed help.
+
+       -h
            Print a summary help and exit.
 

@@ -6,8 +6,9 @@ SYNOPSIS
        gcloud compute instances detach-disk
          NAME
          [--device-name DEVICE_NAME | --disk DISK]
-         --zone ZONE
-         [-h, --help]
+         [--help]
+         [--zone ZONE]
+         [-h]
 
 DESCRIPTION
        gcloud compute instances detach-disk is used to detach disks from
@@ -37,9 +38,13 @@ FLAGS
            disk to remove by persistent disk name, then you must not specify
            its device name using the "--device-name" flag.
 
-       --zone ZONE
-           The zone of the instance.
-
        --help
+           Display detailed help.
+
+       --zone ZONE
+           The zone of the instance to detach a disk from. If omitted and the
+           arguments are not all URIs, you will be prompted to select a zone.
+
+       -h
            Print a summary help and exit.
 

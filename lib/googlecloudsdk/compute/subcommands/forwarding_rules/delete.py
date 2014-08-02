@@ -5,7 +5,7 @@ from googlecloudapis.compute.v1 import compute_v1_messages as messages
 from googlecloudsdk.compute.lib import forwarding_rules_utils as utils
 
 
-class DeleteForwardingRule(utils.ForwardingRulesMutator):
+class Delete(utils.ForwardingRulesMutator):
   """Delete forwarding rules."""
 
   @staticmethod
@@ -50,7 +50,7 @@ class DeleteForwardingRule(utils.ForwardingRulesMutator):
     return requests
 
 
-DeleteForwardingRule.detailed_help = {
+Delete.detailed_help = {
     'brief': 'Delete forwarding rules',
     'DESCRIPTION': """\
         *{command}* deletes one or more Google Compute Engine forwarding rules.

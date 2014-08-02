@@ -413,7 +413,7 @@ class MethodTest(unittest.TestCase):
   def testValidateParameters(self):
     method = mock_api_types.Method(
         'compute.instances.list', 'list',
-        ('https://www.googleapis.com/compute/v1beta16/'
+        ('https://www.googleapis.com/compute/v1/'
          'projects/{project}/zones/{zone}/instances'),
         {
             'filter': mock_api_types.Parameter(
@@ -429,7 +429,7 @@ class MethodTest(unittest.TestCase):
         }, None, None)
 
     parameters = method._ValidateParameters(
-        'https://www.googleapis.com/compute/v1beta16/'
+        'https://www.googleapis.com/compute/v1/'
         'projects/1234567890/zones/3.14159265/instances?'
         'filter=filter-expression&'
         'maxResults=132&'
@@ -457,7 +457,7 @@ class MethodTest(unittest.TestCase):
       self.assertRaises(
           mock_api_types.ValidationError,
           method._ValidateParameters,
-          'https://www.googleapis.com/compute/v1beta16/projects/' + suffix)
+          'https://www.googleapis.com/compute/v1/projects/' + suffix)
 
 if __name__ == '__main__':
   unittest.main()

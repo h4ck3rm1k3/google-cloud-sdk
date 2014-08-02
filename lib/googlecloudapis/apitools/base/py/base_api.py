@@ -189,7 +189,8 @@ class BaseApiClient(object):
 
   def __init__(self, url, credentials=None, get_credentials=True, http=None,
                model=None, log_request=False, log_response=False, num_retries=5,
-               credentials_args=None, default_global_params=None):
+               credentials_args=None, default_global_params=None,
+               additional_http_headers=None):
     _RequireClassAttrs(self, ('_package', '_scopes', 'messages_module'))
     if default_global_params is not None:
       util.Typecheck(default_global_params, self.params_type)
@@ -210,6 +211,8 @@ class BaseApiClient(object):
       self._http = self._credentials.authorize(self._http)
     # TODO(user): Remove this field when we switch to proto2.
     self.__include_fields = None
+
+    self.additional_http_headers = additional_http_headers or {}
 
     # TODO(user): Finish deprecating these fields.
     _ = model
@@ -339,6 +342,7 @@ class BaseApiClient(object):
 
   def ProcessHttpRequest(self, http_request):
     """Hook for pre-processing of http requests."""
+    http_request.headers.update(self.additional_http_headers)
     if self.log_request:
       logging.info('Making http %s to %s',
                    http_request.http_method, http_request.url)

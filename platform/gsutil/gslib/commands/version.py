@@ -15,6 +15,7 @@
 
 from hashlib import md5
 import os
+import platform
 import re
 import sys
 
@@ -23,9 +24,10 @@ import crcmod
 import gslib
 from gslib.command import Command
 from gslib.util import GetConfigFilePath
+from gslib.util import MultiprocessingIsAvailable
 from gslib.util import UsingCrcmodExtension
 
-_detailed_help_text = ("""
+_DETAILED_HELP_TEXT = ("""
 <B>SYNOPSIS</B>
   gsutil version
 
@@ -61,7 +63,7 @@ class VersionCommand(Command):
       help_name_aliases=['ver'],
       help_type='command_help',
       help_one_line_summary='Print version info about gsutil',
-      help_text=_detailed_help_text,
+      help_text=_DETAILED_HELP_TEXT,
       subcommand_help_text={},
   )
 
@@ -85,14 +87,17 @@ class VersionCommand(Command):
     else:
       checksum_ok_str = '!= %s' % shipped_checksum
 
-    sys.stdout.write('gsutil version %s\n' % gslib.VERSION)
+    sys.stdout.write('gsutil version: %s\n' % gslib.VERSION)
 
     if long_form:
 
       long_form_output = (
-          'checksum {checksum} ({checksum_ok})\n'
-          'boto version {boto_version}\n'
-          'python version {python_version}\n'
+          'checksum: {checksum} ({checksum_ok})\n'
+          'boto version: {boto_version}\n'
+          'python version: {python_version}\n'
+          'OS: {os_version}\n'
+          'multiprocessing available: {multiprocessing_available}\n'
+          'using cloud sdk: {cloud_sdk}\n'
           'config path: {config_path}\n'
           'gsutil path: {gsutil_path}\n'
           'compiled crcmod: {compiled_crcmod}\n'
@@ -104,7 +109,10 @@ class VersionCommand(Command):
           checksum=cur_checksum,
           checksum_ok=checksum_ok_str,
           boto_version=boto.__version__,
-          python_version=sys.version,
+          python_version=sys.version.replace('\n', ''),
+          os_version='%s %s' % (platform.system(), platform.release()),
+          multiprocessing_available=MultiprocessingIsAvailable()[0],
+          cloud_sdk=(os.environ.get('CLOUDSDK_WRAPPER') == '1'),
           config_path=config_path,
           gsutil_path=gslib.GSUTIL_PATH,
           compiled_crcmod=UsingCrcmodExtension(crcmod),

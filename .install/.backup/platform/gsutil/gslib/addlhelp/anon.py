@@ -11,14 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Additional help text for anonymous access."""
 
-from gslib.help_provider import HELP_NAME
-from gslib.help_provider import HELP_NAME_ALIASES
-from gslib.help_provider import HELP_ONE_LINE_SUMMARY
 from gslib.help_provider import HelpProvider
-from gslib.help_provider import HELP_TEXT
-from gslib.help_provider import HelpType
-from gslib.help_provider import HELP_TYPE
 
 _detailed_help_text = ("""
 <B>OVERVIEW</B>
@@ -40,18 +35,14 @@ _detailed_help_text = ("""
 
 
 class CommandOptions(HelpProvider):
-  """Additional help about Access Control Lists."""
+  """Additional help text for anonymous access."""
 
-  help_spec = {
-    # Name of command or auxiliary help info for which this help applies.
-    HELP_NAME : 'anon',
-    # List of help name aliases.
-    HELP_NAME_ALIASES : ['anonymous', 'public'],
-    # Type of help:
-    HELP_TYPE : HelpType.ADDITIONAL_HELP,
-    # One line summary of this help.
-    HELP_ONE_LINE_SUMMARY :
-        'Accessing Public Data Without Credentials',
-    # The full help text.
-    HELP_TEXT : _detailed_help_text,
-  }
+  # Help specification. See help_provider.py for documentation.
+  help_spec = HelpProvider.HelpSpec(
+      help_name = 'anon',
+      help_name_aliases = ['anonymous', 'public'],
+      help_type = 'additional_help',
+      help_one_line_summary = 'Accessing Public Data Without Credentials',
+      help_text = _detailed_help_text,
+      subcommand_help_text = {},
+  )

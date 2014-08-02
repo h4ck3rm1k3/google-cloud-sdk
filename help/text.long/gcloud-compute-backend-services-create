@@ -5,10 +5,11 @@ SYNOPSIS
        gcloud compute backend-services create
          NAME
          [--description DESCRIPTION]
+         [--help]
          --http-health-check HTTP_HEALTH_CHECK
          [--port PORT; default="80"]
          [--timeout TIMEOUT; default="30s"]
-         [-h, --help]
+         [-h]
 
 DESCRIPTION
        gcloud compute backend-services create is used to create backend
@@ -29,6 +30,9 @@ FLAGS
        --description DESCRIPTION
            An optional, textual description for the backend service.
 
+       --help
+           Display detailed help.
+
        --http-health-check HTTP_HEALTH_CHECK
            An HTTP health check object for checking the health of the backend
            service.
@@ -43,6 +47,6 @@ FLAGS
            units for this flag are "s" for seconds, "m" for minutes, and "h"
            for hours.
 
-       --help
+       -h
            Print a summary help and exit.
 

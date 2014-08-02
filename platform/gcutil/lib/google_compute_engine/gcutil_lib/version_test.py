@@ -45,7 +45,7 @@ class VersionTest(gcutil_unittest.GcutilTestCase):
 class SimpleVersionTest(unittest.TestCase):
 
   def testKnownVersionsExist(self):
-    self.assertEqual('v1beta16', version.v1beta16._name)
+    self.assertEqual('v1', version.v1._name)
 
   def testValidateAndExtractBaseVersion(self):
     valid_versions = (
@@ -71,18 +71,12 @@ class SimpleVersionTest(unittest.TestCase):
           ValueError, version._ApiVersions._ExtractBaseVersion, invalid)
 
   def testVersionComparison(self):
-    versions = version._ApiVersions(('v1beta16', 'v1', 'v2beta1'))
-    v1beta16 = versions.get('v1beta16')
+    versions = version._ApiVersions(('v1',))
     v1 = versions.get('v1')
 
-    self.assertEqual(0, v1beta16._index)
-    self.assertEqual(1, versions.get('v1')._index)
 
-    self.assertTrue(v1beta16 != v1)
-    self.assertFalse(v1beta16 == v1)
+    self.assertEqual(0, v1._index)
 
-    self.assertEqual(v1beta16, v1beta16)
-    self.assertEqual(v1beta16, version._ApiVersion('v1beta16', 0, versions))
 
   def testVersionStringComparison(self):
     versions = version._ApiVersions(('v1', 'v2', 'v3'))

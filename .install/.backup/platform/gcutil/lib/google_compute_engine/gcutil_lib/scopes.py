@@ -25,6 +25,7 @@ STORAGE_W_SCOPE = 'https://www.googleapis.com/auth/devstorage.write_only'
 STORAGE_RW_SCOPE = (
         'https://www.googleapis.com/auth/devstorage.read_write')
 STORAGE_FULL_SCOPE = 'https://www.googleapis.com/auth/devstorage.full_control'
+CLOUD_PLATFORM_SCOPE = 'https://www.googleapis.com/auth/cloud-platform'
 
 
 # Historically we asked for these scopes, but not all are needed.  In order
@@ -65,6 +66,7 @@ SCOPE_ALIASES = {
     'storage-wo': STORAGE_W_SCOPE,
     'taskqueue': TASKQUEUE,
     'userinfo-email': USER_INFO_SCOPE,
+    'cloud-platform': CLOUD_PLATFORM_SCOPE,
     }
 
 

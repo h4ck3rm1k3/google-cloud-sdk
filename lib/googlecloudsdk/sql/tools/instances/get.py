@@ -5,6 +5,7 @@ from apiclient import errors
 
 from googlecloudsdk.calliope import base
 from googlecloudsdk.calliope import exceptions
+from googlecloudsdk.core import resources
 from googlecloudsdk.sql import util
 
 
@@ -43,8 +44,12 @@ class Get(base.Command):
     sql = self.context['sql']
     instance_id = util.GetInstanceIdWithoutProject(args.instance)
     project_id = util.GetProjectId(args.instance)
-    request = sql.instances().get(project=project_id,
-                                  instance=instance_id)
+    # TODO(user): as we deprecate P:I args, simplify the call to .Parse().
+    instance_ref = resources.Parse(
+        instance_id, collection='sql.instances',
+        params={'project': project_id})
+    request = sql.instances().get(project=instance_ref.project,
+                                  instance=instance_ref.instance)
     try:
       result = request.execute()
       return result

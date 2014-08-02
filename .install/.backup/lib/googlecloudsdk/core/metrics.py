@@ -4,6 +4,7 @@
 
 import atexit
 import collections
+import hashlib
 import mutex
 import os
 import Queue
@@ -41,7 +42,11 @@ class _MetricsWorker(object):
     Returns:
       The running MetricsWorker or None if initialization failed.
     """
-    if properties.VALUES.core.disable_usage_reporting.GetBool():
+    disabled = properties.VALUES.core.disable_usage_reporting.GetBool()
+    if disabled is None:
+      # If there is no preference set, fall back to the installation default.
+      disabled = config.INSTALLATION_CONFIG.disable_usage_reporting
+    if disabled:
       log.debug('Metrics are disabled.')
       return None
 
@@ -66,6 +71,7 @@ class _MetricsWorker(object):
     self.__headers = {
         'User-Agent': user_agent,
     }
+    self.__project_ids = {}
 
     hostname = socket.getfqdn()
     install_type = 'Google' if hostname.endswith('.google.com') else 'External'
@@ -135,8 +141,25 @@ class _MetricsWorker(object):
       finally:
         queue.task_done()
 
-  @staticmethod
-  def __SendEvent(headers, base_params, event):
+  def __GetProjectIDHash(self):
+    """Gets the hash of the current project id.
+
+    Returns:
+      str, The hex digest of the current project id or None if the
+      project is not set.
+    """
+    project_id = properties.VALUES.core.project.Get()
+    if not project_id:
+      return None
+    hashed_id = self.__project_ids.get(project_id)
+    if not hashed_id:
+      checksum = hashlib.sha1()
+      checksum.update(project_id)
+      hashed_id = checksum.hexdigest()
+      self.__project_ids[project_id] = hashed_id
+    return hashed_id
+
+  def __SendEvent(self, headers, base_params, event):
     """Sends the given event to analytics.
 
     Args:
@@ -152,6 +175,9 @@ class _MetricsWorker(object):
         ('el', event.label),
         ('ev', event.value),
     ]
+    project_id_hash = self.__GetProjectIDHash()
+    if project_id_hash:
+      params.append(('cd11', project_id_hash))
     params.extend(base_params)
 
     body = urllib.urlencode(params)

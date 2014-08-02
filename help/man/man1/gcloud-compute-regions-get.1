@@ -12,11 +12,10 @@ gcloud-compute-regions-get \- Get Google Compute Engine regions
 \fBgcloud compute regions get\fR
   [NAME_REGEX \&...]
   [\-\-fields FIELDS [FIELDS \&...]]
-  [\-\-format FORMAT; default="yaml"]
+  [\-\-help]
   [\-\-limit LIMIT]
-  [\-\-raw\-links]
   [\-\-sort\-by SORT_BY]
-  [\-h, \-\-help]
+  [\-h]
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -60,9 +59,9 @@ zones[]
 .\}
 .RE
 .PP
-\fB\-\-format\fR \fIFORMAT\fR
+\fB\-\-help\fR
 .RS 4
-Specifies the display format\&. By default, resources are printed in YAML format\&. The "text" and "yaml" formats print data as they are fetched from the server, so these formats feel more responsive\&. The "json" format delays printing until all data is collected into a single list, so it may feel less responsive\&.
+Display detailed help\&.
 .RE
 .PP
 \fB\-\-limit\fR \fILIMIT\fR
@@ -70,17 +69,12 @@ Specifies the display format\&. By default, resources are printed in YAML format
 The maximum number of results\&.
 .RE
 .PP
-\fB\-\-raw\-links\fR
-.RS 4
-If provided, resource references in output from the server will not be condensed for readability\&. For example, when listing operations, if a targetLink is \(lqhttps://www\&.googleapis\&.com/compute/v1/projects/my\-project/zones/us\-central2\-a/instances/my\-instance\(rq, \(lqus\-central2\-a/instances/my\-instance\(rq is shown for brevity\&. This behavior can be turned off using this flag\&.
-.RE
-.PP
 \fB\-\-sort\-by\fR \fISORT_BY\fR
 .RS 4
 A field to sort by\&. To perform a descending\-order sort, prefix the value of this flag with a tilde (\(lq~\(rq)\&.
 .RE
 .PP
-\fB\-\-help\fR
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE

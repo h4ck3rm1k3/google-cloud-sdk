@@ -6,9 +6,10 @@ SYNOPSIS
        gcloud compute target-instances create
          NAME
          [--description DESCRIPTION]
+         [--help]
          --instance INSTANCE
          --zone ZONE
-         [-h, --help]
+         [-h]
 
 DESCRIPTION
        gcloud compute target-instances create is used to create a target
@@ -25,6 +26,9 @@ FLAGS
        --description DESCRIPTION
            An optional, textual description of the target instance.
 
+       --help
+           Display detailed help.
+
        --instance INSTANCE
            The name of the virtual machine instance that will handle the
            traffic.
@@ -32,6 +36,6 @@ FLAGS
        --zone ZONE
            The zone of the target instance (i.e., where the instance resides).
 
-       --help
+       -h
            Print a summary help and exit.
 

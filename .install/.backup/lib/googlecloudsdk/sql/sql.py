@@ -6,18 +6,18 @@ import os
 
 from googlecloudsdk.core import cli
 
-_loader = cli.CLI(
+_cli = cli.CLILoader(
     name='sql',
     command_root_directory=os.path.join(
         cli.GoogleCloudSDKPackageRoot(),
         'sql',
-        'tools'))
+        'tools')).Generate()
 
-sql = _loader.EntryPoint()
+sql = _cli.EntryPoint()
 
 
 def main():
-  _loader.Execute()
+  _cli.Execute()
 
 if __name__ == '__main__':
   main()

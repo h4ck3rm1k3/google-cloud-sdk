@@ -4,6 +4,7 @@ from googlecloudapis.compute.v1 import compute_v1_messages as messages
 from googlecloudsdk.calliope import arg_parsers
 from googlecloudsdk.calliope import exceptions
 from googlecloudsdk.compute.lib import base_classes
+from googlecloudsdk.core import resources
 
 THRESHOLD_UPPER_BOUND = 5000
 THRESHOLD_LOWER_BOUND = 1
@@ -102,15 +103,18 @@ class Update(base_classes.ReadWriteCommand):
     return self.context['compute'].httpHealthChecks
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'httpHealthChecks'
+
+  def CreateReference(self, args):
+    return resources.Parse(args.name, collection='compute.httpHealthChecks')
 
   def GetGetRequest(self, args):
     """Returns a request for fetching the existing HTTP health check."""
     return (self.service,
             'Get',
             messages.ComputeHttpHealthChecksGetRequest(
-                httpHealthCheck=args.name,
+                httpHealthCheck=self.ref.Name(),
                 project=self.context['project']))
 
   def GetSetRequest(self, args, replacement, existing):
@@ -118,7 +122,7 @@ class Update(base_classes.ReadWriteCommand):
     return (self.service,
             'Update',
             messages.ComputeHttpHealthChecksUpdateRequest(
-                httpHealthCheck=args.name,
+                httpHealthCheck=self.ref.Name(),
                 httpHealthCheckResource=replacement,
                 project=self.context['project']))
 
@@ -162,8 +166,8 @@ class Update(base_classes.ReadWriteCommand):
         and (args.check_interval < CHECK_INTERVAL_LOWER_BOUND_SEC
              or args.check_interval > CHECK_INTERVAL_UPPER_BOUND_SEC)):
       raise exceptions.ToolException(
-          '--check-interval must not be less than {0} second or greater than '
-          '{1} seconds; received: {2} seconds'.format(
+          '[--check-interval] must not be less than {0} second or greater '
+          'than {1} seconds; received [{2}] seconds.'.format(
               CHECK_INTERVAL_LOWER_BOUND_SEC, CHECK_INTERVAL_UPPER_BOUND_SEC,
               args.check_interval))
 
@@ -171,27 +175,27 @@ class Update(base_classes.ReadWriteCommand):
         and (args.timeout < TIMEOUT_LOWER_BOUND_SEC
              or args.timeout > TIMEOUT_UPPER_BOUND_SEC)):
       raise exceptions.ToolException(
-          '--timeout must not be less than {0} second or greater than {1} '
-          'seconds; received: {2} seconds'.format(
+          '[--timeout] must not be less than {0} second or greater than {1} '
+          'seconds; received: [{2}] seconds.'.format(
               TIMEOUT_LOWER_BOUND_SEC, TIMEOUT_UPPER_BOUND_SEC, args.timeout))
 
     if (args.healthy_threshold is not None
         and (args.healthy_threshold < THRESHOLD_LOWER_BOUND
              or args.healthy_threshold > THRESHOLD_UPPER_BOUND)):
       raise exceptions.ToolException(
-          '--healthy-threshold must be an integer between {0} and {1}, '
-          'inclusive; received: {2}'.format(THRESHOLD_LOWER_BOUND,
-                                            THRESHOLD_UPPER_BOUND,
-                                            args.healthy_threshold))
+          '[--healthy-threshold] must be an integer between {0} and {1}, '
+          'inclusive; received: [{2}].'.format(THRESHOLD_LOWER_BOUND,
+                                               THRESHOLD_UPPER_BOUND,
+                                               args.healthy_threshold))
 
     if (args.unhealthy_threshold is not None
         and (args.unhealthy_threshold < THRESHOLD_LOWER_BOUND
              or args.unhealthy_threshold > THRESHOLD_UPPER_BOUND)):
       raise exceptions.ToolException(
-          '--unhealthy-threshold must be an integer between {0} and {1}, '
-          'inclusive; received: {2}'.format(THRESHOLD_LOWER_BOUND,
-                                            THRESHOLD_UPPER_BOUND,
-                                            args.unhealthy_threshold))
+          '[--unhealthy-threshold] must be an integer between {0} and {1}, '
+          'inclusive; received [{2}].'.format(THRESHOLD_LOWER_BOUND,
+                                              THRESHOLD_UPPER_BOUND,
+                                              args.unhealthy_threshold))
 
     args_unset = not (args.port
                       or args.request_path
@@ -200,7 +204,7 @@ class Update(base_classes.ReadWriteCommand):
                       or args.healthy_threshold
                       or args.unhealthy_threshold)
     if args.description is None and args.host is None and args_unset:
-      raise exceptions.ToolException('at least one property must be modified')
+      raise exceptions.ToolException('At least one property must be modified.')
 
     return super(Update, self).Run(args)
 

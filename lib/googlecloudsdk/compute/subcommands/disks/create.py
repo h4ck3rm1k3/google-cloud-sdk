@@ -6,11 +6,14 @@ from googlecloudsdk.calliope import exceptions
 from googlecloudsdk.compute.lib import base_classes
 from googlecloudsdk.compute.lib import constants
 from googlecloudsdk.compute.lib import image_utils
+from googlecloudsdk.compute.lib import utils
+from googlecloudsdk.core import resources
 
-_DEFAULT_DISK_SIZE_GB = 200
+_DEFAULT_STANDARD_DISK_SIZE_GB = 500
+_DEFAULT_SSD_DISK_SIZE_GB = 200
 
 
-class CreateDisks(base_classes.BaseAsyncMutator):
+class Create(base_classes.BaseAsyncMutator, image_utils.ImageExpander):
   """Create Google Compute Engine persistent disks."""
 
   @staticmethod
@@ -29,8 +32,9 @@ class CreateDisks(base_classes.BaseAsyncMutator):
         number followed by a size unit of ``KB'' for kilobyte, ``MB''
         for megabyte, ``GB'' for gigabyte, or ``TB'' for terabyte. For
         example, ``10GB'' will produce 10 gigabyte disks. If omitted,
-        a default size of 200 GB is used. The minimum size a disk can
-        have is 1 GB. Disk size must be a multiple of 1 GB.
+        a default size of 500 GB is used for standard disks and 200GB
+        for SSD disks. The minimum size a disk can
+        have is 1 GB. Disk size must be a multiple of 10 GB.
         """
 
     parser.add_argument(
@@ -41,19 +45,23 @@ class CreateDisks(base_classes.BaseAsyncMutator):
 
     source_group = parser.add_mutually_exclusive_group()
 
-    def AddSourceImageHelp():
+    def AddImageHelp():
       return """\
-          A source image to apply to the disks being created.
+          An image to apply to the disks being created. When using
+          this option, the size of the disks must be at least as large as
+          the image size. Use ``--size'' to adjust the size of the disks.
           +
           {alias_table}
           +
           This flag is mutually exclusive with ``--source-snapshot''.
           """.format(alias_table=image_utils.GetImageAliasTable())
 
-    source_image = source_group.add_argument(
-        '--source-image',
-        help='A source image to apply to the disks being created.')
-    source_image.detailed_help = AddSourceImageHelp
+    image = source_group.add_argument(
+        '--image',
+        help='An image to apply to the disks being created.')
+    image.detailed_help = AddImageHelp
+
+    image_utils.AddImageProjectFlag(parser)
 
     source_snapshot = source_group.add_argument(
         '--source-snapshot',
@@ -66,13 +74,26 @@ class CreateDisks(base_classes.BaseAsyncMutator):
         current project, run 'gcloud compute snapshots list'. A
         snapshot from an existing disk can be created using the
         'gcloud compute disks snapshot' command. This flag is mutually
-        exclusive with ``--source-image''.
+        exclusive with ``--image''.
+        +
+        When using this option, the size of the disks must be at least
+        as large as the snapshot size. Use ``--size'' to adjust the
+        size of the disks.
         """
 
-    parser.add_argument(
-        '--zone',
-        help='The zone to create the disks in.',
-        required=True)
+    disk_type = parser.add_argument(
+        '--type',
+        help='Specifies the type of disk to create.')
+    disk_type.detailed_help = """\
+        Specifies the type of disk to create. To get a
+        list of available disk types, run 'gcloud compute
+        disk-types list'. The default disk type is pd-standard.
+        """
+
+    utils.AddZoneFlag(
+        parser,
+        resource_type='disks',
+        operation_type='create')
 
   @property
   def service(self):
@@ -83,7 +104,7 @@ class CreateDisks(base_classes.BaseAsyncMutator):
     return 'Insert'
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'disks'
 
   def CreateRequests(self, args):
@@ -92,45 +113,58 @@ class CreateDisks(base_classes.BaseAsyncMutator):
     if args.size:
       if args.size % constants.BYTES_IN_ONE_GB != 0:
         raise exceptions.ToolException(
-            'disk size must be a multiple of 1 GB; did you mean "{0}GB"?'
+            'Disk size must be a multiple of 1 GB. Did you mean [{0}GB]?'
             .format(args.size / constants.BYTES_IN_ONE_GB + 1))
       size_gb = args.size / constants.BYTES_IN_ONE_GB
     else:
       size_gb = None
 
-    if not size_gb and not args.source_snapshot and not args.source_image:
-      size_gb = _DEFAULT_DISK_SIZE_GB
+    if not size_gb and not args.source_snapshot and not args.image:
+      if args.type == 'pd-ssd':
+        size_gb = _DEFAULT_SSD_DISK_SIZE_GB
+      else:
+        size_gb = _DEFAULT_STANDARD_DISK_SIZE_GB
 
     requests = []
+    disk_refs = self.CreateZonalReferences(args.names, args.zone)
 
-    if args.source_snapshot:
-      source_snapshot_uri = self.context['uri-builder'].Build(
-          'global', 'snapshots', args.source_snapshot)
-    else:
-      source_snapshot_uri = None
-
-    if args.source_image:
-      source_image_uri = image_utils.ExpandImage(
-          args.source_image, self.context['uri-builder'])
+    if args.image:
+      source_image_uri = self.ExpandImageFlag(args)
     else:
       source_image_uri = None
 
-    for name in args.names:
+    if args.source_snapshot:
+      snapshot_ref = resources.Parse(
+          args.source_snapshot, collection='compute.snapshots')
+      snapshot_uri = snapshot_ref.SelfLink()
+    else:
+      snapshot_uri = None
+
+    for disk_ref in disk_refs:
+      if args.type:
+        type_ref = resources.Parse(
+            args.type, collection='compute.diskTypes',
+            params={'zone': disk_ref.zone})
+        type_uri = type_ref.SelfLink()
+      else:
+        type_uri = None
+
       request = messages.ComputeDisksInsertRequest(
           disk=messages.Disk(
-              name=name,
+              name=disk_ref.Name(),
               description=args.description,
               sizeGb=size_gb,
-              sourceSnapshot=source_snapshot_uri),
+              sourceSnapshot=snapshot_uri,
+              type=type_uri),
           project=self.context['project'],
           sourceImage=source_image_uri,
-          zone=args.zone)
+          zone=disk_ref.zone)
       requests.append(request)
 
     return requests
 
 
-CreateDisks.detailed_help = {
+Create.detailed_help = {
     'brief': 'Create Google Compute Engine persistent disks',
     'DESCRIPTION': """\
         *{command}* creates one or more Google Compute Engine
@@ -144,7 +178,11 @@ CreateDisks.detailed_help = {
         for their entire lifetime. The contents of a disk can be moved
         to a different zone by snapshotting the disk (using
         'gcloud compute disks snapshot') and creating a new disk using
-        ``--source-snapshot'' in the desired zone.
+        ``--source-snapshot'' in the desired zone. The contents of a
+        disk can also be moved across project or zone by creating an
+        image (using 'gcloud compute images create') and creating a
+        new disk using ``--source-image'' in the desired project and/or
+        zone.
 
         When creating disks, be sure to include the ``--zone'' option:
 

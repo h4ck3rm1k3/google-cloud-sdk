@@ -5,10 +5,14 @@ NAME
 SYNOPSIS
        gcloud compute target-http-proxies
          COMMAND
-         [-h, --help]
+         [--help]
+         [-h]
 
 FLAGS
        --help
+           Display detailed help.
+
+       -h
            Print a summary help and exit.
 
 COMMANDS

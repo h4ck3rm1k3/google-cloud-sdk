@@ -3,7 +3,7 @@
 from googlecloudsdk.compute.lib import base_classes
 
 
-class DeleteFirewalls(base_classes.GlobalDeleter):
+class Delete(base_classes.GlobalDeleter):
   """Delete Google Compute Engine firewall rules."""
 
   @property
@@ -11,11 +11,11 @@ class DeleteFirewalls(base_classes.GlobalDeleter):
     return self.context['compute'].firewalls
 
   @property
-  def collection(self):
+  def resource_type(self):
     return 'firewalls'
 
 
-DeleteFirewalls.detailed_help = {
+Delete.detailed_help = {
     'brief': 'Delete Google Compute Engine firewall rules',
     'DESCRIPTION': """\
         *{command}* deletes one or more Google Compute Engine firewall

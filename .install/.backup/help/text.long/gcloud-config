@@ -2,7 +2,9 @@ NAME
        gcloud-config - View and edit Google Cloud SDK properties.
 
 SYNOPSIS
-       gcloud config COMMAND [-h, --help]
+       gcloud config
+         COMMAND
+         [-h, --help]
 
 FLAGS
        --help

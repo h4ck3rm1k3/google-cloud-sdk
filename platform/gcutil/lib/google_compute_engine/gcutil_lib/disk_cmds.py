@@ -35,13 +35,14 @@ class DiskCommand(command_base.GoogleComputeCommand):
   """Base command for working with the disks collection."""
 
   print_spec = command_base.ResourcePrintSpec(
-      summary=['name', 'zone', 'status', 'size-gb'],
+      summary=['name', 'zone', 'status', 'disk-type', 'size-gb'],
       field_mappings=(
           ('name', 'name'),
           ('description', 'description'),
           ('zone', 'zone'),
           ('status', 'status'),
           ('source-snapshot', 'sourceSnapshot'),
+          ('disk-type', 'type'),
           ('size-gb', 'sizeGb')),
       detail=(
           ('name', 'name'),
@@ -52,6 +53,7 @@ class DiskCommand(command_base.GoogleComputeCommand):
           ('source-snapshot', 'sourceSnapshot'),
           ('source-image', 'sourceImage'),
           ('source-image-id', 'sourceImageId'),
+          ('disk-type', 'type'),
           ('size-gb', 'sizeGb')),
       sort_by='name')
 

@@ -12,9 +12,10 @@ gcloud-compute-disks-snapshot \- Snapshot Google Compute Engine persistent disks
 \fBgcloud compute disks snapshot\fR
   DISK_NAME [DISK_NAME \&...]
   [\-\-description DESCRIPTION]
+  [\-\-help]
   [\-\-snapshot\-names SNAPSHOT_NAME [SNAPSHOT_NAME \&...]]
-  \-\-zone ZONE
-  [\-h, \-\-help]
+  [\-\-zone ZONE]
+  [\-h]
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -30,6 +31,11 @@ The names of the disks to snapshot\&.
 \fB\-\-description\fR \fIDESCRIPTION\fR
 .RS 4
 An optional, textual description for the snapshots being created\&.
+.RE
+.PP
+\fB\-\-help\fR
+.RS 4
+Display detailed help\&.
 .RE
 .PP
 \fB\-\-snapshot\-names\fR \fISNAPSHOT_NAME [SNAPSHOT_NAME \&...]\fR
@@ -52,10 +58,10 @@ will result in \(lqmy\-disk\-1\(rq being snapshotted as \(lqsnapshot\-1\(rq, \(l
 .PP
 \fB\-\-zone\fR \fIZONE\fR
 .RS 4
-The zone of the disks\&.
+The zone of the disks to snapshot\&. If omitted and the arguments are not all URIs, you will be prompted to select a zone\&.
 .RE
 .PP
-\fB\-\-help\fR
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE

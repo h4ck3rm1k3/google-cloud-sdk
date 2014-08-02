@@ -255,6 +255,53 @@ def SearchForExecutableOnPath(executable, path=None):
   return matching
 
 
+def FindExecutableOnPath(executable, path=None, pathext=None):
+  """Searches for 'executable' in the directories listed in 'path'.
+
+  If 'executable' contains any directory components then 'path' is ignored.  If
+  'pathext' is specified and 'executable' does not have any of those extensions
+  then 'executable'+'extension' is checked.
+
+  Args:
+    executable: The name of the executable to find.
+    path: A list of directories to search separated by 'os.pathsep'.  If none
+      then the system PATH is used.
+    pathext: A list of file name extensions to use separated by 'os.pathsep'.
+      If none then the platform specific system PATHEXT is used.
+
+  Returns:
+    The path of 'executable' (+ 'extension' if necessary) if found and
+      executable, None if not found.
+  """
+
+  head, tail = os.path.split(executable)
+  if head:
+    path = '.'
+  elif path is None:
+    path = os.environ.get('PATH')
+  if not path:
+    return None
+  paths = path.split(os.pathsep)
+  if pathext is None:
+    if sys.platform == 'win32' or os.name == 'os2':
+      pathext = os.environ.get('PATHEXT')
+    if pathext is None:
+      pathext = ''
+  extensions = pathext.split(os.pathsep)
+  if extensions:
+    _, extension = os.path.splitext(tail)
+    for ext in extensions:
+      if extension == ext:
+        extensions = []
+  for directory in paths:
+    head = os.path.join(directory, executable)
+    for tail in [''] + extensions:
+      full = head + tail
+      if os.path.isfile(full) and os.access(full, os.X_OK):
+        return full
+  return None
+
+
 class TemporaryDirectory(object):
   """A class to easily create and dispose of temporary directories.
 

@@ -11,9 +11,10 @@ gcloud-compute-instances-remove-tags \- Remove tags from Google Compute Engine v
 .nf
 \fBgcloud compute instances remove\-tags\fR
   NAME
+  [\-\-help]
   [\-\-all | \-\-tags TAG [TAG \&...]]
-  \-\-zone ZONE
-  [\-h, \-\-help]
+  [\-\-zone ZONE]
+  [\-h]
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -45,6 +46,11 @@ The name of the instance whose tags should be modified\&.
 Remove all tags from the instance\&.
 .RE
 .PP
+\fB\-\-help\fR
+.RS 4
+Display detailed help\&.
+.RE
+.PP
 \fB\-\-tags\fR \fITAG [TAG \&...]\fR
 .RS 4
 Specifies strings to be removed from the instance tags\&. Multiple tags can be removed by repeating this flag\&.
@@ -52,10 +58,10 @@ Specifies strings to be removed from the instance tags\&. Multiple tags can be r
 .PP
 \fB\-\-zone\fR \fIZONE\fR
 .RS 4
-The zone of the instance\&.
+The zone of the instance to set tags on\&. If omitted and the arguments are not all URIs, you will be prompted to select a zone\&.
 .RE
 .PP
-\fB\-\-help\fR
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE

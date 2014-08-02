@@ -10,7 +10,7 @@ class ResourceviewsV1beta1(base_api.BaseApiClient):
   MESSAGES_MODULE = messages
 
   _PACKAGE = u'resourceviews'
-  _SCOPES = [u'https://www.googleapis.com/auth/cloud-platform', u'https://www.googleapis.com/auth/ndev.cloudman', u'https://www.googleapis.com/auth/ndev.cloudman.readonly']
+  _SCOPES = [u'https://www.googleapis.com/auth/cloud-platform', u'https://www.googleapis.com/auth/compute', u'https://www.googleapis.com/auth/compute.readonly', u'https://www.googleapis.com/auth/ndev.cloudman', u'https://www.googleapis.com/auth/ndev.cloudman.readonly']
   _VERSION = u'v1beta1'
   _CLIENT_ID = ''
   _CLIENT_SECRET = ''
@@ -21,7 +21,8 @@ class ResourceviewsV1beta1(base_api.BaseApiClient):
   def __init__(self, url='', credentials=None,
                get_credentials=True, http=None, model=None,
                log_request=False, log_response=False,
-               credentials_args=None, default_global_params=None):
+               credentials_args=None, default_global_params=None,
+               additional_http_headers=None):
     """Create a new resourceviews handle."""
     url = url or u'https://www.googleapis.com/resourceviews/v1beta1/'
     super(ResourceviewsV1beta1, self).__init__(
@@ -29,12 +30,15 @@ class ResourceviewsV1beta1(base_api.BaseApiClient):
         get_credentials=get_credentials, http=http, model=model,
         log_request=log_request, log_response=log_response,
         credentials_args=credentials_args,
-        default_global_params=default_global_params)
+        default_global_params=default_global_params,
+        additional_http_headers=additional_http_headers)
     self.regionViews = self.RegionViewsService(self)
     self.zoneViews = self.ZoneViewsService(self)
 
   class RegionViewsService(base_api.BaseApiService):
     """Service class for the regionViews resource."""
+
+    _NAME = u'regionViews'
 
     def __init__(self, client):
       super(ResourceviewsV1beta1.RegionViewsService, self).__init__(client)
@@ -221,6 +225,8 @@ class ResourceviewsV1beta1(base_api.BaseApiClient):
 
   class ZoneViewsService(base_api.BaseApiService):
     """Service class for the zoneViews resource."""
+
+    _NAME = u'zoneViews'
 
     def __init__(self, client):
       super(ResourceviewsV1beta1.ZoneViewsService, self).__init__(client)

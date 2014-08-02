@@ -11,7 +11,8 @@ gcloud-compute-project-info-remove-metadata \- Remove project\-wide metadata ent
 .nf
 \fBgcloud compute project\-info remove\-metadata\fR
   [\-\-all | \-\-keys KEY [KEY \&...]]
-  [\-h, \-\-help]
+  [\-\-help]
+  [\-h]
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -23,12 +24,17 @@ gcloud-compute-project-info-remove-metadata \- Remove project\-wide metadata ent
 If provided, all metadata entries are removed\&.
 .RE
 .PP
+\fB\-\-help\fR
+.RS 4
+Display detailed help\&.
+.RE
+.PP
 \fB\-\-keys\fR \fIKEY [KEY \&...]\fR
 .RS 4
 The keys of the entries to remove\&.
 .RE
 .PP
-\fB\-\-help\fR
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE

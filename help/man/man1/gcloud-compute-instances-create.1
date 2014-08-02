@@ -13,10 +13,13 @@ gcloud-compute-instances-create \- Create Compute Engine virtual machine instanc
   NAME [NAME \&...]
   [\-\-boot\-disk\-device\-name BOOT_DISK_DEVICE_NAME]
   [\-\-boot\-disk\-size BOOT_DISK_SIZE]
+  [\-\-boot\-disk\-type BOOT_DISK_TYPE]
   [\-\-can\-ip\-forward]
   [\-\-description DESCRIPTION]
   [\-\-disk PROPERTY=VALUE [PROPERTY=VALUE \&...]]
+  [\-\-help]
   [\-\-image IMAGE]
+  [\-\-image\-project IMAGE_PROJECT]
   [\-\-machine\-type MACHINE_TYPE; default="n1\-standard\-1"]
   [\-\-maintenance\-policy MAINTENANCE_POLICY; default="MIGRATE"]
   [\-\-metadata KEY=VALUE [KEY=VALUE \&...]]
@@ -27,8 +30,8 @@ gcloud-compute-instances-create \- Create Compute Engine virtual machine instanc
   [\-\-no\-restart\-on\-failure]
   [\-\-no\-scopes | \-\-scopes [ACCOUNT=]SCOPE [[ACCOUNT=]SCOPE \&...]]
   [\-\-tags TAG [TAG \&...]]
-  \-\-zone ZONE
-  [\-h, \-\-help]
+  [\-\-zone ZONE]
+  [\-h]
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -64,12 +67,18 @@ Assigns the given external IP address to an instance\&. This option can only be 
 .PP
 \fB\-\-boot\-disk\-device\-name\fR \fIBOOT_DISK_DEVICE_NAME\fR
 .RS 4
-The name the guest operating system will see for the boot disk as\&. This option can only be specified when using \(lq\-\-image\(rq\&. When creating more than one instance, the value of the device name will apply to all of the instances\*(Aq boot disks\&.
+The name the guest operating system will see for the boot disk as\&. This option can only be specified if a new boot disk is being created (as opposed to mounting an existing persistent disk)\&. When creating more than one instance, the value of the device name will apply to all of the instances\*(Aq boot disks\&.
 .RE
 .PP
 \fB\-\-boot\-disk\-size\fR \fIBOOT_DISK_SIZE\fR
 .RS 4
-The size of the boot disk\&. This option can only be specified when using \(lq\-\-image\(rq\&. The value must be a whole number followed by a size unit of \(lqKB\(rq for kilobyte, \(lqMB\(rq for megabyte, \(lqGB\(rq for gigabyte, or \(lqTB\(rq for terabyte\&. For example, \(lq10GB\(rq will produce a 10 gigabyte disk\&. If omitted, a default size of 200 GB is used\&. The minimum size a disk can have is 1 GB\&. Disk size must be a multiple of 1 GB\&. When creating more than one instance, the size will apply to all of the instances\*(Aq boot disks\&.
+The size of the boot disk\&. This option can only be specified if a new boot disk is being created (as opposed to mounting an existing persistent disk)\&. The value must be a whole number followed by a size unit of \(lqKB\(rq for kilobyte, \(lqMB\(rq for megabyte, \(lqGB\(rq for gigabyte, or \(lqTB\(rq for terabyte\&. For example, \(lq10GB\(rq will produce a 10 gigabyte disk\&. If omitted, a default size of 200 GB is used\&. The minimum size a boot disk can have is 10 GB\&. Disk size must be a multiple of 1 GB\&. When creating more than one instance, the size will apply to all of the instances\*(Aq boot disks\&.
+.RE
+.PP
+\fB\-\-boot\-disk\-type\fR \fIBOOT_DISK_TYPE\fR
+.RS 4
+The type of the boot disk\&. This option can only be specified if a new boot disk is being created (as opposed to mounting an existing persistent disk)\&. To get a list of available disk types, run
+\fIgcloud compute disk\-types list\fR\&.
 .RE
 .PP
 \fB\-\-can\-ip\-forward\fR
@@ -114,11 +123,16 @@ If \(lqyes\(rq, this persistent disk will be automatically deleted when the inst
 .RE
 .RE
 .PP
+\fB\-\-help\fR
+.RS 4
+Display detailed help\&.
+.RE
+.PP
 \fB\-\-image\fR \fIIMAGE\fR
 .RS 4
 Specifies the boot image for the instances\&. For each instance, a new boot disk will be created from the given image\&. Each boot disk will have the same name as the instance\&.
 .sp
-The value for this option can be the name of an image in the current project, a URI when referring to an image in another project, or an alias from the table below\&.
+The value for this option can be the name of an image or an alias from the table below\&.
 .TS
 tab(:);
 ltB ltB ltB ltB.
@@ -136,13 +150,24 @@ lt lt lt l
 lt lt lt l
 lt lt lt l
 lt lt lt l
+lt lt lt l
+lt lt lt l
 lt lt lt l.
 T{
 centos\-6
 T}:T{
 centos\-cloud
 T}:T{
-centos\-6\-v20140415
+centos\-6
+T}:T{
+\ \&
+T}
+T{
+coreos
+T}:T{
+coreos\-cloud
+T}:T{
+coreos\-beta
 T}:T{
 \ \&
 T}
@@ -151,7 +176,7 @@ debian\-7
 T}:T{
 debian\-cloud
 T}:T{
-debian\-7\-wheezy\-v20140415
+debian\-7\-wheezy
 T}:T{
 \ \&
 T}
@@ -160,7 +185,16 @@ debian\-7\-backports
 T}:T{
 debian\-cloud
 T}:T{
-backports\-debian\-7\-wheezy\-v20140415
+backports\-debian\-7\-wheezy
+T}:T{
+\ \&
+T}
+T{
+opensuse\-13
+T}:T{
+opensuse\-cloud
+T}:T{
+opensuse\-13\-1
 T}:T{
 \ \&
 T}
@@ -169,7 +203,7 @@ rhel\-6
 T}:T{
 rhel\-cloud
 T}:T{
-rhel\-6\-v20140415
+rhel\-6
 T}:T{
 \ \&
 T}
@@ -178,19 +212,24 @@ sles\-11
 T}:T{
 suse\-cloud
 T}:T{
-sles\-11\-sp3\-v20140306
+sles\-11
 T}:T{
 \ \&
 T}
 .TE
 .sp 1
-As new images are released, these aliases will be updated\&. If using this tool in a script where depending on a specific version of an image is necessary, then do not use the aliases\&. Instead, use the URI of the desired image\&.
+When the value is an alias, this tool will query the public image project that contains the image type to find the latest image matching the alias\&. The user\(cqs project is also queried for an image with the same name as the alias\&. If a conflict exists, the user will be prompted to resolve the conflict\&.
 .sp
-Aliases are expanded first, so avoid creating images in your project whose names are in the set of aliases\&. If you do create an image whose name matches an alias, you can refer to it by using its URI\&.
+To specify an image in another project for which there is no alias, use \(lq\-\-image\-project\(rq\&. When \(lq\-\-image\-project\(rq is present, no API calls are made to resolve the image\&. This property is useful for scripts\&.
 .sp
 When using this option, \(lq\-\-boot\-disk\-device\-name\(rq and \(lq\-\-boot\-disk\-size\(rq can be used to override the boot disk\(cqs device name and size, respectively\&.
 .sp
 By default, \(lqdebian\-7\-backports\(rq is assumed for this flag\&.
+.RE
+.PP
+\fB\-\-image\-project\fR \fIIMAGE_PROJECT\fR
+.RS 4
+The project against which all image references will be resolved\&. See \(lq\-\-image\(rq for more details\&.
 .RE
 .PP
 \fB\-\-machine\-type\fR \fIMACHINE_TYPE\fR
@@ -369,10 +408,10 @@ for more details\&.
 .PP
 \fB\-\-zone\fR \fIZONE\fR
 .RS 4
-The zone to create the instances in\&.
+The zone of the instances to create\&. If omitted and the arguments are not all URIs, you will be prompted to select a zone\&.
 .RE
 .PP
-\fB\-\-help\fR
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE

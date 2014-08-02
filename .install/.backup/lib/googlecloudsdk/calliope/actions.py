@@ -103,7 +103,7 @@ optional flags:
                          connect to the instance. Specified in CIDR notation,
                          also known as 'slash' notation (e.g. 192.168.100.0/24).
   --authorized-gae-apps AUTHORIZED_GAE_APPS
-                         List of AppEngine app ids that can access this
+                         List of App Engine app ids that can access this
                          instance.
   --activation-policy ACTIVATION_POLICY; default="ON_DEMAND"
                          The activation policy for this instance. This specifies
@@ -111,7 +111,7 @@ optional flags:
                          only when the instance state is RUNNABLE. Defaults to
                          ON_DEMAND.
   --follow-gae-app FOLLOW_GAE_APP
-                         The AppEngine app this instance should follow. It must
+                         The App Engine app this instance should follow. It must
                          be in the same region as the instance.
   --backup-start-time BACKUP_START_TIME
                          Start time for the daily backup configuration in UTC

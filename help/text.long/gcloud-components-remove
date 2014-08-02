@@ -1,17 +1,35 @@
 NAME
-       gcloud-components-remove - Completely uninstall components and
-       components that depend on them.
+       gcloud-components-remove - Uninstall all listed components, as well as
+       all components that directly or indirectly depend on them.
 
 SYNOPSIS
        gcloud components remove
-         COMPONENT-IDS [COMPONENT-IDS ...]
-         [-h, --help]
+         COMPONENT-ID [COMPONENT-ID ...]
+         [--help]
+         [-h]
+
+DESCRIPTION
+       Uninstall all listed components, as well as all components that
+       directly or indirectly depend on them. For example, if the component
+       unicorn-factory depends on the component horn-factory, removing
+       horn-factory will cause unicorn-factory to be removed as well. The
+       command lists all components it is about to remove, and asks for
+       confirmation before proceeding.
 
 POSITIONAL ARGUMENTS
-       COMPONENT-IDS [COMPONENT-IDS ...]
-           The component ids to remove.
+       COMPONENT-ID [COMPONENT-ID ...]
+           The IDs of the components to be removed.
 
 FLAGS
        --help
+           Display detailed help.
+
+       -h
            Print a summary help and exit.
+
+EXAMPLES
+       To remove component-1, component-2, and all components that directly or
+       indirectly depend on component-1 or component-2, type the following:
+
+           $ gcloud components remove component-1 component-2
 

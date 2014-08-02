@@ -5,7 +5,7 @@ from googlecloudapis.compute.v1 import compute_v1_messages as messages
 from googlecloudsdk.compute.lib import forwarding_rules_utils as utils
 
 
-class SetForwardingRuleTarget(utils.ForwardingRulesTargetMutator):
+class Set(utils.ForwardingRulesTargetMutator):
   """Modify a forwarding rule to direct network traffic to a new target."""
 
   @staticmethod
@@ -47,7 +47,7 @@ class SetForwardingRuleTarget(utils.ForwardingRulesTargetMutator):
 
     return [request]
 
-SetForwardingRuleTarget.detailed_help = {
+Set.detailed_help = {
     'brief': ('Modify a forwarding rule to direct network traffic to a new '
               'target'),
     'DESCRIPTION': """\

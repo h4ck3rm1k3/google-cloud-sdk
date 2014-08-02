@@ -11,11 +11,17 @@ gcloud-compute-project-info \- Read and manipulate project\-level data like quot
 .nf
 \fBgcloud compute project\-info\fR
   COMMAND
-  [\-h, \-\-help]
+  [\-\-help]
+  [\-h]
 .fi
 .SH "FLAGS"
 .PP
 \fB\-\-help\fR
+.RS 4
+Display detailed help\&.
+.RE
+.PP
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE
@@ -36,4 +42,9 @@ Get the Google Compute Engine project resource\&.
 \fBremove\-metadata\fR
 .RS 4
 Remove project\-wide metadata entries\&.
+.RE
+.PP
+\fBset\-usage\-bucket\fR
+.RS 4
+Set the usage reporting bucket for a project\&.
 .RE

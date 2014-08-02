@@ -11,17 +11,28 @@ gcloud-compute-backend-services \- List, create, and delete backend services
 .nf
 \fBgcloud compute backend\-services\fR
   COMMAND
-  [\-h, \-\-help]
+  [\-\-help]
+  [\-h]
 .fi
 .SH "FLAGS"
 .PP
 \fB\-\-help\fR
+.RS 4
+Display detailed help\&.
+.RE
+.PP
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE
 .SH "COMMANDS"
 .sp
 \fICOMMAND\fR is one of the following\&.
+.PP
+\fBadd\-backend\fR
+.RS 4
+Add a backend to a backend service\&.
+.RE
 .PP
 \fBcreate\fR
 .RS 4
@@ -51,4 +62,9 @@ Get health status of backend(s) in an backend service\&.
 \fBlist\fR
 .RS 4
 List backend services\&.
+.RE
+.PP
+\fBremove\-backend\fR
+.RS 4
+Remove a backend frome a backend service\&.
 .RE

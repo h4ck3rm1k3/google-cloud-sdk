@@ -11,8 +11,9 @@ gcloud-compute-target-pools-delete \- Delete target pools
 .nf
 \fBgcloud compute target\-pools delete\fR
   NAME [NAME \&...]
-  \-\-region REGION
-  [\-h, \-\-help]
+  [\-\-help]
+  [\-\-region REGION]
+  [\-h]
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -25,12 +26,17 @@ The resources to delete\&.
 .RE
 .SH "FLAGS"
 .PP
-\fB\-\-region\fR \fIREGION\fR
+\fB\-\-help\fR
 .RS 4
-The region of the resources to delete\&.
+Display detailed help\&.
 .RE
 .PP
-\fB\-\-help\fR
+\fB\-\-region\fR \fIREGION\fR
+.RS 4
+The region of the resources to delete\&. If omitted and the arguments are not all URIs, you will be prompted to select a region\&.
+.RE
+.PP
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE

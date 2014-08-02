@@ -99,7 +99,6 @@ class SingularizeTests(unittest.TestCase):
       ('snapshots', 'snapshot'),
       ('operations', 'operation'),
       ('images', 'image'),
-      ('kernels', 'kernel'),
       ('networks', 'network'),
       ('machineTypes', 'machineType'),
       )

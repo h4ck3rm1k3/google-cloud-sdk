@@ -29,22 +29,29 @@ class InvalidValueError(Error):
 
 class RequiredPropertyError(Error):
   """Generic exception for when a required property was not set."""
+  FLAG_STRING = ('It can be set on a per-command basis by re-running your '
+                 'command with the [--{flag}] flag.\n\n')
 
   def __init__(self, prop, show_arg=False, extra_msg=None):
+    section = (prop.section + '/' if prop.section != VALUES.default_section.name
+               else '')
+    if prop.argument and show_arg:
+      flag = RequiredPropertyError.FLAG_STRING.format(
+          flag=prop.argument.replace('_', '-'))
+    else:
+      flag = ''
+
     msg = ("""\
 The required property [{property_name}] is not currently set.
-To set it, please run:
+{flag}You may set it for your current workspace by running:
 
-  $ gcloud config set --section={section} {property_name} <value>
+  $ gcloud config set {section}{property_name} <value>
 
 or it can be set temporarily by the environment variable [{env_var}]"""
            .format(property_name=prop.name,
-                   section=prop.section,
+                   flag=flag,
+                   section=section,
                    env_var=prop.EnvironmentName()))
-    if prop.argument and show_arg:
-      msg += ('\n\nThis property can also be set on a per-command basis '
-              'with the [--{flag}] flag.'.format(
-                  flag=prop.argument.replace('_', '-')))
     if extra_msg:
       msg += '\n\n' + extra_msg
     super(RequiredPropertyError, self).__init__(msg)
@@ -55,6 +62,7 @@ class _Sections(object):
   """Represents the available sections in the properties file.
 
   Attributes:
+    auth: Section, The section containing auth properties for the Cloud SDK.
     default_section: Section, The main section of the properties file (core).
     core: Section, The section containing core properties for the Cloud SDK.
     component_manager: Section, The section containing properties for the
@@ -64,9 +72,10 @@ class _Sections(object):
   def __init__(self):
     self.core = _SectionCore()
     self.component_manager = _SectionComponentManager()
+    self.auth = _SectionAuth()
 
     self.__sections = dict((section.name, section) for section in
-                           [self.core, self.component_manager])
+                           [self.core, self.component_manager, self.auth])
     self.__args_stack = []
 
   @property
@@ -202,6 +211,10 @@ class _Section(object):
     properties_file = _PropertiesFile.Load()
     result = {}
     for prop in self:
+      if (prop.is_hidden
+          and not include_hidden
+          and _GetPropertyWithoutCallback(prop, properties_file) is None):
+        continue
       value = _GetProperty(prop, properties_file, required=False)
 
       if value is None:
@@ -232,7 +245,7 @@ class _SectionCore(_Section):
     self.disable_usage_reporting = self._Add('disable_usage_reporting')
     # pylint: disable=unnecessary-lambda, Just a value return.
     self.api_host = self._Add(
-        'api_host', hidden=True, argument='api_host',
+        'api_host', hidden=True,
         callbacks=[lambda: 'https://www.googleapis.com'])
     self.verbosity = self._Add('verbosity', argument='verbosity')
     self.user_output_enabled = self._Add('user_output_enabled',
@@ -244,6 +257,29 @@ class _SectionCore(_Section):
         callbacks=[lambda: c_gce.Metadata().Project()])
     self.credentialed_hosted_repo_domains = self._Add(
         'credentialed_hosted_repo_domains')
+
+
+class _SectionAuth(_Section):
+  """Contains the properties for the 'auth' section."""
+
+  def __init__(self):
+    super(_SectionAuth, self).__init__('auth')
+    # pylint: disable=unnecessary-lambda, We don't want to call Metadata()
+    # unless we really have to.
+    self.auth_host = self._Add(
+        'auth_host', hidden=True,
+        callbacks=[lambda: 'https://accounts.google.com/o/oauth2/auth'])
+    self.token_host = self._Add(
+        'token_host', hidden=True,
+        callbacks=[lambda: 'https://accounts.google.com/o/oauth2/token'])
+    self.disable_ssl_validation = self._Add(
+        'disable_ssl_validation', hidden=True)
+    self.client_id = self._Add(
+        'client_id', hidden=True,
+        callbacks=[lambda: config.CLOUDSDK_CLIENT_ID])
+    self.client_secret = self._Add(
+        'client_secret', hidden=True,
+        callbacks=[lambda: config.CLOUDSDK_CLIENT_NOTSOSECRET])
 
 
 class _SectionComponentManager(_Section):
@@ -320,7 +356,7 @@ class _Property(object):
       required: bool, True to raise an exception if the property is not set.
 
     Returns:
-      bool, The boolean value for this property.
+      bool, The boolean value for this property, or None if it is not set.
     """
     return _GetBoolProperty(self, _PropertiesFile.Load(), required)
 
@@ -434,19 +470,9 @@ def _GetProperty(prop, properties_file, required):
     # providing this argument (as opposed to some command calling other commands
     # that the user doesn't know about.
     has_argument = args_stack[0] and hasattr(args_stack[0], prop.argument)
-    for args in reversed(args_stack):
-      if not args:
-        continue
-      value = getattr(args, prop.argument, None)
-      if value is not None:
-        return str(value)
 
-  value = os.environ.get(prop.EnvironmentName(), None)
-  if value is not None:
-    return str(value)
-
-  value = properties_file.Get(prop)
-  if value is not None:
+  value = _GetPropertyWithoutCallback(prop, properties_file)
+  if value:
     return str(value)
 
   # Still nothing, fall back to the callbacks.
@@ -462,6 +488,41 @@ def _GetProperty(prop, properties_file, required):
   return None
 
 
+def _GetPropertyWithoutCallback(prop, properties_file):
+  """Gets the given property from the properties file without using a callback.
+
+  If the property has a designated command line argument and args is provided,
+  check args for the value first. If the corresponding environment variable is
+  set, use that second. If still nothing, use the callbacks.
+
+  Args:
+    prop: properties.Property, The property to get.
+    properties_file: _PropertiesFile, An already loaded properties files to use.
+
+  Returns:
+    str, The value of the property, or None if it is not set.
+  """
+  # Providing the argument overrides all.
+  args_stack = VALUES.GetArgsStack()
+  if prop.argument and args_stack:
+    for args in reversed(args_stack):
+      if not args:
+        continue
+      value = getattr(args, prop.argument, None)
+      if value is not None:
+        return str(value)
+
+  value = os.environ.get(prop.EnvironmentName(), None)
+  if value is not None:
+    return str(value)
+
+  value = properties_file.Get(prop)
+  if value is not None:
+    return str(value)
+
+  return None
+
+
 def _GetBoolProperty(prop, properties_file, required):
   """Gets the given property in bool form.
 
@@ -471,7 +532,7 @@ def _GetBoolProperty(prop, properties_file, required):
     required: bool, True to raise an exception if the property is not set.
 
   Returns:
-    bool, The value of the property, or False if it is not set.
+    bool, The value of the property, or None if it is not set.
   """
   value = _GetProperty(prop, properties_file, required)
   if value is None:

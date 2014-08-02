@@ -9,21 +9,25 @@ import ssl
 import tarfile
 import urllib2
 
+from googlecloudsdk.core import exceptions
 from googlecloudsdk.core import properties
 from googlecloudsdk.core.credentials import store
 from googlecloudsdk.core.util import files as file_utils
 
 
-class Error(Exception):
+TIMEOUT_IN_SEC = 5
+
+
+class Error(exceptions.Error):
   """Base exception for the installers module."""
   pass
 
 
-class ComponentDownloadFailed(Error):
+class ComponentDownloadFailedError(Error):
   """Exception for when we cannot download a component for some reason."""
 
   def __init__(self, component_id, e):
-    super(ComponentDownloadFailed, self).__init__(
+    super(ComponentDownloadFailedError, self).__init__(
         'The component [{component_id}] failed to download.\n\n'.format(
             component_id=component_id) + str(e))
 
@@ -131,18 +135,15 @@ class ComponentInstaller(object):
       return []
 
     if not re.search(r'^\w+://', url):
-      # This is a relative path, look relative to the snapshot file.
-      if not self.__snapshot.url:
-        raise ValueError('Cannot install component [{}] from a relative path '
-                         'because the base URL of the snapshot is not defined.'
-                         .format(component.id))
-      url = os.path.dirname(self.__snapshot.url) + '/' + url
+      raise ValueError('Cannot install component [{}] from a relative path '
+                       'because the base URL of the snapshot is not defined.'
+                       .format(component.id))
 
     try:
       return ComponentInstaller.DownloadAndExtractTar(
           url, self.__download_directory, self.__sdk_root)
     except (URLFetchError, AuthenticationError) as e:
-      raise ComponentDownloadFailed(component.id, e)
+      raise ComponentDownloadFailedError(component.id, e)
 
   @staticmethod
   def DownloadAndExtractTar(url, download_dir, extract_dir):
@@ -199,19 +200,20 @@ class ComponentInstaller(object):
     Returns:
       urllib2.Request, The request.
     """
+    headers = {'Cache-Control': 'no-cache'}
     try:
       if url.startswith(ComponentInstaller.GCS_BROWSER_DL_URL):
         url = url.replace(ComponentInstaller.GCS_BROWSER_DL_URL,
                           ComponentInstaller.GCS_API_DL_URL,
                           1)
-      return urllib2.urlopen(url)
+      req = urllib2.Request(url, headers=headers)
+      return urllib2.urlopen(req, timeout=TIMEOUT_IN_SEC)
     except urllib2.HTTPError as e:
       if e.code != 403 or not url.startswith(ComponentInstaller.GCS_API_DL_URL):
         raise e
       try:
         creds = store.Load()
         store.Refresh(creds)
-        headers = {}
         creds.apply(headers)
       except store.Error as e:
         # If we fail here, it is because there are no active credentials or the
@@ -220,7 +222,8 @@ class ComponentInstaller(object):
             'This component requires valid credentials to install.', e)
       try:
         # Retry the download using the credentials.
-        return urllib2.urlopen(urllib2.Request(url, headers=headers))
+        req = urllib2.Request(url, headers=headers)
+        return urllib2.urlopen(req, timeout=TIMEOUT_IN_SEC)
       except urllib2.HTTPError as e:
         if e.code != 403:
           raise e

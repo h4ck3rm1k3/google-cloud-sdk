@@ -5,10 +5,10 @@ NAME
 SYNOPSIS
        gcloud compute target-pools remove-instances
          NAME
+         [--help]
          --instances INSTANCE [INSTANCE ...]
-         --region REGION
-         --zone ZONE
-         [-h, --help]
+         [--zone ZONE]
+         [-h]
 
 DESCRIPTION
        gcloud compute target-pools remove-instances is used to remove one or
@@ -21,15 +21,17 @@ POSITIONAL ARGUMENTS
            The name of the target pool from which to remove the instances.
 
 FLAGS
+       --help
+           Display detailed help.
+
        --instances INSTANCE [INSTANCE ...]
            Specifies a list of instances to remove from the target pool.
 
-       --region REGION
-           The region of the target pool.
-
        --zone ZONE
-           The zone of the instances.
+           The zone of the instances to remove from the target pool. If
+           omitted and the arguments are not all URIs, you will be prompted to
+           select a zone.
 
-       --help
+       -h
            Print a summary help and exit.
 

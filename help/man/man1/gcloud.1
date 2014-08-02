@@ -11,16 +11,28 @@ gcloud \- manage Google Cloud Platform resources
 .nf
 \fBgcloud\fR
   GROUP|COMMAND
+  [\-\-format FORMAT]
+  [\-\-help]
   [\-\-project PROJECT]
   [\-\-quiet, \-q]
   [\-\-user\-output\-enabled USER_OUTPUT_ENABLED]
   [\-\-verbosity VERBOSITY]
-  [\-h, \-\-help]
+  [\-h]
 .fi
 .SH "DESCRIPTION"
 .sp
 The \fIgcloud\fR CLI manages authentication and local configuration, as well as your interaction with the Google Cloud Platform APIs\&.
 .SH "FLAGS"
+.PP
+\fB\-\-format\fR \fIFORMAT\fR
+.RS 4
+Specify a format for printed output\&. By default, a command\-specific human\-friendly output format is used\&. Setting this flag to one of the available options will serialize the result of the command in the chosen format and print it to stdout\&.
+.RE
+.PP
+\fB\-\-help\fR
+.RS 4
+Display detailed help\&.
+.RE
 .PP
 \fB\-\-project\fR \fIPROJECT\fR
 .RS 4
@@ -42,7 +54,7 @@ Control whether user intended output is printed to the console\&. (true/false)
 Override the default verbosity for this command\&. This must be a standard logging verbosity level: [debug, info, warning, error, critical, none] (Default: [warning])\&.
 .RE
 .PP
-\fB\-\-help\fR
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE
@@ -57,7 +69,7 @@ Manage oauth2 credentials for the Google Cloud SDK\&.
 .PP
 \fBcomponents\fR
 .RS 4
-Install, update, or remove the tools in the Google Cloud SDK\&.
+List, install, update, or remove Google Cloud SDK components or packages\&.
 .RE
 .PP
 \fBcompute\fR

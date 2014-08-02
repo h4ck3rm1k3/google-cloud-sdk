@@ -11,10 +11,10 @@ gcloud-compute-target-pools-add-instances \- Add instances to a target pool
 .nf
 \fBgcloud compute target\-pools add\-instances\fR
   NAME
+  [\-\-help]
   \-\-instances INSTANCE [INSTANCE \&...]
-  \-\-region REGION
-  \-\-zone ZONE
-  [\-h, \-\-help]
+  [\-\-zone ZONE]
+  [\-h]
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -27,22 +27,22 @@ The name of the target pool to which to add the instances\&.
 .RE
 .SH "FLAGS"
 .PP
+\fB\-\-help\fR
+.RS 4
+Display detailed help\&.
+.RE
+.PP
 \fB\-\-instances\fR \fIINSTANCE [INSTANCE \&...]\fR
 .RS 4
 Specifies a list of instances to add to the target pool\&.
 .RE
 .PP
-\fB\-\-region\fR \fIREGION\fR
-.RS 4
-The region of the target pool\&.
-.RE
-.PP
 \fB\-\-zone\fR \fIZONE\fR
 .RS 4
-The zone of the instances\&.
+The zone of the instances to add to the target pool\&. If omitted and the arguments are not all URIs, you will be prompted to select a zone\&.
 .RE
 .PP
-\fB\-\-help\fR
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE

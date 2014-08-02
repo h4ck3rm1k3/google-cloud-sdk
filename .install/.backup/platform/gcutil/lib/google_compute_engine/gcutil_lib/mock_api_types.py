@@ -125,7 +125,10 @@ class StringType(_ApiType):
   def _ValidateByte(self, method, path, value):
     """Validates base64url encoded string."""
     try:
-      base64.urlsafe_b64decode(value)
+      if type(value) is unicode:
+        base64.urlsafe_b64decode(value.encode('ascii'))
+      else:
+        base64.urlsafe_b64decode(value)
     except TypeError:
       raise ValidationError(
           '{method} {path}: expected base64url but received {value}'.format(

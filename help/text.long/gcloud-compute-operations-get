@@ -5,14 +5,13 @@ SYNOPSIS
        gcloud compute operations get
          [NAME_REGEX ...]
          [--fields FIELDS [FIELDS ...]]
-         [--format FORMAT; default="yaml"]
          [--global]
+         [--help]
          [--limit LIMIT]
-         [--raw-links]
          [--regions [REGION ...]]
          [--sort-by SORT_BY]
          [--zones [ZONE ...]]
-         [-h, --help]
+         [-h]
 
 DESCRIPTION
        gcloud compute operations get displays all data associated with Google
@@ -60,26 +59,14 @@ FLAGS
                warnings[].message
                zone
 
-       --format FORMAT
-           Specifies the display format. By default, resources are printed in
-           YAML format. The "text" and "yaml" formats print data as they are
-           fetched from the server, so these formats feel more responsive. The
-           "json" format delays printing until all data is collected into a
-           single list, so it may feel less responsive.
-
        --global
            If provided, operations from the global scope are queried.
 
+       --help
+           Display detailed help.
+
        --limit LIMIT
            The maximum number of results.
-
-       --raw-links
-           If provided, resource references in output from the server will not
-           be condensed for readability. For example, when listing operations,
-           if a targetLink is
-           "https://www.googleapis.com/compute/v1/projects/my-project/zones/us-central2-a/instances/my-instance",
-           "us-central2-a/instances/my-instance" is shown for brevity. This
-           behavior can be turned off using this flag.
 
        --regions [REGION ...]
            If provided, operations from the given regions are queried.
@@ -91,6 +78,6 @@ FLAGS
        --zones [ZONE ...]
            If provided, operations from the given zones are queried.
 
-       --help
+       -h
            Print a summary help and exit.
 

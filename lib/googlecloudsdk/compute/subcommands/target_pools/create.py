@@ -3,6 +3,7 @@
 from googlecloudapis.compute.v1 import compute_v1_messages as messages
 from googlecloudsdk.calliope import exceptions as calliope_exceptions
 from googlecloudsdk.compute.lib import base_classes
+from googlecloudsdk.compute.lib import utils
 
 
 SESSION_AFFINITIES = sorted(
@@ -65,10 +66,10 @@ class Create(base_classes.BaseAsyncMutator):
         check.
         """
 
-    parser.add_argument(
-        '--region',
-        help='The region in which the forwarding rule will be created.',
-        required=True)
+    utils.AddRegionFlag(
+        parser,
+        resource_type='target pool',
+        operation_type='create')
 
     session_affinity = parser.add_argument(
         '--session-affinity',
@@ -100,7 +101,7 @@ class Create(base_classes.BaseAsyncMutator):
     return 'Insert'
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'targetPools'
 
   def CreateRequests(self, args):
@@ -108,13 +109,13 @@ class Create(base_classes.BaseAsyncMutator):
     if ((args.backup_pool and not args.failover_ratio) or
         (args.failover_ratio and not args.backup_pool)):
       raise calliope_exceptions.ToolException(
-          'either both or neither of --failover-ratio and --backup-pool '
-          'must be provided')
+          'Either both or neither of [--failover-ratio] and [--backup-pool] '
+          'must be provided.')
 
     if args.failover_ratio is not None:
       if args.failover_ratio < 0 or args.failover_ratio > 1:
         raise calliope_exceptions.ToolException(
-            '--failover-ratio must be a number between 0 and 1, inclusive')
+            '[--failover-ratio] must be a number between 0 and 1, inclusive.')
 
     if args.health_check:
       health_check = [self.context['uri-builder'].Build(
@@ -128,16 +129,18 @@ class Create(base_classes.BaseAsyncMutator):
     else:
       backup_pool_uri = None
 
+    target_pool_ref = self.CreateRegionalReference(args.name, args.region)
+
     request = messages.ComputeTargetPoolsInsertRequest(
         targetPool=messages.TargetPool(
             backupPool=backup_pool_uri,
             description=args.description,
             failoverRatio=args.failover_ratio,
             healthChecks=health_check,
-            name=args.name,
+            name=target_pool_ref.Name(),
             sessionAffinity=messages.TargetPool.SessionAffinityValueValuesEnum(
                 args.session_affinity)),
-        region=args.region,
+        region=target_pool_ref.region,
         project=self.context['project'])
 
     return [request]

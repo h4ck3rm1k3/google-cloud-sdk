@@ -20,7 +20,11 @@ import sys
 from google.apputils import appcommands
 
 from gcutil_lib import auth_helper
+from gcutil_lib import gcutil_logging
 from gcutil_lib import scopes
+
+
+LOGGER = gcutil_logging.LOGGER
 
 
 class WhoAmI(appcommands.Cmd):
@@ -32,6 +36,11 @@ class WhoAmI(appcommands.Cmd):
   def Run(self, unused_argv):
     """Identifies the authenticated user."""
 
+    LOGGER.warn('This command and deprecated and will be removed in a '
+                'later version. Please use "gcloud auth" for your '
+                'authentication needs and "gcloud config list" to determine '
+                'the currently logged-in user.')
+
     credential = auth_helper.GetCredentialFromStore(
         scopes.DEFAULT_AUTH_SCOPES, ask_user=False)
 
@@ -41,11 +50,11 @@ class WhoAmI(appcommands.Cmd):
     elif (credential and
           (not credential.id_token or 'email' not in credential.id_token)):
       sys.stderr.write('You are authenticated, but the user id has not been '
-                       'logged. Try re-authenticating using "gcutil auth".\n')
+                       'logged. Try re-authenticating using "gcloud auth".\n')
       return 1
     else:
       sys.stderr.write(
-          'You haven\'t set up your account yet. Please run "gcutil auth".\n')
+          'You haven\'t set up your account yet. Please run "gcloud auth".\n')
       return 1
 
 

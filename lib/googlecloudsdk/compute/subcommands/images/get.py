@@ -4,8 +4,8 @@ from googlecloudsdk.compute.lib import base_classes
 from googlecloudsdk.compute.lib import image_utils
 
 
-class GetImages(image_utils.ImageResourceFetcher,
-                base_classes.GlobalGetter):
+class Get(image_utils.ImageResourceFetcher,
+          base_classes.GlobalGetter):
   """Get Google Compute Engine images."""
 
   @staticmethod
@@ -19,11 +19,11 @@ class GetImages(image_utils.ImageResourceFetcher,
     return self.context['compute'].images
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'images'
 
 
-GetImages.detailed_help = {
+Get.detailed_help = {
     'brief': 'Get Google Compute Engine images',
     'DESCRIPTION': """\
         *{command}* displays all data associated with Google Compute

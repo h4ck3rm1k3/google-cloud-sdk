@@ -29,7 +29,6 @@ import gflags as flags
 import unittest
 
 from gcutil_lib import command_base
-from gcutil_lib import gcutil_errors
 from gcutil_lib import gcutil_unittest
 from gcutil_lib import image_cmds
 from gcutil_lib import mock_api
@@ -44,27 +43,96 @@ class ImageCmdsTest(gcutil_unittest.GcutilTestCase):
   def setUp(self):
     self.mock, self.api = mock_api.CreateApi(self.version)
 
-  def testDeprecatedFlags(self):
-    if self.version <= version.get('v1beta16'):
-      return
+  def testCreateImageWithNoSourceThrowsUsageError(self):
 
     set_flags = {
         'project': 'test',
         'description': 'description',
-        'preferred_kernel': 'kernel',
     }
 
     command = self._CreateAndInitializeCommand(
         image_cmds.AddImage, 'addimage', self.version, set_flags)
 
-    self.assertRaises(gcutil_errors.UnsupportedCommand,
+    self.assertRaises(app.UsageError,
+                      command.Handle, 'image')
+
+  def testCreateImageFromArchiveAndDiskThrowsUsageError(self):
+
+    if self.version < version.get('v1'):
+      return
+    set_flags = {
+        'project': 'test',
+        'description': 'description',
+        'source_disk': 'disk',
+        'zone': 'zone',
+    }
+
+    command = self._CreateAndInitializeCommand(
+        image_cmds.AddImage, 'addimage', self.version, set_flags)
+
+    self.assertRaises(app.UsageError,
                       command.Handle, 'image', 'source')
 
+  def testAddImageFromDiskGeneratesCorrectRequest(self):
+    if self.version < version.get('v1'):
+      return
+    test_cases = [{
+        'requested_image': 'test_image',
+        'expected_image': 'test_image',
+        'project_flag': 'test_project',
+        'expected_project': 'test_project',
+        'source_disk': 'test_disk',
+        'expected_source_disk': (
+            'https://www.googleapis.com/compute/' + self.version +
+            '/projects/test_project/zones/dev-central1-std/disks/test_disk'),
+        'zone': 'dev-central1-std',
+    }]
+
+    for test_case in test_cases:
+      self._DoTestAddImageFromDiskGeneratesCorrectRequest(**test_case)
+
+  def _DoTestAddImageFromDiskGeneratesCorrectRequest(
+      self, requested_image, expected_image, project_flag,
+      expected_project, source_disk, expected_source_disk, zone):
+
+    expected_description = 'test image'
+    expected_type = 'RAW'
+
+    set_flags = {
+        'project': project_flag,
+        'description': expected_description,
+        'source_disk': source_disk,
+        'zone': zone,
+    }
+
+    command = self._CreateAndInitializeCommand(
+        image_cmds.AddImage, 'addimage', self.version, set_flags)
+
+    call = self.mock.Respond(
+        'compute.images.insert',
+        {
+            'kind': 'compute#operation',
+        })
+
+    unused_result = command.Handle(requested_image)
+    request = call.GetRequest()
+
+    self.assertEquals('POST', request.method)
+
+    parameters = request.parameters
+    body = json.loads(request.body)
+
+    self.assertEqual(parameters['project'], expected_project)
+    self.assertEqual(body['name'], expected_image)
+    self.assertEqual(body['description'], expected_description)
+
+    self.assertNotIn('rawDisk', body)
+    self.assertEqual(body['sourceType'], expected_type)
+    self.assertEqual(body['sourceDisk'], expected_source_disk)
 
   def _DoTestAddImageFromSourceTarballGeneratesCorrectRequest(
-      self, requested_source, expected_source, submitted_kernel,
-      expected_kernel, requested_image, expected_image, project_flag,
-      expected_project):
+      self, requested_source, expected_source, requested_image,
+      expected_image, project_flag, expected_project):
 
     expected_description = 'test image'
     expected_type = 'RAW'
@@ -73,9 +141,6 @@ class ImageCmdsTest(gcutil_unittest.GcutilTestCase):
         'project': project_flag,
         'description': expected_description,
     }
-
-    if self.version <= version.get('v1beta16'):
-      set_flags['preferred_kernel'] = submitted_kernel
 
     command = self._CreateAndInitializeCommand(
         image_cmds.AddImage, 'addimage', self.version, set_flags)
@@ -98,8 +163,6 @@ class ImageCmdsTest(gcutil_unittest.GcutilTestCase):
     self.assertEqual(body['name'], expected_image)
     self.assertEqual(body['description'], expected_description)
 
-    if command.api.version < version.get('v1'):
-      self.assertEqual(body['preferredKernel'], expected_kernel)
     self.assertEqual(body['sourceType'], expected_type)
     self.assertEqual(body['rawDisk']['source'], expected_source)
 
@@ -107,10 +170,6 @@ class ImageCmdsTest(gcutil_unittest.GcutilTestCase):
     test_cases = [{
         'requested_source': 'http://test.source',
         'expected_source': 'http://test.source',
-        'submitted_kernel': 'projects/test_project/global/kernels/test_kernel',
-        'expected_kernel': (
-            'https://www.googleapis.com/compute/' + self.version +
-            '/projects/test_project/global/kernels/test_kernel'),
         'requested_image': 'test_image',
         'expected_image': 'test_image',
         'project_flag': 'test_project',
@@ -118,10 +177,6 @@ class ImageCmdsTest(gcutil_unittest.GcutilTestCase):
     }, {
         'requested_source': 'gs://test_bucket/source',
         'expected_source': 'http://storage.googleapis.com/test_bucket/source',
-        'submitted_kernel': 'projects/test_project/global/kernels/test_kernel',
-        'expected_kernel': (
-            'https://www.googleapis.com/compute/' + self.version +
-            '/projects/test_project/global/kernels/test_kernel'),
         'requested_image': 'test_image',
         'expected_image': 'test_image',
         'project_flag': 'test_project',
@@ -129,12 +184,6 @@ class ImageCmdsTest(gcutil_unittest.GcutilTestCase):
     }, {
         'requested_source': 'http://example.com/source',
         'expected_source': 'http://example.com/source',
-        'submitted_kernel': (
-            'https://www.googleapis.com/compute/' + self.version +
-            '/projects/right_project/global/kernels/test_kernel'),
-        'expected_kernel': (
-            'https://www.googleapis.com/compute/' + self.version +
-            '/projects/right_project/global/kernels/test_kernel'),
         'requested_image': (
             'https://www.googleapis.com/compute/' + self.version +
             '/projects/right_project/global/images/test_image'),
@@ -280,7 +329,7 @@ class OldImageCmdsTest(unittest.TestCase):
     command.SetFlags(flag_values)
 
     def ImageSelfLink(name):
-      return ('https://www.googleapis.com/compute/v1beta16/projects/'
+      return ('https://www.googleapis.com/compute/v1/projects/'
               'google.com:myproject/global/images/%s') % name
 
     images = [
@@ -306,12 +355,6 @@ class OldImageCmdsTest(unittest.TestCase):
     self.assertEqual(5, len(validate_images))
     for i in range(len(images)):
       self.assertEqual(images[i]['selfLink'], validate_images[i]['selfLink'])
-
-  def testRegisterKernelFlags(self):
-    flag_values = copy.deepcopy(FLAGS)
-    command = image_cmds.AddImage('addimage', flag_values)
-    command.SetFlags(flag_values)
-    command.old_kernels = True
 
   def testPromptForImages(self):
     flag_values = copy.deepcopy(FLAGS)

@@ -20,11 +20,11 @@ _WEBBROWSER_NAMES_BLACKLIST = [
 
 
 class Login(base.Command):
-  """Get credentials via Google's oauth2 web flow.
+  """Get credentials for the tools in the Google Cloud SDK via a web flow.
 
-  Obtains access credentials for Google Cloud Platform resources, via a web
-  flow, and makes them available for all the platform tools in the Cloud SDK. If
-  a project is not provided, prompts for a default project.
+  Obtains access credentials for the Google Cloud Platform resources of the
+  given account, via a web flow.  If the account already has valid credentials,
+  it is set as active without re-running the web flow.
   """
 
   @staticmethod
@@ -36,23 +36,63 @@ class Login(base.Command):
         action='store_false', default=True, dest='launch_browser',
         help=('Print a URL to be copied instead of launching a web browser.'))
     parser.add_argument(
-        '--account', help='Override the account acquired from the web flow.')
-    parser.add_argument(
         '--do-not-activate', action='store_true',
         help='Do not set the new credentials as active.')
+    parser.add_argument(
+        '--force', action='store_true',
+        help='Re-run the web flow even if the given account has valid '
+        'credentials.')
+    parser.add_argument(
+        'account', nargs='?', help='The account to log in as.')
 
   @c_exc.RaiseToolExceptionInsteadOf(c_store.Error)
   def Run(self, args):
     """Run the authentication command."""
 
-    # Run the auth flow. Even if the user already is authenticated, the flow
-    # will allow him or her to choose a different account.
-    try:
-      launch_browser = args.launch_browser and not c_gce.Metadata().connected
+    account = args.account
 
+    if account and not args.force:
+      creds = c_store.LoadIfValid(account=account)
+      if creds:
+        # Account already has valid creds, just switch to it.
+        return self.LoginAs(account, creds, args.project, args.do_not_activate)
+
+    # No valid creds, do the web flow.
+    creds = self.DoWebFlow(args.launch_browser)
+    web_flow_account = creds.token_response['id_token']['email']
+    if account and account != web_flow_account:
+      raise c_exc.ToolException(
+          'You attempted to log in as account [{account}] but the received '
+          'credentials were for account [{web_flow_account}].\n\n'
+          'Please check that your browser is logged in as account [{account}] '
+          'and that you are using the correct browser profile.'.format(
+              account=account, web_flow_account=web_flow_account))
+
+    account = web_flow_account
+    # We got new creds, and they are for the correct user.
+    c_store.Store(creds, account)
+    return self.LoginAs(account, creds, args.project, args.do_not_activate)
+
+  def LoginAs(self, account, creds, project, do_not_activate):
+    if do_not_activate:
+      return creds
+    properties.PersistProperty(properties.VALUES.core.account, account)
+    if project:
+      properties.PersistProperty(properties.VALUES.core.project, project)
+    log.out.write(
+        '\nYou are now logged in as [{account}].\n'
+        'Your current project is [{project}].  You can change this setting by '
+        'running:\n  $ gcloud config set project <project>\n'.format(
+            account=account, project=properties.VALUES.core.project.Get()))
+    return creds
+
+  def DoWebFlow(self, launch_browser):
+    try:
       # Sometimes it's not possible to launch the web browser. This often
       # happens when people ssh into other machines.
       if launch_browser:
+        if c_gce.Metadata().connected:
+          launch_browser = False
         try:
           browser = webbrowser.get()
           if (hasattr(browser, 'name')
@@ -61,36 +101,9 @@ class Login(base.Command):
         except webbrowser.Error:
           launch_browser = False
 
-      creds = c_store.AcquireFromWebFlow(
-          launch_browser=launch_browser)
+      return c_store.AcquireFromWebFlow(launch_browser=launch_browser)
     except c_store.FlowError:
       log.error(
           ('There was a problem with the web flow. Try running with '
            '--no-launch-browser'))
       raise
-
-    account = args.account
-    if not account:
-      account = creds.token_response['id_token']['email']
-
-    c_store.Store(creds, account)
-
-    if not args.do_not_activate:
-      properties.PersistProperty(properties.VALUES.core.account, account)
-
-    if args.project:
-      properties.PersistProperty(properties.VALUES.core.project, args.project)
-
-    return creds
-
-  def Display(self, args, creds):
-    account = creds.token_response['id_token']['email']
-    log.out.write(
-        '\nYou are logged in as {account}.\n'.format(account=account))
-    if args.project:
-      log.out.write("""
-Project set to {project}.
-You can change it at any time by running the following command.
- $ gcloud config set project NEW_PROJECT
-""".format(project=args.project))
-

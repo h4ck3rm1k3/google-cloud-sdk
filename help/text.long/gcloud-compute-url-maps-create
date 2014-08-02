@@ -6,7 +6,8 @@ SYNOPSIS
          NAME
          --default-service DEFAULT_SERVICE
          [--description DESCRIPTION]
-         [-h, --help]
+         [--help]
+         [-h]
 
 DESCRIPTION
        gcloud compute url-maps create is used to create URL maps which map
@@ -39,5 +40,8 @@ FLAGS
            An optional, textual description for the URL map.
 
        --help
+           Display detailed help.
+
+       -h
            Print a summary help and exit.
 

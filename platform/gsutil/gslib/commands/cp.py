@@ -38,6 +38,7 @@ from gslib.storage_url import ContainsWildcard
 from gslib.storage_url import StorageUrlFromString
 from gslib.util import CreateLock
 from gslib.util import GetCloudApiInstance
+from gslib.util import IsCloudSubdirPlaceholder
 from gslib.util import MakeHumanReadable
 from gslib.util import NO_MAX
 from gslib.util import RemoveCRLFFromString
@@ -206,6 +207,28 @@ COPY_IN_CLOUD_TEXT = """
   will cause all versions of gs://bucket1/obj to be copied to gs://bucket2.
 """
 
+FAILURE_HANDLING_TEXT = """
+<B>CHECKSUM VALIDATION AND FAILURE HANDLING</B>
+  At the end of every upload or download, the gsutil cp command validates that
+  the checksum of the local file matches that of the checksum of the object
+  stored in GCS. If it does not, gsutil will delete the invalid copy and print a
+  warning message. This very rarely happens. If it does, please contact
+  gs-team@google.com.
+
+  The cp command will retry when failures occur, but if enough failures happen
+  during a particular copy or delete operation the command will skip that object
+  and move on. At the end of the copy run if any failures were not successfully
+  retried, the cp command will report the count of failures, and exit with
+  non-zero status.
+
+  Note that there are cases where retrying will never succeed, such as if you
+  don't have write permission to the destination bucket or if the destination
+  path for some objects is longer than the maximum allowed length.
+
+  For more details about gsutil's retry handling, please see
+  "gsutil help retries".
+"""
+
 RESUMABLE_TRANSFERS_TEXT = """
 <B>RESUMABLE TRANSFERS</B>
   gsutil automatically uses the Google Cloud Storage resumable upload feature
@@ -224,9 +247,12 @@ RESUMABLE_TRANSFERS_TEXT = """
   visible as soon as it starts being written. Thus, before you attempt to use
   any files downloaded by gsutil you should make sure the download completed
   successfully, by checking the exit status from the gsutil command. This can
-  be done using a script like the following:
+  be done in a bash script, for example, by doing:
 
-     until gsutil cp gs://your-bucket/your-object ./local-file; do sleep 1; done
+     gsutil cp gs://your-bucket/your-object ./local-file
+     if [ "$status" -ne "0" ] ; then
+       << Code that handles failures >>
+     fi
 
   Resumable uploads and downloads store some state information in a file
   in ~/.gsutil named by the destination object or file. If you attempt to
@@ -277,15 +303,21 @@ PARALLEL_COMPOSITE_UPLOADS_TEXT = """
   related to the hash of the contents of the file or object).
 
   To avoid leaving temporary objects around, you should make sure to check the
-  exit status from the gsutil command. This can be done using a script like the
-  following:
+  exit status from the gsutil command.  This can be done in a bash script, for
+  example, by doing:
 
-     until gsutil cp ./file gs://your-bucket/obj; do sleep 1; done
+     gsutil cp ./local-file gs://your-bucket/your-object
+     if [ "$status" -ne "0" ] ; then
+       << Code that handles failures >>
+     fi
+  
+  Or, for copying a while directory, use this instead:
 
-  If you're copying a whole directory use this instead:
-
-     until gsutil cp -c -L cp.log -R ./dir gs://bucket; do sleep 1; done
-
+     gsutil cp -c -L cp.log -R ./dir gs://bucket
+     if [ "$status" -ne "0" ] ; then
+       << Code that handles failures >>
+     fi
+  
   One important caveat is that files uploaded in this fashion are still subject
   to the maximum number of components limit. For example, if you upload a large
   file that gets split into %d components, and try to compose it with another
@@ -301,6 +333,7 @@ PARALLEL_COMPOSITE_UPLOADS_TEXT = """
   "parallel_composite_upload_threshold" variable in the .boto config file to 0.
 """ % (PARALLEL_UPLOAD_TEMP_NAMESPACE, 10, MAX_COMPONENT_COUNT - 9,
        MAX_COMPONENT_COUNT)
+
 
 CHANGING_TEMP_DIRECTORIES_TEXT = """
 <B>CHANGING TEMP DIRECTORIES</B>
@@ -340,7 +373,11 @@ OPTIONS_TEXT = """
   -c             If an error occurrs, continue to attempt to copy the remaining
                  files. If any copies were unsuccessful, gsutil's exit status
                  will be non-zero even if this flag is set. This option is
-                 implicitly set when running "gsutil -m cp...".
+                 implicitly set when running "gsutil -m cp...". Note: -c only
+                 applies to the actual copying operation. If an error occurs
+                 while iterating over the files in the local directory (e.g.,
+                 invalid Unicode file name) gsutil will print an error message
+                 and abort.
 
   -D             Copy in "daisy chain" mode, i.e., copying between two buckets
                  by hooking a download to an upload, via the machine where
@@ -474,13 +511,18 @@ OPTIONS_TEXT = """
                    browser will know to uncompress the data based on the
                    Content-Encoding header, and to render it as HTML based on
                    the Content-Type header.
+                 
+                 Note that if you download an object with Content-Encoding:gzip
+                 gsutil will decompress the content before writing the local
+                 file.
 """
 
-_detailed_help_text = '\n\n'.join([SYNOPSIS_TEXT,
+_DETAILED_HELP_TEXT = '\n\n'.join([SYNOPSIS_TEXT,
                                    DESCRIPTION_TEXT,
                                    NAME_CONSTRUCTION_TEXT,
                                    SUBDIRECTORIES_TEXT,
                                    COPY_IN_CLOUD_TEXT,
+                                   FAILURE_HANDLING_TEXT,
                                    RESUMABLE_TRANSFERS_TEXT,
                                    STREAMING_TRANSFERS_TEXT,
                                    PARALLEL_COMPOSITE_UPLOADS_TEXT,
@@ -549,7 +591,7 @@ class CpCommand(Command):
       help_name_aliases=['copy'],
       help_type='command_help',
       help_one_line_summary='Copy files and objects',
-      help_text=_detailed_help_text,
+      help_text=_DETAILED_HELP_TEXT,
       subcommand_help_text={},
   )
 
@@ -582,6 +624,19 @@ class CpCommand(Command):
     if have_multiple_srcs:
       copy_helper.InsistDstUrlNamesContainer(
           exp_dst_url, have_existing_dst_container, cmd_name)
+
+    # Various GUI tools (like the GCS web console) create placeholder objects
+    # ending with '/' when the user creates an empty directory. Normally these
+    # tools should delete those placeholders once objects have been written
+    # "under" the directory, but sometimes the placeholders are left around. We
+    # need to filter them out here, otherwise if the user tries to rsync from
+    # GCS to a local directory it will result in a directory/file conflict
+    # (e.g., trying to download an object called "mydata/" where the local
+    # directory "mydata" exists).
+    if IsCloudSubdirPlaceholder(exp_src_url):
+      self.logger.info('Skipping cloud sub-directory placeholder object %s',
+                       exp_src_url.GetUrlString())
+      return
 
     if copy_helper_opts.use_manifest and self.manifest.WasSuccessful(
         exp_src_url.GetUrlString()):

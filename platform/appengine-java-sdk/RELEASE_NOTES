@@ -3,6 +3,18 @@ All rights reserved.
 
 App Engine Java SDK - Release Notes
 
+Version 1.9.7
+=============
+- Added memcache historical hit ratio to Admin Console dashboard.
+- Fixed an issue with sockets connections timing out after 2 minutes.
+- Fixed an issue that could cause a StackOverflowError in apps when loading
+  the code of a class as a resource using ClassLoader.getResource.
+    https://code.google.com/p/googleappengine/issues/detail?id=10413
+- Fixed an issue with the dev_appserver caller-class check in Runtime.invoke()
+  which was looking too far up the stack and therefore refusing Method.invoke()
+  calls from another class in the same package.
+    https://code.google.com/p/googleappengine/issues/detail?id=10539
+
 Version 1.9.6
 =============
 - Fixed an issue with the dev_appserver Search API for atom fields that contain

@@ -24,6 +24,7 @@ path_initializer.InitSysPath()
 
 
 import base64
+import collections
 import copy
 import json
 import logging
@@ -46,12 +47,14 @@ from gcutil_lib import mock_api
 from gcutil_lib import mock_lists
 from gcutil_lib import mock_timer
 from gcutil_lib import old_mock_api
-from gcutil_lib import version
 from gcutil_lib import windows_password
 
 
 FLAGS = flags.FLAGS
 LOGGER = gcutil_logging.LOGGER
+
+_LicenseReference = collections.namedtuple(
+    'LicenseReference', ('project', 'name'))
 
 
 class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
@@ -85,23 +88,9 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
     command.PrintResult({'contents': u'Nasty character: \ufffd'})
 
   def testDeprecatedFlagsInAddInstance(self):
-    if self.version <= version.get('v1beta16'):
-      return
-
     set_flags = {
         'project': 'cool-project',
         'persistent_boot_disk': False,
-    }
-
-    command = self._CreateAndInitializeCommand(
-        instance_cmds.AddInstance, 'addinstance', self.version, set_flags)
-
-    self.assertRaises(gcutil_errors.UnsupportedCommand,
-                      command.Handle, 'some-instance')
-
-    set_flags = {
-        'project': 'cool-project',
-        'kernel': 'popcorn',
     }
 
     command = self._CreateAndInitializeCommand(
@@ -139,9 +128,6 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
     self.assertEqual('my-reset-instance', parameters['instance'])
 
   def testSetInstanceDiskAutoDeleteGeneratesCorrectRequest(self):
-    if self.version <= version.get('v1'):
-      return
-
     set_flags = {
         'project': 'my-project',
         'zone': 'my-zone',
@@ -205,6 +191,9 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
                                                    'zones/%s' % expected_zone,
                                                    'instances',
                                                    expected_instance)
+
+    unused_instancelist = mock_lists.GetSampleInstanceListCall(
+        command, self.mock, 1, [expected_instance], [], [])
 
     def DeleteResponse(unused_uri, unused_http_method, parameters,
                        unused_body):
@@ -282,6 +271,9 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
     command = self._CreateAndInitializeCommand(
         instance_cmds.DeleteInstance, 'deleteinstance', self.version, set_flags)
 
+    unused_instancelist = mock_lists.GetSampleInstanceListCall(
+        command, self.mock, 1, [expected_instance], [], [])
+
     def DeleteResponse(unused_uri, unused_http_method, parameters,
                        unused_body):
       return self.mock.MOCK_RESPONSE(
@@ -328,6 +320,9 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
 
     command = self._CreateAndInitializeCommand(
         instance_cmds.DeleteInstance, 'deleteinstance', self.version, set_flags)
+
+    unused_instancelist = mock_lists.GetSampleInstanceListCall(
+        command, self.mock, 1, [expected_instance], [], [])
 
     expected_selflink = (
         'https://www.googleapis.com/compute/v1/'
@@ -389,6 +384,10 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
     command = self._CreateAndInitializeCommand(
         instance_cmds.DeleteInstance, 'deleteinstance', self.version, set_flags)
 
+    for instance in expected_instances:
+      unused_instancelist = mock_lists.GetSampleInstanceListCall(
+          command, self.mock, 1, instance, [], [])
+
     def DeleteResponse(unused_uri, unused_http_method, parameters,
                        unused_body):
       return self.mock.MOCK_RESPONSE(
@@ -427,7 +426,6 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
     expected_project = 'cool-project'
     expected_instance = 'cool-instance'
     expected_zone = 'the-danger-zone'
-    provided_kernel = 'colonel'
     expected_machine_type = 'party-machine'
     disk_name = 'win1'
     disk_flag = ['%s,boot' % disk_name]
@@ -440,9 +438,6 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
         'add_compute_key_to_project': False,
         'auto_delete_boot_disk': True,
         }
-
-    if self.version <= version.get('v1beta16'):
-      set_flags['kernel'] = provided_kernel
 
     command = self._CreateAndInitializeCommand(
         instance_cmds.AddInstance, 'addinstance', self.version, set_flags)
@@ -478,6 +473,19 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
             'kind': 'compute#operation',
             'status': 'DONE'
         })
+
+    # Simulate some non-windows license on the disk.  It allows us to test
+    # that the code does not mistake non-windows license for windows
+    # license.
+    licenses = [
+        _LicenseReference('project1', 'license1'),
+        _LicenseReference('project2', 'license2'),
+    ]
+    self._MockDiskGet(command,
+                      expected_project,
+                      expected_zone,
+                      disk_name,
+                      licenses)
 
     # The instance call will succeed.
     def InstanceInsertResponse(unused_uri, unused_http_method, parameters,
@@ -516,16 +524,16 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
     self.assertEquals(expected_zone, instance_request_parameters['zone'])
     self.assertEquals(expected_project, instance_request_parameters['project'])
     self.assertEquals(expected_instance, instance_request_body['name'])
+    self.assertFalse(
+        self._GetMetadataInRequest(
+            instancecall,
+            metadata_module.INITIAL_WINDOWS_USER_METADATA_NAME))
+    self.assertFalse(
+        self._GetMetadataInRequest(
+            instancecall,
+            metadata_module.INITIAL_WINDOWS_PASSWORD_METADATA_NAME))
 
-    # Kernel is constructed by AddInstance.
-    if command.api.version <= version.get('v1beta16'):
-      expected_kernel = command.NormalizeGlobalResourceName(
-          expected_project,
-          'kernels',
-          provided_kernel)
-      self.assertEquals(expected_kernel, instance_request_body['kernel'])
-
-    # Disk is also constructed by AddInstance.
+    # Disk is constructed by AddInstance.
     expected_disks = [{
         u'source': command.NormalizePerZoneResourceName(
             expected_project,
@@ -535,9 +543,8 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
         u'type': u'PERSISTENT',
         u'deviceName': disk_name,
         u'boot': True,
-        u'mode': u'READ_WRITE'}]
-    if command.api.version >= version.get('v1'):
-      expected_disks[0][u'autoDelete'] = True
+        u'mode': u'READ_WRITE',
+        u'autoDelete': True}]
 
     self.assertEquals(expected_disks, instance_request_body['disks'])
 
@@ -556,16 +563,19 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
         'image': expected_image
         }
 
-    if self.version <= version.get('v1beta16'):
-      set_flags['persistent_boot_disk'] = False
-    else:
-      set_flags['disk'] = ['cool-disk,boot']
+    boot_disk_name = 'cool-disk'
+    set_flags['disk'] = ['{0},boot'.format(boot_disk_name)]
 
     command = self._CreateAndInitializeCommand(
         instance_cmds.AddInstance, 'addinstance', self.version, set_flags)
 
     # gcutil checks to see whether the image is on any known list.
     mock_lists.MockImageListForCustomerAndStandardProjects(command, self.mock)
+
+    self._MockDiskGet(command,
+                      expected_project,
+                      expected_zone,
+                      boot_disk_name)
 
     # The instance call will succeed.
     def InstanceInsertResponse(unused_uri, unused_http_method, parameters,
@@ -688,22 +698,6 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
     self.assertEqual(expected_value,
                      self._GetMetadataInRequest(instancecall, key))
 
-  def _MockListImagesWithWindowsImage(self, command, windows_image_name):
-    # The call to list images from customer project.
-    mock_lists.GetSampleImageListCall(command, self.mock)
-
-    # The calls to standard projects including Windows project.
-    # We iterate through the standard project and return the expected
-    # windows_image_name only for the Windows project
-    windows_mocked = False
-    for project in command_base.STANDARD_IMAGE_PROJECTS:
-      if project in command_base.WINDOWS_IMAGE_PROJECTS and not windows_mocked:
-        mock_lists.GetSampleImageListCall(
-            command, self.mock, 1, [windows_image_name])
-        windows_mocked = True
-      else:
-        mock_lists.GetSampleImageListCall(command, self.mock)
-
   def _SetUpAddInstanceUsingWindowsImage(
       self, user_name=None, password_file=None):
     expected_project = 'cool-project'
@@ -728,18 +722,26 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
       set_flags['metadata_from_file'] = [
           metadata_module.INITIAL_WINDOWS_PASSWORD_METADATA_NAME + ':' +
           password_file]
-
-    if self.version <= version.get('v1beta16'):
-      set_flags['persistent_boot_disk'] = False
-    else:
-      set_flags['disk'] = ['cool-disk,boot']
+    disk_name = 'cool-disk'
+    set_flags['disk'] = [disk_name + ',boot']
 
     command = self._CreateAndInitializeCommand(
         instance_cmds.AddInstance, 'addinstance', self.version, set_flags)
 
-    # Mock listing images from the standard project and make sure
-    # that a Windows project matches the expected_image.
-    self._MockListImagesWithWindowsImage(command, expected_image)
+    # gcutil checks to see whether the image is on any known list.
+    mock_lists.MockImageListForCustomerAndStandardProjects(command, self.mock)
+
+    # Include windows license.
+    licenses = [
+        _LicenseReference('test-project', 'test-license'),
+        _LicenseReference(
+            command_base.WINDOWS_IMAGE_PROJECTS[0], 'windows-2008')
+    ]
+    self._MockDiskGet(command,
+                      expected_project,
+                      expected_zone,
+                      disk_name,
+                      licenses)
 
     # The instance call will succeed.
     def InstanceInsertResponse(unused_uri, unused_http_method, parameters,
@@ -767,96 +769,6 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
     instancecall = self.mock.RespondF('compute.instances.insert',
                                       InstanceInsertResponse)
     return (command, instancecall)
-
-  def testAddInstanceWithExistingPersistentBootDisk(self):
-    if self.version >= version.get('v1'):
-      return
-
-    expected_project = 'cool-project'
-    expected_instance = 'fail-instance'
-    expected_zone = 'the-danger-zone'
-
-    set_flags = {
-        'project': expected_project,
-        'zone': expected_zone,
-        'add_compute_key_to_project': False,
-        }
-
-    # Capture I/O.
-    oldin = sys.stdin
-    sys.stdin = StringIO('1\ny\n2\n')
-
-    command = self._CreateAndInitializeCommand(
-        instance_cmds.AddInstance, 'addinstance', self.version, set_flags)
-
-    # A call to _GetZone occurrs for the given zone.
-    unused_zonecall = self.mock.Respond(
-        'compute.zones.get',
-        {
-            'kind': 'compute#zone',
-            'name': expected_zone,
-            'status': 'UP',
-            'selfLink': command.NormalizeGlobalResourceName(expected_project,
-                                                            'zones',
-                                                            expected_zone)
-        })
-
-    # First, the user will be prompted to select a machine type.
-    unused_machinetypecall = (
-        mock_lists.GetSampleMachineTypeListCall(
-            command, self.mock, 2))
-
-    # Next, the user will be prompted to select an image.
-    mock_lists.MockImageListForCustomerAndStandardProjects(command, self.mock)
-
-    # We also do an image.get call.
-    unused_imagegetcall = self.mock.Respond(
-        'compute.images.get',
-        {
-            'kind': 'compute#image',
-            'description': 'mock image',
-            'name': 'image',
-            'status': 'READY',
-            'selfLink': command.NormalizeGlobalResourceName(
-                expected_project,
-                'images',
-                'image')
-        })
-
-    # The instance creation will fail, because the disk already exists.
-    # AddInstance will quit at this point because there are no instances left
-    # to create.
-    def DiskInsertResponse(unused_uri, unused_http_method, parameters, body):
-      return self.mock.MOCK_RESPONSE(
-          {
-              'error': {'errors': [{'code': 'RESOURCE_ALREADY_EXISTS'}]},
-              'kind': 'compute#operation',
-              'name': json.loads(body)['name'],
-              'operationType': 'insert',
-              'status': 'DONE',
-              'targetLink': command.NormalizeResourceName(
-                  parameters['project'],
-                  'zones/%s' % parameters['zone'],
-                  'disks',
-                  json.loads(body)['name']),
-              'zone': command.NormalizeGlobalResourceName(expected_project,
-                                                          'zones',
-                                                          parameters['zone'])
-          },
-          True)
-
-    unused_diskcall = self.mock.RespondF('compute.disks.insert',
-                                         DiskInsertResponse)
-
-    # Handle the command.
-    (unused_results, exceptions) = command.Handle(expected_instance)
-    self.assertEquals(exceptions, [])
-
-    # If nothing has gone wrong, this test has succeeded.
-    # parameters are validated in the other tests.
-
-    # Reset I/O
-    sys.stdin = oldin
 
   def testAddInstanceWithPersistentBootDisk(self):
     expected_project = 'cool-project'
@@ -994,27 +906,19 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
     self.assertEquals(1, len(instance_requests))
     instance_request_body = json.loads(instance_requests[0].body)
     instance_request_parameters = instance_requests[0].parameters
-    if self.version < version.get('v1'):
-      self.assertEquals(1, len(disk_requests))
-      self.assertEquals(command.NormalizeGlobalResourceName(expected_project,
-                                                            'images',
-                                                            'my_image'),
-                        str(disk_requests[0].parameters['sourceImage']))
-    else:
-      self.assertEquals(0, len(disk_requests))
-      disks = instance_request_body['disks']
-      self.assertEquals(command.NormalizeGlobalResourceName(expected_project,
-                                                            'images',
-                                                            'my_image'),
-                        str(disks[0]['initializeParams']['sourceImage']))
-      if self.version >= version.get('v1'):
-        expected_normalized_disk_type = command.NormalizePerZoneResourceName(
-            expected_project,
-            expected_zone,
-            'diskTypes',
-            expected_disk_type)
-        self.assertEquals(expected_normalized_disk_type,
-                          str(disks[0]['initializeParams']['diskType']))
+    self.assertEquals(0, len(disk_requests))
+    disks = instance_request_body['disks']
+    self.assertEquals(command.NormalizeGlobalResourceName(expected_project,
+                                                          'images',
+                                                          'my_image'),
+                      str(disks[0]['initializeParams']['sourceImage']))
+    expected_normalized_disk_type = command.NormalizePerZoneResourceName(
+        expected_project,
+        expected_zone,
+        'diskTypes',
+        expected_disk_type)
+    self.assertEquals(expected_normalized_disk_type,
+                      str(disks[0]['initializeParams']['diskType']))
 
     self.assertEquals(expected_zone, instance_request_parameters['zone'])
     self.assertEquals(expected_project, instance_request_parameters['project'])
@@ -1024,13 +928,9 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
     sys.stdin = oldin
 
   def testAddInstanceWithScheduling(self):
-    if self.version < version.get('v1beta16'):
-      return
-
     expected_project = 'cool-project'
     expected_instance = 'cool-instance'
     expected_zone = 'the-danger-zone'
-    provided_kernel = 'colonel'
     expected_machine_type = 'party-machine'
     disk_name = 'win1'
     disk_flag = ['%s,boot' % disk_name]
@@ -1046,9 +946,6 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
         'on_host_maintenance': expected_on_host_maintenance,
         'automatic_restart': expected_automatic_restart,
         }
-
-    if self.version <= version.get('v1beta16'):
-      set_flags['kernel'] = provided_kernel
 
     command = self._CreateAndInitializeCommand(
         instance_cmds.AddInstance, 'addinstance', self.version, set_flags)
@@ -1084,6 +981,11 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
             'kind': 'compute#operation',
             'status': 'DONE'
         })
+
+    self._MockDiskGet(command,
+                      expected_project,
+                      expected_zone,
+                      disk_name)
 
     # The instance call will succeed.
     def InstanceInsertResponse(unused_uri, unused_http_method, parameters,
@@ -1126,9 +1028,6 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
         instance_request_body['scheduling']['automaticRestart'])
 
   def testSetScheduling(self):
-    if self.version < version.get('v1beta16'):
-      return
-
     expected_project = 'test-project'
     expected_zone = 'test-zone'
     expected_on_host_maintenance = 'test-on-host-maintenance'
@@ -1270,14 +1169,12 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
         'boot': True,
         'kind': 'compute#attachedDisk',
         'mode': 'READ_WRITE',
+        'autoDelete': True,
         'source': command.NormalizePerZoneResourceName(expected_project,
                                                        expected_zone,
                                                        'disks',
                                                        expected_disk)
         }]
-
-    if self.version >= version.get('v1'):
-      attached_disk[0]['autoDelete'] = True
 
     unused_instancelist = mock_lists.GetSampleInstanceListCall(
         command, self.mock, 1, [expected_instance], [expected_description],
@@ -1333,9 +1230,8 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
           },
           True)
 
-    if self.version >= version.get('v1'):
-      autodeletecall = self.mock.RespondF('compute.instances.setDiskAutoDelete',
-                                          InstanceSetDiskAutoDeleteResponse)
+    autodeletecall = self.mock.RespondF('compute.instances.setDiskAutoDelete',
+                                        InstanceSetDiskAutoDeleteResponse)
     # Handle the command.
     (unused_results, exceptions) = command.Handle(expected_instance)
     self.assertEquals(exceptions, [])
@@ -1348,16 +1244,16 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
     self.assertEquals(expected_project, instance_request_parameters['project'])
     self.assertEquals(expected_instance,
                       instance_request_parameters['instance'])
-    if self.version >= version.get('v1'):
-      # Make sure we disabled auto-delete on the disk before deleting instance.
-      set_auto_delete_requests = autodeletecall.GetAllRequests()
-      self.assertEquals(1, len(set_auto_delete_requests))
-      params = set_auto_delete_requests[0].parameters
-      self.assertEquals(expected_zone, params['zone'])
-      self.assertEquals(expected_project, params['project'])
-      self.assertEquals(expected_instance, params['instance'])
-      self.assertEquals(expected_disk, params['deviceName'])
-      self.assertEquals('false', params['autoDelete'])
+
+    # Make sure we disabled auto-delete on the disk before deleting instance.
+    set_auto_delete_requests = autodeletecall.GetAllRequests()
+    self.assertEquals(1, len(set_auto_delete_requests))
+    params = set_auto_delete_requests[0].parameters
+    self.assertEquals(expected_zone, params['zone'])
+    self.assertEquals(expected_project, params['project'])
+    self.assertEquals(expected_instance, params['instance'])
+    self.assertEquals(expected_disk, params['deviceName'])
+    self.assertEquals('false', params['autoDelete'])
 
     # Reset I/O
     sys.stdin = oldin
@@ -1391,14 +1287,13 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
         'boot': True,
         'kind': 'compute#attachedDisk',
         'mode': 'READ_WRITE',
+        'autoDelete': False,
         'source': command.NormalizePerZoneResourceName(expected_project,
                                                        expected_zone,
                                                        'disks',
                                                        expected_disk)
         }]
 
-    if self.version >= version.get('v1'):
-      attached_disk[0]['autoDelete'] = False
     unused_instancelist = mock_lists.GetSampleInstanceListCall(
         command, self.mock, 1, [expected_instance], [expected_description],
         [attached_disk])
@@ -1471,7 +1366,7 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
                                                           parameters['zone'])
           },
           True)
-    diskcall = self.mock.RespondF('compute.disks.delete', DiskDeleteResponse)
+    self.mock.RespondF('compute.disks.delete', DiskDeleteResponse)
 
     def InstanceSetDiskAutoDeleteResponse(unused_uri, unused_http_method,
                                           parameters, unused_body):
@@ -1496,19 +1391,16 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
           },
           True)
 
-    if self.version >= version.get('v1'):
-      autodeletecall = self.mock.RespondF('compute.instances.setDiskAutoDelete',
-                                          InstanceSetDiskAutoDeleteResponse)
+    autodeletecall = self.mock.RespondF('compute.instances.setDiskAutoDelete',
+                                        InstanceSetDiskAutoDeleteResponse)
     # Handle the command.
     (unused_results, exceptions) = command.Handle(expected_instance)
     self.assertEquals(exceptions, [])
 
     # Validate requests.
-    expected_ops_requests = 1
-    if self.version >= version.get('v1'):
-      # No need to specifically wait for instances before deleting disks
-      # since this happens in one shot.
-      expected_ops_requests = 0
+    # No need to specifically wait for instances before deleting disks
+    # since this happens in one shot.
+    expected_ops_requests = 0
 
     ops_requests = opscall.GetAllRequests()
     self.assertEquals(expected_ops_requests, len(ops_requests))
@@ -1521,27 +1413,15 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
     self.assertEquals(expected_instance,
                       instance_request_parameters['instance'])
 
-    expected_disk_requests = True
-
-    if self.version >= version.get('v1'):
-      # Make sure we enabled auto-delete on the disk before deleting instance.
-      set_auto_delete_requests = autodeletecall.GetAllRequests()
-      self.assertEquals(1, len(set_auto_delete_requests))
-      params = set_auto_delete_requests[0].parameters
-      self.assertEquals(expected_zone, params['zone'])
-      self.assertEquals(expected_project, params['project'])
-      self.assertEquals(expected_instance, params['instance'])
-      self.assertEquals(expected_device_name, params['deviceName'])
-      self.assertEquals('true', params['autoDelete'])
-      expected_disk_requests = False
-
-    if expected_disk_requests:
-      disk_requests = diskcall.GetAllRequests()
-      self.assertEquals(1, len(disk_requests))
-      disk_request_parameters = disk_requests[0].parameters
-      self.assertEquals(expected_zone, disk_request_parameters['zone'])
-      self.assertEquals(expected_project, disk_request_parameters['project'])
-      self.assertEquals(expected_disk, disk_request_parameters['disk'])
+    # Make sure we enabled auto-delete on the disk before deleting instance.
+    set_auto_delete_requests = autodeletecall.GetAllRequests()
+    self.assertEquals(1, len(set_auto_delete_requests))
+    params = set_auto_delete_requests[0].parameters
+    self.assertEquals(expected_zone, params['zone'])
+    self.assertEquals(expected_project, params['project'])
+    self.assertEquals(expected_instance, params['instance'])
+    self.assertEquals(expected_device_name, params['deviceName'])
+    self.assertEquals('true', params['autoDelete'])
 
     # Reset I/O
     sys.stdin = oldin
@@ -1551,7 +1431,6 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
     expected_instance = 'test_instance'
     expected_description = 'test instance'
     submitted_image = 'expected_image'
-    submitted_kernel = 'expected_kernel'
     submitted_machine_type = 'goes_to_11'
     submitted_zone = 'copernicus-moon-base'
     expected_authorized_ssh_keys = []
@@ -1568,24 +1447,11 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
         'synchronous_mode': False
         }
 
-    if self.version <= version.get('v1beta16'):
-      set_flags['kernel'] = submitted_kernel
-      set_flags['persistent_boot_disk'] = False
-    else:
-      set_flags['disk'] = ['cool-disk,boot']
+    boot_disk_name = 'cool-disk'
+    set_flags['disk'] = [boot_disk_name + ',boot']
 
     command = self._CreateAndInitializeCommand(
         instance_cmds.AddInstance, 'addinstance', self.version, set_flags)
-
-    expected_kernel = command.NormalizeGlobalResourceName(
-        expected_project,
-        'kernels',
-        submitted_kernel)
-
-    expected_image = command.NormalizeGlobalResourceName(
-        expected_project,
-        'images',
-        submitted_image)
 
     def InstanceInsertResponse(unused_uri, unused_http_method, parameters,
                                body):
@@ -1604,21 +1470,6 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
               'zones',
               parameters['zone'])
           }
-      if command.api.version <= version.get('v1beta16'):
-        response_body.update({
-            'image': command.NormalizeGlobalResourceName(
-                parameters['project'],
-                'images',
-                json.loads(body)['image'])
-            })
-
-      if command.api.version <= version.get('v1beta16'):
-        response_body.update({
-            'kernel': command.NormalizeGlobalResourceName(
-                parameters['project'],
-                'kernels',
-                json.loads(body)['kernel'])
-            })
       return self.mock.MOCK_RESPONSE(response_body, True)
 
     instancecall = self.mock.RespondF('compute.instances.insert',
@@ -1640,6 +1491,11 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
                                                          1,
                                                          [submitted_image])
 
+    self._MockDiskGet(command,
+                      expected_project,
+                      submitted_zone,
+                      boot_disk_name)
+
     (unused_results, exceptions) = command.Handle(expected_instance)
 
     self.assertEqual(exceptions, [])
@@ -1657,11 +1513,6 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
     self.assertEqual(body['name'], expected_instance)
     self.assertEqual(body['description'], expected_description)
 
-    if command.api.version <= version.get('v1beta16'):
-      self.assertEqual(body['image'], expected_image)
-
-    if command.api.version <= version.get('v1beta16'):
-      self.assertEqual(body['kernel'], expected_kernel)
     self.assertFalse(
         'natIP' in body['networkInterfaces'][0]['accessConfigs'][0])
 
@@ -1675,6 +1526,46 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
     self.assertFalse('canIpForward' in body)
     self.assertEqual(submitted_zone, parameters['zone'])
     self.assertFalse('zone' in body)
+
+  def _MockImageGet(self, command, project, image_name, licenses=()):
+    response = {
+        'kind': 'compute#image',
+        'description': 'mock image',
+        'name': image_name,
+        'status': 'READY',
+        'selfLink': command.NormalizeGlobalResourceName(
+            project,
+            'images',
+            image_name)
+    }
+    self._AddLicenseUrlsToResponse(command, response, licenses)
+    self.mock.Respond('compute.images.get', response)
+
+  def _MockDiskGet(self, command, project, zone, disk_name, licenses=()):
+    response = {
+        'kind': 'compute#disk',
+        'description': 'mock disk',
+        'name': disk_name,
+        'zone': command.NormalizeGlobalResourceName(
+            project,
+            'zones',
+            zone),
+        'status': 'READY',
+        'selfLink': command.NormalizeGlobalResourceName(
+            project,
+            'disk',
+            disk_name)
+    }
+    self._AddLicenseUrlsToResponse(command, response, licenses)
+    self.mock.Respond('compute.disks.get', response)
+
+  def _AddLicenseUrlsToResponse(self, command, response, licenses):
+    if licenses:
+      urls = [command.NormalizeGlobalResourceName(
+          lic.project,
+          'licenses',
+          lic.name) for lic in licenses]
+      response['licenses'] = urls
 
 
 class OldInstanceCmdsTest(unittest.TestCase):
@@ -1741,7 +1632,6 @@ class OldInstanceCmdsTest(unittest.TestCase):
     flag_values.use_compute_key = False
     flag_values.authorized_ssh_keys = expected_authorized_ssh_keys
     flag_values.add_compute_key_to_project = False
-    flag_values.persistent_boot_disk = False
 
     self._instances.list = old_mock_api.CommandExecutor(self._instance_list)
 
@@ -1771,7 +1661,15 @@ class OldInstanceCmdsTest(unittest.TestCase):
       self.assertEqual(result['body']['kind'], expected_kind)
       self.assertEqual(result['body']['name'], expected_instance)
       self.assertEqual(result['body']['description'], expected_description)
-      self.assertEqual(result['body']['image'], expected_image)
+      self.assertEqual(
+          result['body']['disks'][0]['deviceName'],
+          expected_instance)
+      self.assertEqual(
+          result['body']['disks'][0]['initializeParams']['diskName'],
+          expected_instance)
+      self.assertEqual(
+          result['body']['disks'][0]['initializeParams']['sourceImage'],
+          expected_image)
       self.assertFalse(
           'natIP' in result['body']['networkInterfaces'][0]['accessConfigs'][0],
           result)
@@ -1794,14 +1692,13 @@ class OldInstanceCmdsTest(unittest.TestCase):
     command = instance_cmds.AddInstance('addinstance', flag_values)
     self._DoNotPauseForCommand(command)
 
-    flag_values.service_version = 'v1beta16'
+    flag_values.service_version = 'v1'
     flag_values.zone = 'happy_zone'
     flag_values.machine_type = 'machinetype1'
     flag_values.project = 'test_project'
     flag_values.description = 'description'
     flag_values.image = 'myimage'
     flag_values['can_ip_forward'].Parse('true')
-    flag_values.persistent_boot_disk = False
     flag_values.add_compute_key_to_project = False
 
     self._instances.list = old_mock_api.CommandExecutor(self._instance_list)
@@ -1823,7 +1720,7 @@ class OldInstanceCmdsTest(unittest.TestCase):
   def testAddInstanceWithDiskOptionsGeneratesCorrectRequest(self):
     flag_values = copy.deepcopy(FLAGS)
     flag_values.project = 'myproject'
-    flag_values.service_version = 'v1beta16'
+    flag_values.service_version = 'v1'
 
     command = instance_cmds.AddInstance('addinstance', flag_values)
     self._DoNotPauseForCommand(command)
@@ -1838,7 +1735,7 @@ class OldInstanceCmdsTest(unittest.TestCase):
     submitted_disk_name_read_only = 'disk567,deviceName=name567,mode=READ_ONLY'
     submitted_disk_no_name = 'disk678'
     submitted_disk_full_name = (
-        'https://www.googleapis.com/compute/v1beta16/'
+        'https://www.googleapis.com/compute/v1/'
         'projects/google.com:test/zones/my-zone/disks/disk789')
     submitted_disk_ro = 'disk890,mode=ro'
     submitted_disk_rw = 'disk90A,mode=rw'
@@ -1861,7 +1758,6 @@ class OldInstanceCmdsTest(unittest.TestCase):
     flag_values.add_compute_key_to_project = False
     flag_values.image = submitted_image
     flag_values.zone = submitted_zone
-    flag_values.persistent_boot_disk = False
 
     disk_zone = 'zones/copernicus-moon-base'
 
@@ -1882,31 +1778,37 @@ class OldInstanceCmdsTest(unittest.TestCase):
     (results, exceptions) = command.Handle(expected_instance)
     result = results['items'][0]
 
+    # Auto-created boot disk is first.
     disk = result['body']['disks'][0]
+    self.assertEqual(disk['deviceName'], expected_instance)
+    self.assertEqual(disk['mode'], 'READ_WRITE')
+
+    # And now the data disks.
+    disk = result['body']['disks'][1]
     self.assertEqual(disk['deviceName'], 'name123')
     self.assertEqual(disk['mode'], 'READ_WRITE')
-    disk = result['body']['disks'][1]
+    disk = result['body']['disks'][2]
     self.assertEqual(disk['deviceName'], 'name234')
     self.assertEqual(disk['mode'], 'READ_WRITE')
-    disk = result['body']['disks'][2]
+    disk = result['body']['disks'][3]
     self.assertEqual(disk['deviceName'], 'disk345')
     self.assertEqual(disk['mode'], 'READ_ONLY')
-    disk = result['body']['disks'][3]
+    disk = result['body']['disks'][4]
     self.assertEqual(disk['deviceName'], 'disk456')
     self.assertEqual(disk['mode'], 'READ_WRITE')
-    disk = result['body']['disks'][4]
+    disk = result['body']['disks'][5]
     self.assertEqual(disk['deviceName'], 'name567')
     self.assertEqual(disk['mode'], 'READ_ONLY')
-    disk = result['body']['disks'][5]
+    disk = result['body']['disks'][6]
     self.assertEqual(disk['deviceName'], submitted_disk_no_name)
     self.assertEqual(disk['mode'], 'READ_WRITE')
-    disk = result['body']['disks'][6]
+    disk = result['body']['disks'][7]
     self.assertEqual(disk['deviceName'], submitted_disk_full_name)
     self.assertEqual(disk['mode'], 'READ_WRITE')
-    disk = result['body']['disks'][7]
+    disk = result['body']['disks'][8]
     self.assertEqual(disk['deviceName'], 'disk890')
     self.assertEqual(disk['mode'], 'READ_ONLY')
-    disk = result['body']['disks'][8]
+    disk = result['body']['disks'][9]
     self.assertEqual(disk['deviceName'], 'disk90A')
     self.assertEqual(disk['mode'], 'READ_WRITE')
     self.assertEqual(exceptions, [])
@@ -1918,14 +1820,13 @@ class OldInstanceCmdsTest(unittest.TestCase):
     command = instance_cmds.AddInstance('addinstance', flag_values)
     self._DoNotPauseForCommand(command)
 
-    service_version = 'v1beta16'
+    service_version = 'v1'
     expected_instance = 'test_instance'
     submitted_boot_disk_unqualified = 'diskA,boot'
     submitted_boot_disk_ro = 'diskB,mode=ro,boot'
     submitted_boot_disk_rw = 'diskC,mode=rw,boot'
     submitted_non_boot_disk = 'diskD'
     submitted_machine_type = 'goes_to_11'
-    submitted_kernel = 'projects/google/global/kernels/some-kernel'
 
     expected_authorized_ssh_keys = []
     flag_values.service_version = service_version
@@ -1938,9 +1839,6 @@ class OldInstanceCmdsTest(unittest.TestCase):
     flag_values.use_compute_key = False
     flag_values.authorized_ssh_keys = expected_authorized_ssh_keys
     flag_values.add_compute_key_to_project = False
-    flag_values.kernel = submitted_kernel
-    flag_values['kernel'].present = True
-    flag_values.persistent_boot_disk = False
 
     self._instances.list = old_mock_api.CommandExecutor(self._instance_list)
 
@@ -1987,10 +1885,6 @@ class OldInstanceCmdsTest(unittest.TestCase):
     self.assertEqual(disk['boot'], False)
     self.assertEqual(exceptions, [])
 
-    expected_kernel = command.NormalizeGlobalResourceName('google',
-                                                          'kernels',
-                                                          submitted_kernel)
-    self.assertEqual(expected_kernel, result['body']['kernel'])
     self.assertEqual(disk_zone, result['zone'])
 
   def testPersistentBootDisk(self):
@@ -1999,13 +1893,12 @@ class OldInstanceCmdsTest(unittest.TestCase):
     command = instance_cmds.AddInstance('addinstance', flag_values)
     self._DoNotPauseForCommand(command)
 
-    service_version = 'v1beta16'
+    service_version = 'v1'
     expected_instance = 'test_instance'
     submitted_machine_type = 'machine-type1'
     submitted_zone = 'zone1'
     submitted_image = 'projects/google/global/images/some-image'
     submitted_project = 'test_project_name'
-    image_kernel = 'projects/google/global/kernels/image-kernel'
 
     expected_authorized_ssh_keys = []
     flag_values.service_version = service_version
@@ -2016,10 +1909,8 @@ class OldInstanceCmdsTest(unittest.TestCase):
     flag_values.authorized_ssh_keys = expected_authorized_ssh_keys
     flag_values.add_compute_key_to_project = False
     flag_values.image = submitted_image
-    flag_values.persistent_boot_disk = True
 
-    self._images.get = old_mock_api.CommandExecutor(
-        {'preferredKernel': image_kernel})
+    self._images.get = old_mock_api.CommandExecutor({})
     self._instances.list = old_mock_api.CommandExecutor(self._instance_list)
 
     command.SetFlags(flag_values)
@@ -2035,32 +1926,13 @@ class OldInstanceCmdsTest(unittest.TestCase):
     (results, exceptions) = command.Handle(expected_instance)
     result = results['items'][0]
 
-    # Make sure boot PD was created from image.
-    self.assertEqual(1, len(command.api.disks.requests))
-
-    disk_insert = command.api.disks.requests[0].request_payload
-    expected_disk_name = command._GetDefaultBootDiskName(expected_instance)
-    expected_image = command.NormalizeGlobalResourceName('google',
-                                                         'images',
-                                                         submitted_image)
-    self.assertEqual(expected_disk_name, disk_insert['body']['name'])
-    self.assertEqual(expected_image, disk_insert['sourceImage'])
-    self.assertEqual('google', self._images.get._parameters['project'])
-    self.assertEqual('some-image', self._images.get._parameters['image'])
-
-    # Make sure the disk was attached to the instance.
+    # Make sure the auto-created boot disk was attached to the instance.
     disk = result['body']['disks'][0]
     self.assertEqual(disk['deviceName'],
                      command._GetDefaultBootDiskName(expected_instance))
     self.assertEqual(disk['mode'], 'READ_WRITE')
     self.assertEqual(disk['boot'], True)
     self.assertEqual(exceptions, [])
-
-    # Make sure the kernel was set from the image.
-    expected_kernel = command.NormalizeGlobalResourceName('google',
-                                                          'kernels',
-                                                          image_kernel)
-    self.assertEqual(expected_kernel, result['body']['kernel'])
 
     # Make sure image was not set.
     self.assertFalse('image' in result['body'])
@@ -2091,7 +1963,6 @@ class OldInstanceCmdsTest(unittest.TestCase):
     flag_values.use_compute_key = False
     flag_values.authorized_ssh_keys = expected_authorized_ssh_keys
     flag_values.add_compute_key_to_project = False
-    flag_values.persistent_boot_disk = False
 
     self._instances.list = old_mock_api.CommandExecutor(self._instance_list)
 
@@ -2140,8 +2011,16 @@ class OldInstanceCmdsTest(unittest.TestCase):
     self.assertEqual(result['project'], expected_project)
     self.assertEqual(result['body']['name'], expected_instance)
     self.assertEqual(result['body']['description'], expected_description)
-    self.assertEqual(result['body']['image'], expected_image)
-    self.assertEqual(result['body']['disks'][0]['source'], expected_disk)
+    self.assertEqual(
+        result['body']['disks'][0]['deviceName'],
+        expected_instance)
+    self.assertEqual(
+        result['body']['disks'][0]['initializeParams']['diskName'],
+        expected_instance)
+    self.assertEqual(
+        result['body']['disks'][0]['initializeParams']['sourceImage'],
+        expected_image)
+    self.assertEqual(result['body']['disks'][1]['source'], expected_disk)
     self.assertFalse(
         'natIP' in result['body']['networkInterfaces'][0]['accessConfigs'][0],
         result)
@@ -2175,7 +2054,6 @@ class OldInstanceCmdsTest(unittest.TestCase):
     flag_values.use_compute_key = False
     flag_values.authorized_ssh_keys = expected_authorized_ssh_keys
     flag_values.add_compute_key_to_project = False
-    flag_values.persistent_boot_disk = False
 
     self._projects.get = old_mock_api.CommandExecutor(
         {'externalIpAddresses': []})
@@ -2203,7 +2081,15 @@ class OldInstanceCmdsTest(unittest.TestCase):
     self.assertEqual(result['project'], expected_project)
     self.assertEqual(result['body']['name'], expected_instance)
     self.assertEqual(result['body']['description'], expected_description)
-    self.assertEqual(result['body']['image'], expected_image)
+    self.assertEqual(
+        result['body']['disks'][0]['deviceName'],
+        expected_instance)
+    self.assertEqual(
+        result['body']['disks'][0]['initializeParams']['diskName'],
+        expected_instance)
+    self.assertEqual(
+        result['body']['disks'][0]['initializeParams']['sourceImage'],
+        expected_image)
     self.assertFalse('natIP' in
                      result['body']['networkInterfaces'][0]['accessConfigs'][0],
                      result)
@@ -2238,7 +2124,6 @@ class OldInstanceCmdsTest(unittest.TestCase):
     flag_values.use_compute_key = False
     flag_values.authorized_ssh_keys = expected_authorized_ssh_keys
     flag_values.add_compute_key_to_project = False
-    flag_values.persistent_boot_disk = False
 
     self._projects.get = old_mock_api.CommandExecutor(
         {'externalIpAddresses': ['192.0.2.2', '192.0.2.3']})
@@ -2267,7 +2152,16 @@ class OldInstanceCmdsTest(unittest.TestCase):
     self.assertEqual(result['project'], expected_project)
     self.assertEqual(result['body']['name'], expected_instance)
     self.assertEqual(result['body']['description'], expected_description)
-    self.assertEqual(result['body']['image'], expected_image)
+    self.assertEqual(
+        result['body']['disks'][0]['deviceName'],
+        expected_instance)
+    self.assertEqual(
+        result['body']['disks'][0]['initializeParams']['diskName'],
+        expected_instance)
+    self.assertEqual(
+        result['body']['disks'][0]['initializeParams']['sourceImage'],
+        expected_image)
+
     self.assertFalse(
         'natIP' in result['body']['networkInterfaces'][0]['accessConfigs'][0],
         result)
@@ -2301,7 +2195,6 @@ class OldInstanceCmdsTest(unittest.TestCase):
     flag_values.use_compute_key = False
     flag_values.authorized_ssh_keys = expected_authorized_ssh_keys
     flag_values.add_compute_key_to_project = False
-    flag_values.persistent_boot_disk = False
 
     self._instances.list = old_mock_api.CommandExecutor(self._instance_list)
 
@@ -2327,7 +2220,15 @@ class OldInstanceCmdsTest(unittest.TestCase):
     self.assertEqual(result['project'], expected_project)
     self.assertEqual(result['body']['name'], expected_instance)
     self.assertEqual(result['body']['description'], expected_description)
-    self.assertEqual(result['body']['image'], expected_image)
+    self.assertEqual(
+        result['body']['disks'][0]['deviceName'],
+        expected_instance)
+    self.assertEqual(
+        result['body']['disks'][0]['initializeParams']['diskName'],
+        expected_instance)
+    self.assertEqual(
+        result['body']['disks'][0]['initializeParams']['sourceImage'],
+        expected_image)
     self.assertTrue('networkIP' not in result['body']['networkInterfaces'][0])
     instance_tags = result['body'].get('tags', {}).get('items', [])
     self.assertEqual(submitted_zone, result['zone'])
@@ -2360,7 +2261,6 @@ class OldInstanceCmdsTest(unittest.TestCase):
     flag_values.use_compute_key = False
     flag_values.authorized_ssh_keys = expected_authorized_ssh_keys
     flag_values.add_compute_key_to_project = False
-    flag_values.persistent_boot_disk = False
 
     self._instances.list = old_mock_api.CommandExecutor(self._instance_list)
 
@@ -2386,7 +2286,15 @@ class OldInstanceCmdsTest(unittest.TestCase):
     self.assertEqual(result['project'], expected_project)
     self.assertEqual(result['body']['name'], expected_instance)
     self.assertEqual(result['body']['description'], expected_description)
-    self.assertEqual(result['body']['image'], expected_image)
+    self.assertEqual(
+        result['body']['disks'][0]['deviceName'],
+        expected_instance)
+    self.assertEqual(
+        result['body']['disks'][0]['initializeParams']['diskName'],
+        expected_instance)
+    self.assertEqual(
+        result['body']['disks'][0]['initializeParams']['sourceImage'],
+        expected_image)
     self.assertFalse('natIP' in
                      result['body']['networkInterfaces'][0]['accessConfigs'][0])
     instance_tags = result['body'].get('tags', {}).get('items', [])
@@ -2420,7 +2328,6 @@ class OldInstanceCmdsTest(unittest.TestCase):
     flag_values.use_compute_key = False
     flag_values.authorized_ssh_keys = expected_authorized_ssh_keys
     flag_values.add_compute_key_to_project = False
-    flag_values.persistent_boot_disk = False
 
     self._instances.list = old_mock_api.CommandExecutor(self._instance_list)
 
@@ -2446,7 +2353,15 @@ class OldInstanceCmdsTest(unittest.TestCase):
     self.assertEqual(result['project'], expected_project)
     self.assertEqual(result['body']['name'], expected_instance)
     self.assertEqual(result['body']['description'], expected_description)
-    self.assertEqual(result['body']['image'], expected_image)
+    self.assertEqual(
+        result['body']['disks'][0]['deviceName'],
+        expected_instance)
+    self.assertEqual(
+        result['body']['disks'][0]['initializeParams']['diskName'],
+        expected_instance)
+    self.assertEqual(
+        result['body']['disks'][0]['initializeParams']['sourceImage'],
+        expected_image)
     self.assertFalse('accessConfigs' in result['body']['networkInterfaces'][0])
     instance_tags = result['body'].get('tags', {}).get('items', [])
     self.assertEqual(submitted_zone, result['zone'])
@@ -2477,7 +2392,6 @@ class OldInstanceCmdsTest(unittest.TestCase):
     flag_values.use_compute_key = False
     flag_values.authorized_ssh_keys = expected_authorized_ssh_keys
     flag_values.add_compute_key_to_project = False
-    flag_values.persistent_boot_disk = False
     flag_values.require_tty = False
 
     command.SetFlags(flag_values)
@@ -2522,7 +2436,7 @@ class OldInstanceCmdsTest(unittest.TestCase):
     expected_instance = 'test_instance'
     expected_description = 'test instance'
     submitted_image = 'expected_image'
-    service_version = 'v1beta16'
+    service_version = 'v1'
     submitted_machine_type = 'goes_to_11'
     submitted_zone = 'copernicus-moon-base'
     expected_authorized_ssh_keys = []
@@ -2535,7 +2449,6 @@ class OldInstanceCmdsTest(unittest.TestCase):
     flag_values.machine_type = submitted_machine_type
     flag_values.use_compute_key = False
     flag_values.authorized_ssh_keys = expected_authorized_ssh_keys
-    flag_values.persistent_boot_disk = False
     if expected_service_account:
       # addinstance command checks whether --service_account is explicitly
       # given, so in this case, set the present flag along with the value.
@@ -2580,7 +2493,15 @@ class OldInstanceCmdsTest(unittest.TestCase):
       self.assertEqual(result['project'], expected_project)
       self.assertEqual(result['body']['name'], expected_instance)
       self.assertEqual(result['body']['description'], expected_description)
-      self.assertEqual(result['body']['image'], expected_image)
+      self.assertEqual(
+          result['body']['disks'][0]['deviceName'],
+          expected_instance)
+      self.assertEqual(
+          result['body']['disks'][0]['initializeParams']['diskName'],
+          expected_instance)
+      self.assertEqual(
+          result['body']['disks'][0]['initializeParams']['sourceImage'],
+          expected_image)
       self.assertFalse('accessConfigs' in
                        result['body']['networkInterfaces'][0])
       self.assertEqual(result['body'].get('metadata'), expected_metadata)
@@ -2620,7 +2541,6 @@ class OldInstanceCmdsTest(unittest.TestCase):
     flag_values.use_compute_key = False
     flag_values.authorized_ssh_keys = ['user:unknown-file']
     flag_values.add_compute_key_to_project = False
-    flag_values.persistent_boot_disk = False
 
     self._instances.list = old_mock_api.CommandExecutor(self._instance_list)
 
@@ -2639,7 +2559,7 @@ class OldInstanceCmdsTest(unittest.TestCase):
 
   def testAddAuthorizedUserKeyToProject(self):
     flag_values = copy.deepcopy(FLAGS)
-    flag_values.service_version = 'v1beta16'
+    flag_values.service_version = 'v1'
     command = instance_cmds.AddInstance('addinstance', flag_values)
     self._DoNotPauseForCommand(command)
 
@@ -2666,7 +2586,7 @@ class OldInstanceCmdsTest(unittest.TestCase):
         call_record)
     expected_project = 'test_project'
 
-    flag_values.service_version = 'v1beta16'
+    flag_values.service_version = 'v1'
     flag_values.project = expected_project
     command.SetApi(old_mock_api.CreateMockApi())
     command.SetFlags(flag_values)
@@ -2687,7 +2607,7 @@ class OldInstanceCmdsTest(unittest.TestCase):
 
   def testAddAuthorizedUserKeyAlreadyInProject(self):
     flag_values = copy.deepcopy(FLAGS)
-    flag_values.service_version = 'v1beta16'
+    flag_values.service_version = 'v1'
     command = instance_cmds.AddInstance('addinstance', flag_values)
     self._DoNotPauseForCommand(command)
 
@@ -2714,7 +2634,7 @@ class OldInstanceCmdsTest(unittest.TestCase):
         call_record)
     expected_project = 'test_project'
 
-    flag_values.service_version = 'v1beta16'
+    flag_values.service_version = 'v1'
     flag_values.project = expected_project
     command.SetApi(old_mock_api.CreateMockApi())
     command.SetFlags(flag_values)
@@ -2810,7 +2730,7 @@ class OldInstanceCmdsTest(unittest.TestCase):
         'project': expected_project,
         'zone': submitted_zone
     }
-    flag_values.service_version = 'v1beta16'
+    flag_values.service_version = 'v1'
     flag_values.project = expected_project
     flag_values.zone = submitted_zone
     flag_values.description = expected_description
@@ -2818,9 +2738,8 @@ class OldInstanceCmdsTest(unittest.TestCase):
     flag_values.use_compute_key = False
     flag_values.authorized_ssh_keys = []
     flag_values.add_compute_key_to_project = False
-    flag_values.persistent_boot_disk = False
     metadata = [{'key': 'foo', 'value': 'bar'}]
-    disks = [{'source': ('https://www.googleapis.com/compute/v1beta16/projects/'
+    disks = [{'source': ('https://www.googleapis.com/compute/v1/projects/'
                          'google.com:test/disks/disk789'),
               'deviceName': 'disk789', 'mode': 'READ_WRITE',
               'type': 'PERSISTENT', 'boot': False}]
@@ -2835,14 +2754,9 @@ class OldInstanceCmdsTest(unittest.TestCase):
     result = command._BuildRequestWithMetadata(
         expected_context, metadata, disks).execute()
 
-    expected_image = command.NormalizeGlobalResourceName(expected_project,
-                                                         'images',
-                                                         submitted_image)
-
     self.assertEqual(result['project'], expected_project)
     self.assertEqual(result['body']['name'], expected_instance)
     self.assertEqual(result['body']['description'], expected_description)
-    self.assertEqual(result['body']['image'], expected_image)
     self.assertEqual(result['body']['metadata'], expected_metadata)
     self.assertEqual(result['body']['disks'], disks)
 
@@ -2851,7 +2765,7 @@ class OldInstanceCmdsTest(unittest.TestCase):
     command = instance_cmds.AddInstance('addinstance', flag_values)
     self._DoNotPauseForCommand(command)
 
-    service_version = 'v1beta16'
+    service_version = 'v1'
     expected_project = 'test_project'
     expected_instance = 'test_instance'
     expected_description = 'test instance'
@@ -2870,7 +2784,6 @@ class OldInstanceCmdsTest(unittest.TestCase):
     flag_values.authorized_ssh_keys = []
     flag_values.tags = expected_tags * 2  # Create duplicates.
     flag_values.add_compute_key_to_project = False
-    flag_values.persistent_boot_disk = False
 
     self._instances.list = old_mock_api.CommandExecutor(self._instance_list)
 
@@ -2896,7 +2809,15 @@ class OldInstanceCmdsTest(unittest.TestCase):
     self.assertEqual(result['project'], expected_project)
     self.assertEqual(result['body']['name'], expected_instance)
     self.assertEqual(result['body']['description'], expected_description)
-    self.assertEqual(result['body']['image'], expected_image)
+    self.assertEqual(
+        result['body']['disks'][0]['deviceName'],
+        expected_instance)
+    self.assertEqual(
+        result['body']['disks'][0]['initializeParams']['diskName'],
+        expected_instance)
+    self.assertEqual(
+        result['body']['disks'][0]['initializeParams']['sourceImage'],
+        expected_image)
     self.assertFalse(
         'natIP' in result['body']['networkInterfaces'][0]['accessConfigs'][0],
         result)
@@ -3570,8 +3491,8 @@ class OldInstanceCmdsTest(unittest.TestCase):
     command_line = command._BuildSshCmd(mock_instance_resource, 'scp', scp_args)
     self.assertEqual(expected_command, command_line)
 
-  def testImageKernelFlagsRegistered(self):
-    """Make sure we set up image/kernel flags for addinstance."""
+  def testImageFlagsRegistered(self):
+    """Make sure we set up image flags for addinstance."""
     flag_values = copy.deepcopy(FLAGS)
     command = instance_cmds.AddInstance('addinstance', flag_values)
     self._DoNotPauseForCommand(command)
@@ -3580,7 +3501,6 @@ class OldInstanceCmdsTest(unittest.TestCase):
     command._InitializeContextParser()
     flag_values.old_images = True
     flag_values.standard_images = False
-    flag_values.old_kernels = True
 
   def _DoTestInstancesCollectionScope(self, flag_values):
     command = instance_cmds.ListInstances('instances', flag_values)

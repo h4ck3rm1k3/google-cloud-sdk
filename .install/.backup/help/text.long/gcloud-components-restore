@@ -4,7 +4,8 @@ NAME
        backtrack one step.
 
 SYNOPSIS
-       gcloud components restore [-h, --help]
+       gcloud components restore
+         [-h, --help]
 
 FLAGS
        --help

@@ -5,6 +5,7 @@ from apiclient import errors
 
 from googlecloudsdk.calliope import base
 from googlecloudsdk.calliope import exceptions
+from googlecloudsdk.core import resources
 from googlecloudsdk.core.util import console_io
 from googlecloudsdk.sql import util
 
@@ -44,17 +45,21 @@ class Delete(base.Command):
     sql = self.context['sql']
     instance_id = util.GetInstanceIdWithoutProject(args.instance)
     project_id = util.GetProjectId(args.instance)
+    # TODO(user): as we deprecate P:I args, simplify the call to .Parse().
+    instance_ref = resources.Parse(
+        instance_id, collection='sql.instances',
+        params={'project': project_id})
     request = sql.instances().delete(
-        project=project_id,
-        instance=instance_id)
+        project=instance_ref.project,
+        instance=instance_ref.instance)
     if not console_io.PromptContinue(
         'All of the instance data will be lost when the instance is deleted.'):
       return util.QUIT
     try:
       result = request.execute()
-      operations = self.command.ParentGroup().ParentGroup().operations(
-          instance=instance_id)
-      operation = operations.get(operation=result['operation'])
+      operations = self.command.ParentGroup().ParentGroup().operations()
+      operation = operations.get(instance=str(instance_ref),
+                                 operation=result['operation'])
       return operation
     except errors.HttpError as error:
       raise exceptions.HttpException(util.GetError(error))

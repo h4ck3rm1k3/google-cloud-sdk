@@ -4,10 +4,14 @@ NAME
 SYNOPSIS
        gcloud compute
          GROUP|COMMAND
-         [-h, --help]
+         [--help]
+         [-h]
 
 FLAGS
        --help
+           Display detailed help.
+
+       -h
            Print a summary help and exit.
 
 GROUPS
@@ -18,6 +22,9 @@ GROUPS
 
        backend-services
            List, create, and delete backend services.
+
+       disk-types
+           Read Google Compute Engine virtual disk types.
 
        disks
            Read and manipulate Google Compute Engine disks.

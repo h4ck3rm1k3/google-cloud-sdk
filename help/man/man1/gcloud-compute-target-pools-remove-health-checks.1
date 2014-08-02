@@ -11,9 +11,10 @@ gcloud-compute-target-pools-remove-health-checks \- Remove an HTTP health check 
 .nf
 \fBgcloud compute target\-pools remove\-health\-checks\fR
   NAME
+  [\-\-help]
   \-\-http\-health\-check HEALTH_CHECK
-  \-\-region REGION
-  [\-h, \-\-help]
+  [\-\-region REGION]
+  [\-h]
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -26,6 +27,11 @@ The name of the target pool from which to remove the health check\&.
 .RE
 .SH "FLAGS"
 .PP
+\fB\-\-help\fR
+.RS 4
+Display detailed help\&.
+.RE
+.PP
 \fB\-\-http\-health\-check\fR \fIHEALTH_CHECK\fR
 .RS 4
 Specifies an HTTP health check object to remove from the target pool\&.
@@ -33,10 +39,10 @@ Specifies an HTTP health check object to remove from the target pool\&.
 .PP
 \fB\-\-region\fR \fIREGION\fR
 .RS 4
-The region of the target pool\&.
+The region of the target pool to remove health checks from\&. If omitted and the arguments are not all URIs, you will be prompted to select a region\&.
 .RE
 .PP
-\fB\-\-help\fR
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE

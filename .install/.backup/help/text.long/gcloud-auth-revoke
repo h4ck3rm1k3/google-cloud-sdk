@@ -3,7 +3,10 @@ NAME
        currently active account is used.
 
 SYNOPSIS
-       gcloud auth revoke [ACCOUNTS ...] [--all] [-h, --help]
+       gcloud auth revoke
+         [ACCOUNTS ...]
+         [--all]
+         [-h, --help]
 
 POSITIONAL ARGUMENTS
        [ACCOUNTS ...]

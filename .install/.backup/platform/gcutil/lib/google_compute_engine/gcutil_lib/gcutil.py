@@ -25,7 +25,6 @@ more information about gcutil usage.
 
 import atexit
 import logging
-import os
 import sys
 
 
@@ -36,6 +35,7 @@ from gcutil_lib import address_cmds
 from gcutil_lib import basic_cmds
 from gcutil_lib import command_base
 from gcutil_lib import disk_cmds
+from gcutil_lib import disk_type_cmds
 from gcutil_lib import firewall_cmds
 from gcutil_lib import forwarding_rule_cmds
 from gcutil_lib import http_health_check_cmds
@@ -79,6 +79,7 @@ def main(unused_argv):
   address_cmds.AddCommands()
   basic_cmds.AddCommands()
   disk_cmds.AddCommands()
+  disk_type_cmds.AddCommands()
   firewall_cmds.AddCommands()
   image_cmds.AddCommands()
   instance_cmds.AddCommands()

@@ -4,12 +4,58 @@ All rights reserved.
 
 Google Cloud SDK - Release Notes
 
+
+0.9.27 (2014/06/18)
+===================
+  - Added --shell mode to all gcloud commands
+    - Type a partial command followed by '--shell' to drop into a sub shell at that
+      point in the command tree.
+    - Eg:
+      $ gcloud compute --shell
+      gcloud compute $ instances list
+      gcloud compute $ copy-files ...
+  - Updated gsutil to 4.3
+  - Allow installed crcmod to be used by default with gsutil by enabling site packages
+
+
+0.9.26 (2014/06/04)
+===================
+  - Windows support for SSH and SCP to Compute VMs
+    - The following will now work natively on Windows without the need for cygwin:
+      - gcloud compute ssh
+      - gcloud compute copy-files
+      - gcutil ssh
+      - gcutil push
+      - gcutil pull
+  - Support for Java apps in 'gcloud preview app run'
+  - Updated gsutil to 4.1
+  - Updated gcutil to 1.16.0
+  - Updated all App Engine tools to 1.9.6
+    - https://code.google.com/p/googleappengine/wiki/SdkReleaseNotes
+    - https://code.google.com/p/googleappengine/wiki/SdkForJavaReleaseNotes
+
+
+0.9.25 (2014/05/21)
+===================
+  - 'gcloud preview app deploy' and '... run' argument updates.
+  - 'gcloud config *' argument updates.
+  - Updated all App Engine tools to 1.9.5
+    - https://code.google.com/p/googleappengine/wiki/SdkReleaseNotes
+    - https://code.google.com/p/googleappengine/wiki/SdkForJavaReleaseNotes
+
+
+0.9.24 (2014/05/07)
+====================
+  - gcloud now has App Engine and Cloud Datastore integration.
+    - Commands can be found under `gcloud preview app` and `gcloud preview datastore`
+
+
 0.9.23 (2014/05/01)
 ====================
   - New `gcloud compute` tool for working with compute engine (RC)
     - Run `gcloud components update compute` to install
     - Run `gcloud help compute` for more information
-  - Updated all AppEngine tools to 1.9.4
+  - Updated all App Engine tools to 1.9.4
     - https://code.google.com/p/googleappengine/wiki/SdkReleaseNotes
     - https://code.google.com/p/googleappengine/wiki/SdkForJavaReleaseNotes
   - Added color to error and warning messages (on Linux and Mac)
@@ -51,7 +97,7 @@ Google Cloud SDK - Release Notes
 
 0.9.17 (2014/02/11)
 ====================
-  - Updated all AppEngine tools to 1.9.0
+  - Updated all App Engine tools to 1.9.0
     - https://code.google.com/p/googleappengine/wiki/SdkReleaseNotes
     - https://code.google.com/p/googleappengine/wiki/SdkForJavaReleaseNotes
   - Cloud SDK now distributed under the Apache v2.0 license.  Please see LICENSE
@@ -68,7 +114,7 @@ Google Cloud SDK - Release Notes
 0.9.15 (2014/01/15)
 ====================
   - Updated gsutil to 3.40
-  - Updated all AppEngine tools to 1.8.9
+  - Updated all App Engine tools to 1.8.9
     - https://code.google.com/p/googleappengine/wiki/SdkReleaseNotes
     - https://code.google.com/p/googleappengine/wiki/SdkForJavaReleaseNotes
   - Fixed broken PHP runtimes on Mac and Windows installs when running
@@ -97,7 +143,7 @@ Google Cloud SDK - Release Notes
 
 0.9.13 (2013/11/19)
 ===================
-  - Updated all AppEngine tools to 1.8.8
+  - Updated all App Engine tools to 1.8.8
     - https://code.google.com/p/googleappengine/wiki/SdkReleaseNotes
     - https://code.google.com/p/googleappengine/wiki/SdkForJavaReleaseNotes
   - Disabling site packages when running commands, to avoid library conflicts.
@@ -105,7 +151,7 @@ Google Cloud SDK - Release Notes
 
 0.9.12 (2013/11/06)
 ===================
-  - Updated all AppEngine tools to 1.8.7
+  - Updated all App Engine tools to 1.8.7
     - https://code.google.com/p/googleappengine/wiki/SdkReleaseNotes
     - https://code.google.com/p/googleappengine/wiki/SdkForJavaReleaseNotes
   - Updated bq to 2.0.17
@@ -132,7 +178,7 @@ Google Cloud SDK - Release Notes
 
 0.9.10 (2013/10/20)
 ===================
-  - Upgraded all AppEngine tools to 1.8.6.
+  - Upgraded all App Engine tools to 1.8.6.
     - https://code.google.com/p/googleappengine/wiki/SdkReleaseNotes
     - https://code.google.com/p/googleappengine/wiki/SdkForJavaReleaseNotes
   - Upgraded bq to 2.0.16.
@@ -142,7 +188,7 @@ Google Cloud SDK - Release Notes
 
 0.9.9 (2013/09/26)
 ===================
-  - Upgraded all AppEngine tools to 1.8.5.
+  - Upgraded all App Engine tools to 1.8.5.
     - https://code.google.com/p/googleappengine/wiki/SdkReleaseNotes
     - https://code.google.com/p/googleappengine/wiki/SdkForJavaReleaseNotes
   - Upgraded bq to 2.0.15.
@@ -152,7 +198,7 @@ Google Cloud SDK - Release Notes
 
 0.9.8 (2013/08/27)
 ===================
-  - Upgraded all AppEngine tools to 1.8.4.
+  - Upgraded all App Engine tools to 1.8.4.
     - https://code.google.com/p/googleappengine/wiki/SdkReleaseNotes
     - https://code.google.com/p/googleappengine/wiki/SdkForJavaReleaseNotes
   - Upgraded gcutil to 1.8.3.
@@ -161,7 +207,7 @@ Google Cloud SDK - Release Notes
 
 0.9.7 (2013/08/06)
 ===================
-  - Upgraded all AppEngine tools to 1.8.3
+  - Upgraded all App Engine tools to 1.8.3
     - https://code.google.com/p/googleappengine/wiki/SdkReleaseNotes
     - https://code.google.com/p/googleappengine/wiki/SdkForJavaReleaseNotes
   - Upgraded gsutil to 3.34
@@ -169,7 +215,7 @@ Google Cloud SDK - Release Notes
 
 0.9.6 (2013/07/17)
 ===================
-  - Upgraded all AppEngine tools to 1.8.2
+  - Upgraded all App Engine tools to 1.8.2
     - https://code.google.com/p/googleappengine/wiki/SdkReleaseNotes
     - https://code.google.com/p/googleappengine/wiki/SdkForJavaReleaseNotes
   - Upgraded bq to 2.0.14
@@ -179,13 +225,13 @@ Google Cloud SDK - Release Notes
 
 0.9.5 (2013/06/18)
 ===================
-  - AppEngine Hotfix
+  - App Engine Hotfix
 
 
 0.9.4 (2013/06/12)
 ===================
   - archive file name changed to google-cloud-sdk
-  - Upgraded all AppEngine tools to 1.8.1
+  - Upgraded all App Engine tools to 1.8.1
   - Upgraded gcutil to 1.8.1
   - Upgraded gsutil to 3.31 (3.30 was never released)
   - More improvements to gauth experience
@@ -202,7 +248,7 @@ Google Cloud SDK - Release Notes
 
 0.9.2 (2013/05/07)
 ===================
-  - Upgraded all AppEngine tools to 1.8.0
+  - Upgraded all App Engine tools to 1.8.0
   - Upgraded gsutil to 3.27
   - Several improvements to gauth experience
     - Will not re-run oauth2 flow if you already have valid credentials (you

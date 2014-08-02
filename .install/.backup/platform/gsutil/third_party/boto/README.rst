@@ -1,15 +1,15 @@
 ####
 boto
 ####
-boto 2.22.1
+boto 2.29.1
 
-Released: 6-January-2014
+Released: 30-May-2014
 
 .. image:: https://travis-ci.org/boto/boto.png?branch=develop
         :target: https://travis-ci.org/boto/boto
 
 .. image:: https://pypip.in/d/boto/badge.png
-        :target: https://crate.io/packages/boto/
+        :target: https://pypi.python.org/pypi/boto/
 
 ************
 Introduction
@@ -108,15 +108,15 @@ Install via `pip`_:
 
 ::
 
-	$ pip install boto
+    $ pip install boto
 
 Install from source:
 
 ::
 
-	$ git clone git://github.com/boto/boto.git
-	$ cd boto
-	$ python setup.py install
+    $ git clone git://github.com/boto/boto.git
+    $ cd boto
+    $ python setup.py install
 
 **********
 ChangeLogs

@@ -3,7 +3,7 @@
 from googlecloudsdk.compute.lib import base_classes
 
 
-class GetTargetPools(base_classes.RegionalGetter):
+class Get(base_classes.RegionalGetter):
   """Get target pools."""
 
   @staticmethod
@@ -16,11 +16,11 @@ class GetTargetPools(base_classes.RegionalGetter):
     return self.context['compute'].targetPools
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'targetPools'
 
 
-GetTargetPools.detailed_help = {
+Get.detailed_help = {
     'brief': 'Get Google Compute Engine target pools',
     'DESCRIPTION': """\
         *{command}* displays all data associated with Google Compute

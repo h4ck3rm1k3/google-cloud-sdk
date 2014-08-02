@@ -318,7 +318,7 @@ def GetSampleZoneListCall(command, mock_server, num_responses=2,
     availableMachineType = [['party-machine', 't1000'] for x in indices]
 
   list_response_templates = {
-      'v1beta16': (
+      'v1': (
           lambda unused_uri, unused_http_method,
           unused_parameters, unused_body:
           mock_server.MOCK_RESPONSE(

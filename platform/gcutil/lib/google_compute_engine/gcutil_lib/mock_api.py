@@ -33,7 +33,7 @@ def CreateApi(api_version):
   """Creates mock API for a given Google Compute Engine API version.
 
   Args:
-    api_version: Version of the API demanded. For example: 'v1beta16'.
+    api_version: Version of the API demanded. For example: 'v1'.
 
   Returns:
     Tuple (mock, api). mock is an instance of MockServer which can be used to

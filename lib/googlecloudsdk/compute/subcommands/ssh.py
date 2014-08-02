@@ -2,19 +2,49 @@
 
 """Implements the command for SSHing into an instance."""
 import getpass
-import logging
-import subprocess
 
 from googlecloudsdk.calliope import exceptions
 from googlecloudsdk.compute.lib import ssh_utils
+from googlecloudsdk.compute.lib import utils
 
 
-class SSH(ssh_utils.BaseSSHCommand):
+class SSH(ssh_utils.BaseSSHCLICommand):
   """SSH into a virtual machine instance."""
 
   @staticmethod
   def Args(parser):
-    ssh_utils.BaseSSHCommand.Args(parser)
+    ssh_utils.BaseSSHCLICommand.Args(parser)
+
+    parser.add_argument(
+        '--command',
+        help='A command to run on the virtual machine.')
+
+    ssh_flags = parser.add_argument(
+        '--ssh-flag',
+        action='append',
+        help='Additional flags to be passed to ssh.')
+    ssh_flags.detailed_help = """\
+        Additional flags to be passed to *ssh(1)*. It is recommended that flags
+        be passed using an assignment operator and quotes. This flag will
+        replace occurences of ``%USER%'' and ``%INSTANCE%'' with their
+        dereferenced values. Example:
+
+          $ {command} my-instance --zone us-central1-a \\
+              --ssh-flag="-vvv" --ssh-flag="-L 80:%INSTANCE%:80"
+        +
+        is equivalent to passing the flags ``--vvv'' and ``-L
+        80:162.222.181.197:80'' to *ssh(1)* if the external IP address of
+        ``my-instance'' is 162.222.181.197.
+        """
+
+    parser.add_argument(
+        '--container',
+        help="""\
+            The name of a container inside of the virtual machine instance to
+            connect to. This only applies to virtual machines that are using
+            a Google container virtual machine image. For more information,
+            see link:https://developers.google.com/compute/docs/containers[].
+            """)
 
     user_host = parser.add_argument(
         'user_host',
@@ -32,33 +62,10 @@ class SSH(ssh_utils.BaseSSHCommand):
         $USER from the environment is selected.
         """
 
-    parser.add_argument(
-        '--command',
-        help='A command to run on the virtual machine.')
-
-    parser.add_argument(
-        '--tty', '-t',
-        action='store_true',
-        help="""\
-            If provided, allocates a pseudo-tty. This is useful if a command
-            is provided which requires interaction from the user (e.g.,
-            ``--command /bin/bash''). This is equivalent to ``-t'' in
-            *ssh(1)*.
-            """)
-
-    parser.add_argument(
-        '--zone',
-        help='The zone of the instance.',
-        required=True)
-
-    parser.add_argument(
-        '--container',
-        help="""\
-            The name of a container inside of the virtual machine instance to
-            connect to. This only applies to virtual machines that are using
-            a Google container virtual machine image. For more information,
-            see link:https://developers.google.com/compute/docs/containers[].
-            """)
+    utils.AddZoneFlag(
+        parser,
+        resource_type='instance',
+        operation_type='connect to')
 
   def Run(self, args):
     super(SSH, self).Run(args)
@@ -70,25 +77,26 @@ class SSH(ssh_utils.BaseSSHCommand):
       user, instance = parts
     else:
       raise exceptions.ToolException(
-          'expected argument of the form [USER@]INSTANCE; received: {0}'
+          'Expected argument of the form [USER@]INSTANCE; received [{0}].'
           .format(args.user_host))
 
-    self.EnsureSSHKeyIsInProject(user)
+    instance_ref = self.CreateZonalReference(instance, args.zone)
+    external_ip_address = self.GetInstanceExternalIpAddress(instance_ref)
 
-    instance_resource = self.GetInstance(instance, args.zone)
-    external_ip_address = ssh_utils.GetExternalIPAddress(instance_resource)
+    ssh_args = [self.ssh_executable]
+    if not args.plain:
+      ssh_args.extend(self.GetDefaultFlags())
+      # Allocates a tty if no command was provided and a container was provided.
+      if args.container and not args.command:
+        ssh_args.append('-t')
 
-    self.WaitUntilSSHable(user, external_ip_address)
+    if args.ssh_flag:
+      for flag in args.ssh_flag:
+        dereferenced_flag = (
+            flag.replace('%USER%', user)
+            .replace('%INSTANCE%', external_ip_address))
+        ssh_args.append(dereferenced_flag)
 
-    ssh_args = [
-        self.ssh_executable,
-        '-i',
-        self.ssh_key_file,
-    ]
-    # Allocates a tty if one was explicitly requested, or no command was
-    # provided and a container was provided.
-    if args.tty or (args.container and not args.command):
-      ssh_args.append('-t')
     ssh_args.append(ssh_utils.UserHost(user, external_ip_address))
 
     if args.container:
@@ -106,27 +114,19 @@ class SSH(ssh_utils.BaseSSHCommand):
       ssh_args.append('--')
       ssh_args.append(args.command)
 
-    logging.debug('running ssh command: %s', ' '.join(ssh_args))
-    try:
-      subprocess.check_call(ssh_args)
-    except OSError as e:
-      raise exceptions.ToolException(
-          '{0}: {1}'.format(e.strerror, ' '.join(ssh_args)))
-    except subprocess.CalledProcessError as e:
-      raise exceptions.ToolException(
-          'exit code {0}: {1}'.format(e.returncode, ' '.join(ssh_args)))
+    self.ActuallyRun(args, ssh_args, user, external_ip_address)
 
 
 SSH.detailed_help = {
     'brief': 'SSH into a virtual machine instance',
     'DESCRIPTION': """\
-        *{command}* is a thin wrapper around the 'ssh' command that
+        *{command}* is a thin wrapper around the *ssh(1)* command that
         takes care of authentication and the translation of the
         instance name into an IP address.
 
         This command ensures that the user's public SSH key is present
         in the project's metadata. If the user does not have a public
-        SSH key, one is generated using 'ssh-keygen'.
+        SSH key, one is generated using *ssh-keygen(1)*.
         """,
     'EXAMPLES': """\
         To SSH into ``my-instance'' in zone ``us-central2-a'', run:
@@ -144,7 +144,7 @@ SSH.detailed_help = {
           $ {command} my-instance --zone us-central2-a --command "ps -ejH"
 
         If you are using the Google container virtual machine image, you
-        can ssh into one of your containers with:
+        can SSH into one of your containers with:
 
           $ {command} my-instance \\
               --zone us-central2-a \\

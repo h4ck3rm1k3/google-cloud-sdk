@@ -4,6 +4,7 @@
 
 import getpass
 import os
+
 from oauth2client import client
 
 from googlecloudsdk.calliope import base
@@ -28,12 +29,13 @@ class ActivateServiceAccount(base.Command):
     parser.add_argument('--key-file',
                         help=('Path to the service accounts private key.'),
                         required=True)
-    parser.add_argument('--password-file',
-                        help=('Path to a file containing the password for the '
-                              'service account private key.'))
-    parser.add_argument('--prompt-for-password', action='store_true',
-                        help=('Prompt for the password for the service account '
-                              'private key.'))
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--password-file',
+                       help=('Path to a file containing the password for the '
+                             'service account private key.'))
+    group.add_argument('--prompt-for-password', action='store_true',
+                       help=('Prompt for the password for the service account '
+                             'private key.'))
 
   def Run(self, args):
     """Create service account credentials."""
@@ -43,17 +45,12 @@ class ActivateServiceAccount(base.Command):
     except IOError as e:
       raise c_exc.BadFileException(e)
 
-    if args.password_file and args.prompt_for_password:
-      raise c_exc.InvalidArgumentException(
-          'Cannot use a password file and prompt for password at the same time.'
-          )
-
     password = None
     if args.password_file:
       try:
         password = open(args.password_file).read().strip()
       except IOError as e:
-        raise c_exc.UnknownArgumentException(e)
+        raise c_exc.UnknownArgumentException('--password-file', e)
     if args.prompt_for_password:
       password = getpass.getpass('Password: ')
 

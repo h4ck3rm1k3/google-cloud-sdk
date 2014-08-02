@@ -1,4 +1,4 @@
-# Copyright 2012 Google Inc. All Rights Reserved.
+# Copyright 2014 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,51 +14,61 @@
 
 """Helper module to manage initial password for Windows images."""
 
-import getpass
-
+import random
 from gcutil_lib import gcutil_errors
 from gcutil_lib import gcutil_logging
 
 LOGGER = gcutil_logging.LOGGER
 
-GCE_ADMIN_ACCOUNT = 'gceadmin'
 MIN_PASSWORD_LENGTH = 8
 NON_ALPHA_NUM_CHARS = '~!@#$%^&*_-+=`|\\(){}[]:;"\'<>,.?/'
 MIN_CHAR_CATEGORIES = 3
 
+# Max number of attempts to generate password.
+_MAX_GENERATION_ATTEMPT = 15
 
-def GetPassword(prompt):
-  """Prompts and gets the initial windows password from user.
+# The character set that we will generate password from.
+# Some characters are excluded because they may be confusing
+# on display.
+_CANDIDATES_UPPER = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
+_CANDIDATES_LOWER = 'abcdefghijkmnopqrstuvwxyz'
+_CANDIDATES_DIGIT = '123456789'
+_CANDIDATES_ALPHA_NUM = (_CANDIDATES_UPPER + _CANDIDATES_LOWER
+                         + _CANDIDATES_DIGIT)
+_CANDIDATES_NON_ALPHA_NUM = '~!@#$%^&*_-+=`\\(){}[]:;"\'<>,.?/'
+
+
+def GeneratePassword(user_account_name):
+  """Generates a random password for Windows user account.
 
   Args:
-    prompt: The prompt for the user.
+    user_account_name: The user account name that we generate password for.
 
   Returns:
-    The password user typed.
-
-  Raises:
-    CommandError: The user typed in weak or mismatched password and we have
-      exhausted the retries.
+    The generated password.
   """
-  max_attempt_count = 3
-  for i in xrange(max_attempt_count):
-    password1 = getpass.getpass(prompt)
-    password2 = getpass.getpass('Please retype the password')
-    if password1 == password2:
-      try:
-        ValidateStrongPasswordRequirement(password1)
-        return password1
-      except gcutil_errors.CommandError as e:
-        error_message = e.message
-    else:
-      error_message = 'Passwords do not match.'
-    if i < max_attempt_count - 1:
-      error_message += ' Try again.'
-      LOGGER.warn(error_message)
-  raise gcutil_errors.CommandError(error_message)
+  r = random.SystemRandom()
+  for _ in xrange(_MAX_GENERATION_ATTEMPT):
+    # First pick 12 chars randomly from letters and digits.
+    char_list = list(r.choice(_CANDIDATES_ALPHA_NUM)
+                     for _ in xrange(12))
+    # Split the list into 3 groups of 4 chars each.
+    # Add a random non-alpha-num char between the groups.
+    char_list.insert(4, r.choice(_CANDIDATES_NON_ALPHA_NUM))
+    char_list.insert(9, r.choice(_CANDIDATES_NON_ALPHA_NUM))
+    password = ''.join(char_list)
+
+    try:
+      ValidateStrongPasswordRequirement(password, user_account_name)
+      return password
+    except gcutil_errors.CommandError:
+      pass
+  raise gcutil_errors.CommandError(
+      'Failed to generate password after %d attempts.'
+      % _MAX_GENERATION_ATTEMPT)
 
 
-def ValidateStrongPasswordRequirement(password):
+def ValidateStrongPasswordRequirement(password, user_account_name):
   """Validates that a password meets strong password requirement.
 
   The strong password must be at least 8 chars long and meet the
@@ -67,6 +77,7 @@ def ValidateStrongPasswordRequirement(password):
 
   Args:
     password: Password to be validated.
+    user_account_name: The user account name.
 
   Raises:
     CommandError: The password does not meet the strong password requirement.
@@ -101,9 +112,11 @@ def ValidateStrongPasswordRequirement(password):
         'Windows password must contain at least 3 types of characters. See '
         'http://technet.microsoft.com/en-us/library/cc786468(v=ws.10).aspx')
 
-  # Currently we only support 'gceadmin' account, and it does not have
-  # display name, so we only need to check against string 'gceadmin'
-  if GCE_ADMIN_ACCOUNT in password.lower():
+  # Currently, we do not set the user display name.  So we only need to
+  # check and make sure that the password does not contain the user account
+  # name.
+  if (len(user_account_name) >= 3
+      and user_account_name.lower() in password.lower()):
     raise gcutil_errors.CommandError(
         'Windows password cannot contain the user account name: %s.' %
-        GCE_ADMIN_ACCOUNT)
+        user_account_name)

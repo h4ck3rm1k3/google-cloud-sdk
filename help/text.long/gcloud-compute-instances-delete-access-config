@@ -6,9 +6,10 @@ SYNOPSIS
        gcloud compute instances delete-access-config
          NAME
          [--access-config-name ACCESS_CONFIG_NAME; default="external-nat"]
+         [--help]
          [--network-interface NETWORK_INTERFACE; default="nic0"]
          --zone ZONE
-         [-h, --help]
+         [-h]
 
 DESCRIPTION
        gcloud compute instances delete-access-config is used to delete access
@@ -25,6 +26,9 @@ FLAGS
            Specifies the name of the access configuration to delete.
            "external-nat" is used as the default if this flag is not provided.
 
+       --help
+           Display detailed help.
+
        --network-interface NETWORK_INTERFACE
            Specifies the name of the network interface from which to delete
            the access configuration. If this is not provided, then "nic0" is
@@ -34,6 +38,6 @@ FLAGS
            The zone of the instance from which to delete the access
            configuration.
 
-       --help
+       -h
            Print a summary help and exit.
 

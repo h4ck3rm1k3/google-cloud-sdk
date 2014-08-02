@@ -4,6 +4,17 @@ All rights reserved.
 
 Google Cloud SDK - Release Notes
 
+0.9.28 (2014/07/18)
+===================
+  - Updated gcutil to 1.16.3 and various AppEngine runtimes to 1.9.7 binaries.
+  - Support running several modules by gcloud app run and fixed output errors.
+  - Limit gcloud upgrade nags to once per day.
+  - Bring help files up to date (for example improved the documentation for DM 'templates create' and 'deployments create').
+  - Added prompting for regions and zones to most subcommands of the compute component.
+  - Added new subcommands to the compute component for adding and removing backends from backend services.
+  - Added --ssh-flags to 'gcloud compute ssh' for passing additional flags to ssh.
+  - Added image alias support for the --image flag in the compute component.
+
 
 0.9.27 (2014/06/18)
 ===================

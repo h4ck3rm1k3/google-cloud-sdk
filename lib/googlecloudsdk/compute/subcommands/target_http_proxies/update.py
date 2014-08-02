@@ -34,7 +34,7 @@ class Update(base_classes.BaseAsyncMutator):
     return 'SetUrlMap'
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'targetHttpProxies'
 
   def CreateRequests(self, args):

@@ -4,7 +4,9 @@ NAME
        group or subcommand.
 
 SYNOPSIS
-       gcloud help [COMMAND ...] [-h, --help]
+       gcloud help
+         [COMMAND ...]
+         [-h, --help]
 
 POSITIONAL ARGUMENTS
        [COMMAND ...]

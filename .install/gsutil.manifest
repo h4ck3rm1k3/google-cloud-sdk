@@ -36,6 +36,7 @@ platform/gsutil/gslib/tests/testcase/__init__.py
 platform/gsutil/gslib/tests/testcase/base.py
 platform/gsutil/gslib/tests/testcase/unit_testcase.py
 platform/gsutil/gslib/tests/testcase/integration_testcase.py
+platform/gsutil/gslib/tests/test_hash.py
 platform/gsutil/gslib/tests/test_data/
 platform/gsutil/gslib/tests/test_data/test.mp3
 platform/gsutil/gslib/tests/test_data/test.p12
@@ -103,6 +104,7 @@ platform/gsutil/gslib/third_party/__init__.py
 platform/gsutil/gslib/plurality_checkable_iterator.py
 platform/gsutil/gslib/addlhelp/
 platform/gsutil/gslib/addlhelp/dev.py
+platform/gsutil/gslib/addlhelp/retries.py
 platform/gsutil/gslib/addlhelp/anon.py
 platform/gsutil/gslib/addlhelp/metadata.py
 platform/gsutil/gslib/addlhelp/support.py
@@ -141,6 +143,7 @@ platform/gsutil/gslib/commands/stat.py
 platform/gsutil/gslib/commands/signurl.py
 platform/gsutil/gslib/commands/notification.py
 platform/gsutil/gslib/commands/config.py
+platform/gsutil/gslib/commands/hash.py
 platform/gsutil/gslib/commands/setmeta.py
 platform/gsutil/gslib/commands/rsync.py
 platform/gsutil/gslib/commands/cors.py
@@ -157,6 +160,7 @@ platform/gsutil/gslib/commands/defacl.py
 platform/gsutil/gslib/cred_types.py
 platform/gsutil/gslib/daisy_chain_wrapper.py
 platform/gsutil/gslib/cloud_api.py
+platform/gsutil/gslib/progress_callback.py
 platform/gsutil/gslib/storage_uri_builder.py
 platform/gsutil/gslib/data/
 platform/gsutil/gslib/data/cacerts.txt
@@ -744,6 +748,7 @@ platform/gsutil/third_party/boto/tests/unit/ec2/elb/__init__.py
 platform/gsutil/third_party/boto/tests/unit/ec2/elb/test_listener.py
 platform/gsutil/third_party/boto/tests/unit/ec2/elb/test_loadbalancer.py
 platform/gsutil/third_party/boto/tests/unit/ec2/test_volume.py
+platform/gsutil/third_party/boto/tests/unit/ec2/test_ec2object.py
 platform/gsutil/third_party/boto/tests/unit/ec2/cloudwatch/
 platform/gsutil/third_party/boto/tests/unit/ec2/cloudwatch/__init__.py
 platform/gsutil/third_party/boto/tests/unit/ec2/cloudwatch/test_connection.py

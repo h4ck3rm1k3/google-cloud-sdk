@@ -4,8 +4,8 @@ from googlecloudsdk.compute.lib import base_classes
 from googlecloudsdk.compute.lib import operations_utils
 
 
-class ListOperations(operations_utils.OperationsResourceFetcherMixin,
-                     base_classes.BaseLister):
+class List(operations_utils.OperationsResourceFetcherMixin,
+           base_classes.BaseLister):
   """List Google Compute Engine operations."""
 
   @staticmethod
@@ -14,5 +14,5 @@ class ListOperations(operations_utils.OperationsResourceFetcherMixin,
     operations_utils.AddOperationFetchingArgs(parser)
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'operations'

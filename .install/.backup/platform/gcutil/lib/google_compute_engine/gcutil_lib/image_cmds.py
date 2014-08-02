@@ -17,6 +17,7 @@
 
 
 
+from google.apputils import app
 from google.apputils import appcommands
 import gflags as flags
 
@@ -61,13 +62,16 @@ class ImageCommand(command_base.GoogleComputeCommand):
           ('kernel', 'preferredKernel'),
           ('deprecation', 'deprecated.state'),
           ('replacement', 'deprecated.replacement'),
-          ('status', 'status')),
+          ('status', 'status'),
+          ('disk-size-gb', 'diskSizeGb'),
+          ('archive-size-bytes', 'archiveSizeBytes')),
       sort_by='name')
 
   resource_collection_name = 'images'
 
   def __init__(self, name, flag_values):
     super(ImageCommand, self).__init__(name, flag_values)
+
 
 
 class AddImage(ImageCommand):
@@ -96,7 +100,9 @@ class AddImage(ImageCommand):
                         flag_values=flag_values)
     kernel_cmds.RegisterCommonKernelFlags(flag_values)
 
-  def Handle(self, image_name, root_source_tarball):
+  def Handle(self,
+             image_name,
+             root_source_tarball):
     """Add the specified image.
 
     Args:
@@ -111,21 +117,23 @@ class AddImage(ImageCommand):
     image_context = self._context_parser.ParseContextOrPrompt('images',
                                                               image_name)
 
-    # Accept gs:// URLs.
-    if root_source_tarball.startswith('gs://'):
-      root_source_tarball = ('http://storage.googleapis.com/' +
-                             root_source_tarball[len('gs://'):])
 
     image_resource = {
         'kind': self._GetResourceApiKind('image'),
         'name': image_context['image'],
         'description': self._flags.description,
         'sourceType': 'RAW',
-        'rawDisk': {
-            'source': root_source_tarball,
-            'containerType': 'TAR',
-            }
-        }
+    }
+
+    if root_source_tarball:
+      # Accept gs:// URLs.
+      if root_source_tarball.startswith('gs://'):
+        root_source_tarball = ('http://storage.googleapis.com/' +
+                               root_source_tarball[len('gs://'):])
+      image_resource['rawDisk'] = {
+          'source': root_source_tarball,
+          'containerType': 'TAR',
+      }
 
     if self.api.version <= version.get('v1beta16'):
       if self._flags['preferred_kernel'].present:

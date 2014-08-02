@@ -6,7 +6,8 @@ SYNOPSIS
        gcloud auth revoke
          [ACCOUNTS ...]
          [--all]
-         [-h, --help]
+         [--help]
+         [-h]
 
 POSITIONAL ARGUMENTS
        [ACCOUNTS ...]
@@ -17,5 +18,8 @@ FLAGS
            Revoke all known credentials.
 
        --help
+           Display detailed help.
+
+       -h
            Print a summary help and exit.
 

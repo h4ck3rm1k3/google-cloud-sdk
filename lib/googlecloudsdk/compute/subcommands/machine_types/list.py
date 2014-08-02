@@ -3,7 +3,7 @@
 from googlecloudsdk.compute.lib import base_classes
 
 
-class ListMachineTypes(base_classes.ZonalLister):
+class List(base_classes.ZonalLister):
   """List Google Compute Engine machine types."""
 
   @property
@@ -11,5 +11,5 @@ class ListMachineTypes(base_classes.ZonalLister):
     return self.context['compute'].machineTypes
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'machineTypes'

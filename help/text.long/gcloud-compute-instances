@@ -5,10 +5,14 @@ NAME
 SYNOPSIS
        gcloud compute instances
          COMMAND
-         [-h, --help]
+         [--help]
+         [-h]
 
 FLAGS
        --help
+           Display detailed help.
+
+       -h
            Print a summary help and exit.
 
 COMMANDS
@@ -35,6 +39,9 @@ COMMANDS
 
        delete-access-config
            Delete access configs from Google Compute Engine virtual machines.
+
+       describe
+           Describe a virtual machine instance.
 
        detach-disk
            Detach disks from Google Compute Engine virtual machine instances.

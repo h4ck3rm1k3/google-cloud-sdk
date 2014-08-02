@@ -21,6 +21,7 @@ import socket
 import sys
 import apiclient
 import httplib2
+import yaml
 
 
 
@@ -169,6 +170,8 @@ def Singularize(string):
   """A naive function for singularizing Compute Engine collection names."""
   if string.endswith('sses'):
     return string[:len(string) - 2]
+  elif string.endswith('ies'):
+    return string[:len(string) - 3] + 'y'
   elif string.endswith('s'):
     return string[:len(string) - 1]
   return string
@@ -342,3 +345,56 @@ def CombineListResults(result1, result2):
   kind = result1.get('kind') or result2.get('kind')
 
   return {'kind': kind, 'items': items}
+
+
+def PrintYaml(resource, out=sys.stdout):
+  """Print a resource key/value pair into a yaml file.
+
+  Args:
+    resource: set of serializable resource to print.
+    out: the output stream.
+  """
+  yaml.safe_dump(
+      resource,
+      stream=out,
+      default_flow_style=False,
+      indent=2,
+      explicit_start=True)
+
+
+def ParseYaml(filename=None):
+  """Parse a yaml file.
+
+  Args:
+    filename: the name of the yaml file to parse.
+
+  Returns:
+    key/value pair in json format.
+  """
+  with open(filename) as f:
+    return yaml.load(f)
+
+
+def GetProjectId(project_id_or_number, api):
+  """Gets the project ID given the project ID or numeric project number.
+
+  Args:
+    project_id_or_number: The string that is project ID or project number.
+    api: The Google Compute Engine API client.
+
+  Returns:
+    The project ID.  If numeric project number is passed in, a call to
+    server is made to look up the project ID.  If the input
+    project_id_or_number is non-numeric, it is returned as project ID.
+  """
+  # Project ID must start with a letter, so if the string is all digit,
+  # it must be the numeric project number.
+  is_numeric_project_number = project_id_or_number.isdigit()
+  if is_numeric_project_number:
+    # If the user gives the numeric project number, we will convert it to the
+    # string project ID by querying the server.
+    project = api.projects.get(project=project_id_or_number).execute()
+    project_id = project.get('name')
+  else:
+    project_id = project_id_or_number
+  return project_id

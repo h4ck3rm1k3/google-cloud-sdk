@@ -12,12 +12,20 @@ gcloud-compute-images-create \- Create Google Compute Engine images
 \fBgcloud compute images create\fR
   NAME
   [\-\-description DESCRIPTION]
-  \-\-source\-uri SOURCE_URI
-  [\-h, \-\-help]
+  [\-\-help]
+  [\-\-source\-disk\-zone SOURCE_DISK_ZONE]
+  [\-\-source\-disk SOURCE_DISK | \-\-source\-uri SOURCE_URI]
+  [\-h]
 .fi
 .SH "DESCRIPTION"
 .sp
 \fBgcloud compute images create\fR is used to create custom disk images\&. The resulting image can be provided during instance or disk creation so that the instance attached to the resulting disks has access to a known set of software or files from the image\&.
+.sp
+Images can be created from gzipped compressed tarball containing raw disk data or from existing disks in any zone\&.
+.sp
+Images are global resources, so they can be used across zones and projects\&.
+.sp
+To learn more about creating image tarballs, visit https://developers\&.google\&.com/compute/docs/images\&.
 .SH "POSITIONAL ARGUMENTS"
 .PP
 \fINAME\fR
@@ -31,12 +39,31 @@ The name of the image to create\&.
 An optional, textual description for the image being created\&.
 .RE
 .PP
-\fB\-\-source\-uri\fR \fISOURCE_URI\fR
+\fB\-\-help\fR
 .RS 4
-The full Google Cloud Storage URL where the disk image is stored\&.
+Display detailed help\&.
 .RE
 .PP
-\fB\-\-help\fR
+\fB\-\-source\-disk\fR \fISOURCE_DISK\fR
+.RS 4
+A source disk to create the image from\&. The value for this option can be the name of a disk with the zone specified via \(lq\-\-source\-disk\-zone\(rq flag\&.
+.sp
+This flag is mutually exclusive with \(lq\-\-source\-uri\(rq\&.
+.RE
+.PP
+\fB\-\-source\-disk\-zone\fR \fISOURCE_DISK_ZONE\fR
+.RS 4
+The zone of the disk specified by \-\-source\-disk\&. If omitted and the arguments are not all URIs, you will be prompted to select a zone\&.
+.RE
+.PP
+\fB\-\-source\-uri\fR \fISOURCE_URI\fR
+.RS 4
+The full Google Cloud Storage URI where the disk image is stored\&. This file must be a gzip\-compressed tarball whose name ends in \(lq\&.tar\&.gz\(rq\&.
+.sp
+This flag is mutually exclusive with \(lq\-\-source\-disk\(rq\&.
+.RE
+.PP
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE

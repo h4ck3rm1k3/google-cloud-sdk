@@ -5,11 +5,27 @@ from apiclient import errors
 
 from googlecloudsdk.calliope import base
 from googlecloudsdk.calliope import exceptions
+from googlecloudsdk.core import resources
 from googlecloudsdk.sql import util
 
 
 class List(base.Command):
   """Lists all SSL certs for a Cloud SQL instance."""
+
+  @staticmethod
+  def Args(parser):
+    """Args is called by calliope to gather arguments for this command.
+
+    Args:
+      parser: An argparse parser that you can use it to add arguments that go
+          on the command line after this command. Positional arguments are
+          allowed.
+    """
+    parser.add_argument(
+        '--instance',
+        '-i',
+        required=True,
+        help='Cloud SQL instance ID.')
 
   def Run(self, args):
     """Lists all SSL certs for a Cloud SQL instance.
@@ -30,8 +46,12 @@ class List(base.Command):
     sql = self.context['sql']
     instance_id = util.GetInstanceIdWithoutProject(args.instance)
     project_id = util.GetProjectId(args.instance)
-    request = sql.sslCerts().list(project=project_id,
-                                  instance=instance_id)
+    # TODO(user): as we deprecate P:I args, simplify the call to .Parse().
+    instance_ref = resources.Parse(
+        instance_id, collection='sql.instances',
+        params={'project': project_id})
+    request = sql.sslCerts().list(project=instance_ref.project,
+                                  instance=instance_ref.instance)
     try:
       result = request.execute()
       return result

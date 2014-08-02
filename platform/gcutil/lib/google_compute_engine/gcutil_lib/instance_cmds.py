@@ -31,11 +31,9 @@ from gcutil_lib import command_base
 from gcutil_lib import gcutil_errors
 from gcutil_lib import gcutil_logging
 from gcutil_lib import image_cmds
-from gcutil_lib import kernel_cmds
 from gcutil_lib import metadata
 from gcutil_lib import scopes
 from gcutil_lib import ssh_keys
-from gcutil_lib import version
 from gcutil_lib import windows_password
 from gcutil_lib import windows_user_name
 
@@ -90,7 +88,6 @@ class InstanceCommand(command_base.GoogleComputeCommand):
           ('name', 'name'),
           ('machine-type', 'machineType'),
           ('image', 'image'),
-          ('kernel', 'kernel'),
           ('network', 'networkInterfaces.network'),
           ('network-ip', 'networkInterfaces.networkIP'),
           ('external-ip', 'networkInterfaces.accessConfigs.natIP'),
@@ -104,26 +101,14 @@ class InstanceCommand(command_base.GoogleComputeCommand):
           ('creation-time', 'creationTimestamp'),
           ('machine', 'machineType'),
           ('image', 'image'),
-          ('kernel', 'kernel'),
           ('zone', 'zone'),
           ('tags-fingerprint', 'tags.fingerprint'),
+          ('on-host-maintenance', 'scheduling.onHostMaintenance'),
+          ('automatic-restart', 'scheduling.automaticRestart'),
           ('metadata-fingerprint', 'metadata.fingerprint'),
           ('status', 'status'),
           ('status-message', 'statusMessage')),
       sort_by='name')
-
-  print_spec_with_scheduling_fields = command_base.ResourcePrintSpec(
-      summary=print_spec.summary,
-      field_mappings=print_spec.field_mappings,
-      detail=print_spec.detail + (
-          ('on-host-maintenance', 'scheduling.onHostMaintenance'),
-          ('automatic-restart', 'scheduling.automaticRestart')),
-      sort_by=print_spec.sort_by)
-
-  def GetPrintSpec(self):
-    if self.api.version >= version.get('v1beta16'):
-      return self.print_spec_with_scheduling_fields
-    return self.print_spec
 
   # A map from legal values for the disk "mode" option to the
   # corresponding API value. Keys in this map should be lowercase, as
@@ -424,8 +409,7 @@ class InstanceCommand(command_base.GoogleComputeCommand):
         'boot': boot,
     }
 
-    if (boot and self._flags.auto_delete_boot_disk
-        and self.api.version >= version.get('v1')):
+    if boot and self._flags.auto_delete_boot_disk:
       disk['autoDelete'] = True
     return disk
 
@@ -446,7 +430,6 @@ class AddInstance(InstanceCommand):
     super(AddInstance, self).__init__(name, flag_values)
 
     image_cmds.RegisterCommonImageFlags(flag_values)
-    kernel_cmds.RegisterCommonKernelFlags(flag_values)
 
     flags.DEFINE_string('description',
                         '',
@@ -462,28 +445,13 @@ class AddInstance(InstanceCommand):
                         'To get a list of images you have built, run '
                         '\'gcutil --project=<project-id> listimages\'.',
                         flag_values=flag_values)
-    flags.DEFINE_string('kernel',
-                        None,
-                        '[Deprecated] Specifies the kernel to use for this '
-                        'instance. For example, '
-                        '\'--kernel=projects/google/global/kernels/'
-                        'kernel-name\'. '
-                        'By default, gcutil uses a preferred kernel based on '
-                        'the image you select. To get a list of kernels '
-                        'built by Google, run '
-                        '\'gcutil listkernels --project=google\'.',
-                        flag_values=flag_values)
     flags.DEFINE_boolean('persistent_boot_disk',
                          None,
                          '[Deprecated] Creates a persistent boot disk for this '
                          'instance. If this is set, gcutil creates a new '
                          'disk named \'<instance-name>\' and copies the '
                          'contents of the image onto the new disk and uses '
-                         'it for booting. The preferred kernel for the '
-                         'image will be used to boot, but it may be '
-                         'overridden by passing \'--kernel\'. To use '
-                         'scratch disk space for your root files, pass in '
-                         '\'--nopersistent_boot_disk\'.',
+                         'it for booting.',
                          flag_values=flag_values)
     flags.DEFINE_string('boot_disk_type',
                         'pd-standard',
@@ -619,6 +587,49 @@ class AddInstance(InstanceCommand):
     # The default boot disk name is the same as the instance name.
     return instance_name
 
+  def _IsCreatingWindowsInstance(self, image_url, image_resource, disk_used):
+    # If the boot disk is given, we get the disk and check its
+    # license.
+    if disk_used:
+      disk_context = self._context_parser.ParseContextOrPrompt(
+          'disks', disk_used['source'])
+      disk_resource = self.api.disks.get(
+          project=disk_context['project'],
+          zone=disk_context['zone'],
+          disk=disk_context['disk']).execute()
+      return self._HasWindowsLicense(disk_resource.get('licenses', []))
+
+    # If there is no boot disk, check the licenses in the image.
+    if not image_resource:
+      # If the image_resource is not given, we get it from server.
+      image_context = self._context_parser.ParseContextOrPrompt(
+          'images', image_url)
+      image_resource = self.api.images.get(
+          project=image_context['project'],
+          image=image_context['image']).execute()
+    return self._HasWindowsLicense(image_resource.get('licenses', []))
+
+  def _HasWindowsLicense(self, license_urls):
+    """Checks if a list of license urls contains a license for Windows.
+
+        Currently, we consider a license is for Windows, if it
+        comes from any of the Windows image provider projects.
+
+    Args:
+      license_urls: List of URLs for license resource.
+
+    Returns:
+      True if at least one license in the list is considered Windows license.
+    """
+    if not license_urls:
+      return False
+    for license_url in license_urls:
+      license_context = self._context_parser.ParseContextOrPrompt(
+          'licenses', license_url)
+      if license_context['project'] in command_base.WINDOWS_IMAGE_PROJECTS:
+        return True
+    return False
+
   def Handle(self, *instance_names):
     """Add the specified instance.
 
@@ -635,20 +646,11 @@ class AddInstance(InstanceCommand):
     if not instance_names:
       raise app.UsageError('You must specify at least one instance name')
 
-    if self.api.version > version.get('v1beta16'):
-      if self._flags.persistent_boot_disk is False:
-        raise gcutil_errors.UnsupportedCommand(
-            'Persistent boot disk is required in v1 and later. You may still '
-            'use ephemeral boot disks in the older APIs by specifying '
-            '--service_version=v1beta16.')
-      else:
-        self._flags.persistent_boot_disk = True
-
-      if self._flags.kernel:
-        raise gcutil_errors.UnsupportedCommand(
-            'Injected kernels are no longer supported in v1. You may still '
-            'specify a kernel in the older APIs by specifying '
-            '--service_version=v1beta16.')
+    if self._flags.persistent_boot_disk is False:
+      raise gcutil_errors.UnsupportedCommand(
+          'Persistent boot disk is required.')
+    else:
+      self._flags.persistent_boot_disk = True
 
     if len(instance_names) > 1 and self._flags.disk:
       raise gcutil_errors.CommandError(
@@ -669,70 +671,36 @@ class AddInstance(InstanceCommand):
           self.api.machine_types)['name']
 
     # Processes the disks, so we can check for the presence of a boot
-    # disk before prompting for image or kernel.
+    # disk before prompting for image.
     disks = [self._BuildAttachedDisk(disk) for disk in self._flags.disk]
 
-    if (self._flags.persistent_boot_disk is None
-        and not self._HasBootDisk(disks)):
-      self._flags.persistent_boot_disk = self._PresentSafetyPrompt(
-          'You can create a new persistent boot disk (preferred) '
-          'or use a scratch disk (not recommended). Do you want '
-          'to create a persistent boot disk?')
-
+    boot_disk_used = self._GetBootDisk(disks)
+    image_resource = command_base.ResolveImageTrackOrImageToResource(
+        self.api.images, self._flags.project, self._flags.image,
+        lambda image: self._presenter.PresentElement(image['selfLink']))
     self._flags.image = self._context_parser.NormalizeOrPrompt(
-        'images', command_base.ResolveImageTrackOrImage(
-            self.api.images, self._flags.project, self._flags.image,
-            lambda image: self._presenter.PresentElement(image['selfLink'])))
+        'images',
+        image_resource['selfLink'] if image_resource else self._flags.image)
 
     if not self._flags.image and not self._HasBootDisk(disks):
-      self._flags.image = self._presenter.PromptForImage(
-          self.api.images)['selfLink']
-
-    if self.api.version <= version.get('v1beta16'):
-      if not self._flags['kernel'].present and self._HasBootDisk(disks):
-        # Have boot disk but no kernel, prompt for a kernel.
-        chosen_kernel = self._presenter.PromptForKernel(self.api.kernels)
-        if chosen_kernel is not None:
-          self._flags.kernel = chosen_kernel['selfLink']
+      image_resource = self._presenter.PromptForImage(
+          self.api.images)
+      self._flags.image = image_resource['selfLink']
 
     instance_metadata = self._metadata_flags_processor.GatherMetadata()
-    is_image_from_windows_project = self._IsImageFromWindowsProject(
-        self._flags.image)
-    has_windows_password = (
-        metadata.GetMetadataValue(
-            instance_metadata,
-            metadata.INITIAL_WINDOWS_PASSWORD_METADATA_NAME)
-        is not None)
-    has_windows_user = (
-        metadata.GetMetadataValue(
-            instance_metadata,
-            metadata.INITIAL_WINDOWS_USER_METADATA_NAME)
-        is not None)
 
-    # We deem the instance to be Windows instance if the image is from
-    # Google provided Windows project, or if the user gives the
-    # initial Windows user or password in metadata.
-    is_windows_instance = (
-        is_image_from_windows_project
-        or has_windows_password
-        or has_windows_user)
+    is_windows_instance = self._IsCreatingWindowsInstance(
+        self._flags.image, image_resource, boot_disk_used)
 
     if is_windows_instance:
       if (self._flags.authorized_ssh_keys or
           self._flags.add_compute_key_to_project is not None or
           self._flags.use_compute_key):
-        ssh_ignored_warning = (
-            'SSH key options such as authorized_ssh_keys, '
-            'add_compute_key_to_project and use_compute_key '
-            'are ignored.')
-        if is_image_from_windows_project:
-          LOGGER.warn('Image from public windows project is used. ' +
-                      ssh_ignored_warning)
-        elif has_windows_password:
-          LOGGER.warn(
-              ('%s metadata is given. This is assumed to be a Windows '
-               'instance. ' % metadata.INITIAL_WINDOWS_PASSWORD_METADATA_NAME)
-              + ssh_ignored_warning)
+        LOGGER.warn('Creating Windows instance. '
+                    'SSH key options such as authorized_ssh_keys, '
+                    'add_compute_key_to_project and use_compute_key '
+                    'are ignored.')
+
       # For Windows image, we need to set the user name and password
       # in metadata so the daemon on the machine can set up the initial
       # user account.
@@ -746,83 +714,13 @@ class AddInstance(InstanceCommand):
     # Instance names that we still want to create.
     instances_to_create = instance_contexts
 
-    if self._flags.persistent_boot_disk and not self._HasBootDisk(disks):
-      # Persistent boot device request. We need to create a new disk for each
-      # VM and populate it with contents of the specified image.
-      if self.api.version <= version.get('v1beta16'):
-        # Read the preferredKernel from the image unless overridden by the user.
-        if not self._flags.kernel:
-          image_context = self._context_parser.ParseContextOrPrompt(
-              'images', self._flags.image)
-
-          image_resource = self.api.images.get(
-              project=image_context['project'],
-              image=image_context['image']).execute()
-
-          if 'preferredKernel' in image_resource:
-            self._flags.kernel = image_resource['preferredKernel']
-
-      disk_creation_requests = []
-
+    if not self._HasBootDisk(disks):
+      # Determine the name of the boot disk that the create-instance call will
+      # make on our behalf.
       for instance_context in instance_contexts:
         boot_disk_name = self._GetDefaultBootDiskName(
             instance_context['instance'])
-
         instance_context['boot_disk_name'] = boot_disk_name
-
-        if self.api.version < version.get('v1'):
-          LOGGER.info('Preparing boot disk [%s] for instance [%s]'
-                      ' from disk image [%s].',
-                      boot_disk_name, instance_context['instance'],
-                      self._flags.image)
-          disk_creation_requests.append(
-              self._CreateDiskFromImageRequest(boot_disk_name,
-                                               instance_context['zone'],
-                                               instance_context['project']))
-
-      if self.api.version <= version.get('v1beta16'):
-        self._flags.image = None
-
-      (disk_results, disk_exceptions) = self.ExecuteRequests(
-          disk_creation_requests, wait_for_operations=True,
-          collection_name='disks')
-
-      if disk_exceptions:
-        return (self.MakeListResult(disk_results, 'operationList'),
-                disk_exceptions)
-
-      # Cancel instance creation when the disk creation fails.
-      disk_errors = self._GetErrorOperations(disk_results)
-      if disk_errors:
-        print 'There were errors creating persistent disks:'
-        self.PrintResult(self.MakeListResult(disk_errors, 'operationList'))
-        print 'As a result, the following instances will not be created:'
-
-        failed_disks = []
-        failed_instances = []
-        for result in disk_errors:
-          failed_result_context = self._context_parser.ParseContextOrPrompt(
-              'disks', result['targetLink'])
-          failed_disks.append(failed_result_context['disk'])
-          for instance_context in instances_to_create:
-            if (instance_context['boot_disk_name'] ==
-                failed_result_context['disk'] and
-                instance_context['zone'] == failed_result_context['zone'] and
-                instance_context['project'] ==
-                failed_result_context['project']):
-              instances_to_create.remove(instance_context)
-              failed_instances.append(instance_context['instance'])
-
-        t = self._CreateFormatter()
-        t.SetColumns(['Instance', 'Disk'])
-        for instance, disk in zip(failed_instances, failed_disks):
-          t.AppendRow([instance, disk])
-        t.Write()
-
-      # If there are no instances left to create, just quit.
-      if not instances_to_create:
-        return (self.MakeListResult(disk_results, 'operationList'),
-                disk_exceptions)
 
     if not is_windows_instance and (
         self._flags.add_compute_key_to_project or (
@@ -843,19 +741,15 @@ class AddInstance(InstanceCommand):
     for instance_context in instances_to_create:
       instance_disks = disks
       if 'boot_disk_name' in instance_context:
-        boot_disk = self._BuildAttachedDisk(
-            '%s,boot' % instance_context['boot_disk_name'])
-        if self.api.version >= version.get('v1'):
-          boot_disk = self._BuildAttachedBootDisk(
-              disk_name=instance_context['boot_disk_name'],
-              source_image=self._flags.image,
-              instance_name=instance_context['instance'],
-              disk_size_gb=self._flags.boot_disk_size_gb,
-              auto_delete=self._flags.auto_delete_boot_disk)
-        if self.api.version >= version.get('v1'):
-          boot_disk['initializeParams']['diskType'] = (
-              self._context_parser.NormalizeOrPrompt(
-                  'diskTypes', self._flags.boot_disk_type))
+        boot_disk = self._BuildAttachedBootDisk(
+            disk_name=instance_context['boot_disk_name'],
+            source_image=self._flags.image,
+            instance_name=instance_context['instance'],
+            disk_size_gb=self._flags.boot_disk_size_gb,
+            auto_delete=self._flags.auto_delete_boot_disk)
+        boot_disk['initializeParams']['diskType'] = (
+            self._context_parser.NormalizeOrPrompt(
+                'diskTypes', self._flags.boot_disk_type))
 
         instance_disks = [boot_disk] + disks
       requests.append(self._BuildRequestWithMetadata(
@@ -937,11 +831,15 @@ class AddInstance(InstanceCommand):
 
   def _HasBootDisk(self, disks):
     """Determines if any of the disks in a list is a boot disk."""
+    return self._GetBootDisk(disks) is not None
+
+  def _GetBootDisk(self, disks):
+    """Gets the boot disk from a list of disks."""
     for disk in disks:
       if disk.get('boot', False):
-        return True
+        return disk
 
-    return False
+    return None
 
   def _ValidateFlags(self):
     """Validate flags coming in before we start building resources.
@@ -1017,16 +915,6 @@ class AddInstance(InstanceCommand):
         'metadata': [],
         }
 
-    if self.api.version <= version.get('v1beta16'):
-      if self._flags.image:
-        instance_resource['image'] = self._context_parser.NormalizeOrPrompt(
-            'images', self._flags.image)
-
-    if self.api.version <= version.get('v1beta16'):
-      if self._flags.kernel:
-        instance_resource['kernel'] = self._context_parser.NormalizeOrPrompt(
-            'kernels', self._flags.kernel)
-
     if self._flags.machine_type:
       instance_resource['machineType'] = self._context_parser.NormalizeOrPrompt(
           'machineTypes', self._flags.machine_type)
@@ -1070,19 +958,10 @@ class AddInstance(InstanceCommand):
 
     instance_resource['tags'] = {'items': sorted(set(self._flags.tags))}
 
-    if self.api.version >= version.get('v1beta16'):
-      scheduling = _GetSchedulingFromFlags(self._flags)
-      # Only set the instance's scheduling if it is populated.
-      if scheduling:
-        instance_resource['scheduling'] = scheduling
-    elif self._flags['on_host_maintenance'].present:
-      raise app.UsageError(
-          'Flag --on_host_maintenance is only supported for API versions '
-          'v1beta16 and later.')
-    elif self._flags['automatic_restart'].present:
-      raise app.UsageError(
-          'Flag --automatic_restart is only supported for API versions '
-          'v1beta16 and later.')
+    scheduling = _GetSchedulingFromFlags(self._flags)
+    # Only set the instance's scheduling if it is populated.
+    if scheduling:
+      instance_resource['scheduling'] = scheduling
 
     return self.api.instances.insert(
         project=instance_context['project'],
@@ -1241,7 +1120,6 @@ class DeleteInstance(InstanceCommand):
     Raises:
       UsageError: Required flags were missing.
     """
-
     requests = []
     disk_requests = []
     autodelete_disk_requests = []
@@ -1256,13 +1134,16 @@ class DeleteInstance(InstanceCommand):
     instance_contexts = [self._context_parser.ParseContextOrPrompt(
         'instances', name) for name in instance_names]
 
+    bootdisks = self._FindBootPersistentDisks(instance_contexts)
+    disk_names = [self.DenormalizeResourceName(disk['source'])
+                  for (_, disk) in bootdisks]
+
     # Check to see which persistent disks are attached,
     # and also which are boot.
     if self._flags.delete_boot_pd is not False:
-      bootdisks = self._FindBootPersistentDisks(instance_contexts)
-      disk_names = [self.DenormalizeResourceName(disk['source'])
-                    for (_, disk) in bootdisks]
-
+      # User didn't specify nodeleteboot_pd. Either:
+      # - specified delete_boot_pd
+      # - gave neither, so we should prompt
       if bootdisks:
         # If the -f flag is specified, then delete_boot_pd flag is required.
         if self._flags.force and self._flags.delete_boot_pd is None:
@@ -1272,36 +1153,27 @@ class DeleteInstance(InstanceCommand):
               'must also specify the --[no]delete_boot_pd flag explicitly.')
 
         if self._flags.delete_boot_pd is None:
+          # User didn't set delete_boot_pd, also didn't set
+          # nodelete_boot_pd
           self._flags.delete_boot_pd = self._PresentSafetyPrompt(
               'Delete persistent boot disk ' + ', '.join(disk_names), False)
         for (instance_context, disk) in bootdisks:
+
           if self._flags.delete_boot_pd:
-            if self.api.version >= version.get('v1'):
-              if 'autoDelete' in disk and disk['autoDelete'] is True:
-                LOGGER.info('Auto-delete on %s (%s) is already enabled.',
-                            instance_context['instance'], disk['deviceName'])
-              else:
-                LOGGER.info('Enabling auto-delete on %s (%s).',
-                            instance_context['instance'], disk['deviceName'])
-                autodelete_disk_requests.append(
-                    self.api.instances.setDiskAutoDelete(
-                        **self._PrepareRequestArgs(
-                            instance_context,
-                            deviceName=disk['deviceName'],
-                            autoDelete=True)))
-              continue
-
-            # Prepare delete disk commands to execute after deleting
-            # the instances.
-            disk_context = self._context_parser.ParseContextOrPrompt(
-                'disks', disk['source'])
-
-            request = self.api.disks.delete(
-                project=disk_context['project'],
-                disk=disk_context['disk'],
-                zone=disk_context['zone'])
-            disk_requests.append(request)
-          elif self.api.version >= version.get('v1'):
+            if 'autoDelete' in disk and disk['autoDelete'] is True:
+              LOGGER.info('Auto-delete on %s (%s) is already enabled.',
+                          instance_context['instance'], disk['deviceName'])
+            else:
+              LOGGER.info('Enabling auto-delete on %s (%s).',
+                          instance_context['instance'], disk['deviceName'])
+              autodelete_disk_requests.append(
+                  self.api.instances.setDiskAutoDelete(
+                      **self._PrepareRequestArgs(
+                          instance_context,
+                          deviceName=disk['deviceName'],
+                          autoDelete=True)))
+          else:
+            # User didn't set delete_boot_pd, but chose no in the prompt
             # We must reset the autoDelete flag to false since the user does
             # not want disks to be auto-deleted.
             if 'autoDelete' in disk and disk['autoDelete'] is False:
@@ -1316,6 +1188,22 @@ class DeleteInstance(InstanceCommand):
                           instance_context,
                           deviceName=disk['deviceName'],
                           autoDelete=False)))
+    elif bootdisks:
+      for (instance_context, disk) in bootdisks:
+        # We must reset the autoDelete flag to false since the user does
+        # not want disks to be auto-deleted.
+        if 'autoDelete' in disk and disk['autoDelete'] is False:
+          LOGGER.info('Auto-delete on %s (%s) is already disabled.',
+                      instance_context['instance'], disk['deviceName'])
+        else:
+          LOGGER.info('INFO: Disabling auto-delete on %s (%s).',
+                      instance_context['instance'], disk['deviceName'])
+          autodelete_disk_requests.append(
+              self.api.instances.setDiskAutoDelete(
+                  **self._PrepareRequestArgs(
+                      instance_context,
+                      deviceName=disk['deviceName'],
+                      autoDelete=False)))
 
     (results, exceptions) = self.ExecuteRequests(
         autodelete_disk_requests, wait_for_operations=True)
@@ -1502,11 +1390,6 @@ class SetScheduling(InstanceCommand):
     Returns:
       An operation resource.
     """
-
-    if self.api.version < version.get('v1beta16'):
-      raise gcutil_errors.CommandError(
-          'The setscheduling command is only supported for API versions '
-          'v1beta16 and later.')
 
     scheduling = _GetSchedulingFromFlags(self._flags)
 

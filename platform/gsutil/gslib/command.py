@@ -595,8 +595,9 @@ class Command(HelpProvider):
     else:
       gsutil_api = self.gsutil_api
     url_string = name_expansion_result.GetExpandedUrlStr()
+    op_string = 'default object ACL' if self.def_acl else 'ACL'
     url = StorageUrlFromString(url_string)
-    self.logger.info('Setting ACL on %s...' % url_string)
+    self.logger.info('Setting %s on %s...', op_string, url_string)
     if ((gsutil_api.GetApiSelector(url.scheme) == ApiSelector.XML
          and url.scheme != 'gs') or self.canned):
       # If we are using canned ACLs or interacting with a non-google ACL
@@ -730,14 +731,21 @@ class Command(HelpProvider):
     else:
       if self.command_name == 'defacl':
         acl = blr.root_object.defaultObjectAcl
+        if not acl:
+          self.logger.warn(
+              'No default object ACL present for %s. This could occur if '
+              'the default object ACL is private, in which case objects '
+              'created in this bucket will be readable only by their '
+              'creators. It could also mean you do not have OWNER permission '
+              'on %s and therefore do not have permission to read the '
+              'default object ACL.', url_str, url_str)
       else:
         acl = blr.root_object.acl
-      if not acl:
-        self._WarnServiceAccounts()
-        raise AccessDeniedException('Access denied. Please ensure you have '
-                                    'OWNER permission on %s.' % url_str)
-      else:
-        print AclTranslation.JsonFromMessage(acl)
+        if not acl:
+          self._WarnServiceAccounts()
+          raise AccessDeniedException('Access denied. Please ensure you have '
+                                      'OWNER permission on %s.' % url_str)
+      print AclTranslation.JsonFromMessage(acl)
 
   def GetAclCommandBucketListingReference(self, url_str):
     """Gets a single bucket listing reference for an acl get command.
@@ -757,7 +765,7 @@ class Command(HelpProvider):
     wildcard_url = StorageUrlFromString(url_str)
     if wildcard_url.IsObject():
       plurality_iter = PluralityCheckableIterator(
-          self.WildcardIterator(url_str).IterAll(
+          self.WildcardIterator(url_str).IterObjects(
               bucket_listing_fields=['acl']))
     else:
       # Bucket or provider.  We call IterBuckets explicitly here to ensure that

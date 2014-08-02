@@ -3,7 +3,7 @@
 from googlecloudsdk.compute.lib import base_classes
 
 
-class GetHttpHealthChecks(base_classes.GlobalGetter):
+class Get(base_classes.GlobalGetter):
   """Display detailed information about HTTP health checks."""
 
   @staticmethod
@@ -16,11 +16,11 @@ class GetHttpHealthChecks(base_classes.GlobalGetter):
     return self.context['compute'].httpHealthChecks
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'httpHealthChecks'
 
 
-GetHttpHealthChecks.detailed_help = {
+Get.detailed_help = {
     'brief': 'Display detailed information about HTTP health checks',
     'DESCRIPTION': """\
         *{command}* displays all data associated with Google Compute

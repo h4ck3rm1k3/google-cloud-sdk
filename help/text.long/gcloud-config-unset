@@ -8,7 +8,8 @@ SYNOPSIS
        gcloud config unset
          PROPERTY
          [--global-only]
-         [-h, --help]
+         [--help]
+         [-h]
 
 POSITIONAL ARGUMENTS
        PROPERTY
@@ -19,5 +20,8 @@ FLAGS
            Unset option in the global properties file.
 
        --help
+           Display detailed help.
+
+       -h
            Print a summary help and exit.
 

@@ -110,7 +110,7 @@ class UpdateFirewall(base_classes.ReadWriteCommand):
     return self.context['compute'].firewalls
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'firewalls'
 
   def Run(self, args):
@@ -123,7 +123,7 @@ class UpdateFirewall(base_classes.ReadWriteCommand):
 
     if args_unset:
       raise calliope_exceptions.ToolException(
-          'at least one property must be modified')
+          'At least one property must be modified.')
 
     return super(UpdateFirewall, self).Run(args)
 

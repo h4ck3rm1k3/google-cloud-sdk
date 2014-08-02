@@ -165,7 +165,7 @@ JobIdGeneratorFingerprint = bigquery_client.JobIdGeneratorFingerprint
 # pylint: enable=g-bad-name
 
 
-_VERSION_NUMBER = '2.0.19'
+_VERSION_NUMBER = '2.0.22'
 _CLIENT_USER_AGENT = 'Cloud SDK Command Line Tool' + _VERSION_NUMBER
 _CLIENT_SCOPE = [
     'https://www.googleapis.com/auth/bigquery',
@@ -800,6 +800,21 @@ class NewCmd(appcommands.Cmd):
 class BigqueryCmd(NewCmd):
   """Bigquery-specific NewCmd wrapper."""
 
+  def _NeedsInit(self):
+    """Returns true if this command requires the init command before running.
+
+    Subclasses will override for any exceptional cases.
+    """
+    return not _UseServiceAccount() and not (
+        os.path.exists(_GetBigqueryRcFilename()) or os.path.exists(
+            FLAGS.credential_file))
+
+  def Run(self, argv):
+    """Bigquery commands run `init` before themselves if needed."""
+    if self._NeedsInit():
+      appcommands.GetCommandByName('init').Run([])
+    return super(BigqueryCmd, self).Run(argv)
+
   def RunSafely(self, args, kwds):
     """Run this command, printing information about any exceptions raised."""
     try:
@@ -823,9 +838,8 @@ class BigqueryCmd(NewCmd):
     retcode = 1
 
     contact_us_msg = (
-        'Google engineers monitor and answer questions on Stack Overflow, with '
-        'the tag google-bigquery:\n'
-        '  http://stackoverflow.com/questions/ask?tags=google-bigquery\n'
+        'Please file a bug report in our public issue tracker:\n'
+        '  https://code.google.com/p/google-bigquery/issues/list\n'
         'Please include a brief description of the steps that led to this '
         'issue, as well as the following information: \n\n')
     error_details = (
@@ -1105,6 +1119,11 @@ class _Query(BigqueryCmd):
         'will be used.',
         lower_bound=0, upper_bound=1.0,
         flag_values=fv)
+    flags.DEFINE_boolean(
+        'flatten_results', None,
+        'Whether to flatten nested and repeated fields in the result schema. '
+        'If not set, the default behavior is to flatten.',
+        flag_values=fv)
 
   def RunWithArgs(self, *args):
     # pylint: disable=g-doc-exception
@@ -1138,6 +1157,9 @@ class _Query(BigqueryCmd):
       if self.batch:
         raise app.UsageError(
             'batch cannot be specified in rpc mode.')
+      if self.flatten_results:
+        raise app.UsageError(
+            'flatten_results cannot be specified in rpc mode.')
       kwds['max_results'] = self.max_rows
       fields, rows = client.RunQueryRpc(query, **kwds)
       Factory.ClientTablePrinter.GetTablePrinter().PrintTable(fields, rows)
@@ -1153,6 +1175,7 @@ class _Query(BigqueryCmd):
 
       kwds['destination_table'] = self.destination_table
       kwds['allow_large_results'] = self.allow_large_results
+      kwds['flatten_results'] = self.flatten_results
       kwds['job_id'] = _GetJobIdFromFlags()
       job = client.Query(query, **kwds)
       if self.dry_run:
@@ -1178,9 +1201,15 @@ class _Extract(BigqueryCmd):
         short_name='F', flag_values=fv)
     flags.DEFINE_enum(
         'destination_format', None,
-        ['CSV', 'NEWLINE_DELIMITED_JSON'],
+        ['CSV', 'NEWLINE_DELIMITED_JSON', 'AVRO'],
         'The format with which to write the extracted data. Tables with '
         'nested or repeated fields cannot be extracted to CSV.',
+        flag_values=fv)
+    flags.DEFINE_enum(
+        'compression', 'NONE',
+        ['GZIP', 'NONE'],
+        'The compression type to use for exported files. Possible values '
+        'include GZIP and NONE. The default value is NONE.',
         flag_values=fv)
 
   def RunWithArgs(self, source_table, destination_uris):
@@ -1204,7 +1233,8 @@ class _Extract(BigqueryCmd):
     job = client.Extract(
         table_reference, destination_uris,
         field_delimiter=_NormalizeFieldDelimiter(self.field_delimiter),
-        destination_format=self.destination_format, **kwds)
+        destination_format=self.destination_format,
+        compression=self.compression, **kwds)
     if not FLAGS.sync:
       self.PrintJobStartInfo(job)
 
@@ -2108,6 +2138,10 @@ class _Init(BigqueryCmd):
         'file is deleted.',
         flag_values=fv)
 
+  def _NeedsInit(self):
+    """Init never needs to call itself before running."""
+    return False
+
   def DeleteCredentials(self):
     """Deletes this user's credential file."""
     _ProcessBigqueryrc()
@@ -2226,12 +2260,19 @@ class _Init(BigqueryCmd):
 class _Version(BigqueryCmd):
   usage = """version"""
 
+  def _NeedsInit(self):
+    """If just printing the version, don't run `init` first."""
+    return False
+
   def RunWithArgs(self):
     """Return the version of bq."""
     print 'This is BigQuery CLI %s' % (_VERSION_NUMBER,)
 
 
-def main(argv):
+def main(unused_argv):
+  # Avoid using global flags in main(). In this command line:
+  # bq <global flags> <command> <global and local flags> <command args>,
+  # only "<global flags>" will parse before main, not "<global and local flags>"
   try:
     FLAGS.auth_local_webserver = False
     _ValidateGlobalFlags()
@@ -2259,21 +2300,13 @@ def main(argv):
       if command not in appcommands.GetCommandList():
         appcommands.AddCmd(command, function)
 
-    if (not argv or
-        (len(argv) > 1 and
-         argv[1] not in ['init', 'help', 'version'] and
-         argv[1] in appcommands.GetCommandList())):
-      # Service Accounts don't use cached oauth credentials and
-      # all bigqueryrc defaults are technically optional.
-      if not _UseServiceAccount():
-        if not (os.path.exists(_GetBigqueryRcFilename()) or
-                os.path.exists(FLAGS.credential_file)):
-          appcommands.GetCommandByName('init').Run([])
   except KeyboardInterrupt, e:
     print 'Control-C pressed, exiting.'
     sys.exit(1)
   except BaseException, e:  # pylint: disable=broad-except
     print 'Error initializing bq client: %s' % (e,)
+    # Use global flags if they're available, but we're exitting so we can't
+    # count on global flag parsing anyways.
     if FLAGS.debug_mode or FLAGS.headless:
       traceback.print_exc()
       if not FLAGS.headless:

@@ -32,7 +32,7 @@ class Create(base_classes.BaseAsyncMutator):
     return 'Insert'
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'urlMaps'
 
   def CreateRequests(self, args):

@@ -2,7 +2,9 @@ NAME
        gcloud-init - Initialize a gcloud workspace in the current directory.
 
 SYNOPSIS
-       gcloud init PROJECT [-h, --help]
+       gcloud init
+         PROJECT
+         [-h, --help]
 
 DESCRIPTION
        This command is used to create a local workspace for your Google Cloud

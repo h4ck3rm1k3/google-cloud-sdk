@@ -5,8 +5,9 @@ NAME
 SYNOPSIS
        gcloud compute instances get-serial-port-output
          NAME
-         --zone ZONE
-         [-h, --help]
+         [--help]
+         [--zone ZONE]
+         [-h]
 
 DESCRIPTION
        gcloud compute instances get-serial-port-output is used to get the
@@ -19,9 +20,14 @@ POSITIONAL ARGUMENTS
            The name of the instance.
 
 FLAGS
-       --zone ZONE
-           Specifies the zone of the instance.
-
        --help
+           Display detailed help.
+
+       --zone ZONE
+           The zone of the instance to get serial port output for. If omitted
+           and the arguments are not all URIs, you will be prompted to select
+           a zone.
+
+       -h
            Print a summary help and exit.
 

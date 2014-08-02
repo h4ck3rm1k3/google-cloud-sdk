@@ -8,9 +8,10 @@ SYNOPSIS
          NAME
          [--access-config-name ACCESS_CONFIG_NAME; default="external-nat"]
          [--address ADDRESS]
+         [--help]
          [--network-interface NETWORK_INTERFACE; default="nic0"]
-         --zone ZONE
-         [-h, --help]
+         [--zone ZONE]
+         [-h]
 
 DESCRIPTION
        gcloud compute instances add-access-config is used to create access
@@ -33,14 +34,19 @@ FLAGS
            IP address must be reserved by the project and not be in use by
            another resource.
 
+       --help
+           Display detailed help.
+
        --network-interface NETWORK_INTERFACE
            Specifies the name of the network interface on which to add the new
            access configuration. If this is not provided, then "nic0" is used
            as the default.
 
        --zone ZONE
-           The zone of the instance.
+           The zone of the instance to add an access config to. If omitted and
+           the arguments are not all URIs, you will be prompted to select a
+           zone.
 
-       --help
+       -h
            Print a summary help and exit.
 

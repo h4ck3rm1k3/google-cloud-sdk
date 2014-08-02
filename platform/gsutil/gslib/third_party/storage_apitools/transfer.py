@@ -14,6 +14,7 @@
 #!/usr/bin/env python
 """Upload and download support for apitools."""
 
+import email.generator as email_generator
 import email.mime.multipart as mime_multipart
 import email.mime.nonmultipart as mime_nonmultipart
 import httplib
@@ -21,6 +22,7 @@ import io
 import json
 import mimetypes
 import os
+import StringIO
 import threading
 
 from apiclient import mimeparse
@@ -50,6 +52,7 @@ class _Transfer(object):
     self.__stream = stream
     self.__url = None
 
+    self.retry_func = http_wrapper.HandleExceptionsAndRebuildHttpConnections
     self.auto_transfer = auto_transfer
     self.chunksize = chunksize or 1048576L
 
@@ -259,7 +262,7 @@ class Download(_Transfer):
     if 'content-range' in response.info:
       print 'Received %s' % response.info['content-range']
     else:
-      print 'Received %d bytes' % len(response)
+      print 'Received %d bytes' % response.length
 
   @staticmethod
   def _CompletePrinter(*unused_args):
@@ -301,15 +304,16 @@ class Download(_Transfer):
     self.__SetRangeHeader(request, start, end=end_byte)
     if additional_headers is not None:
       request.headers.update(additional_headers)
-    return http_wrapper.MakeRequest(self.bytes_http, request)
+    return http_wrapper.MakeRequest(
+        self.bytes_http, request, retry_func=self.retry_func)
 
   def __ProcessResponse(self, response):
     """Process this response (by updating self and writing to self.stream)."""
     if response.status_code not in self._ACCEPTABLE_STATUSES:
-      raise exceptions.TransferInvalidError(response.content)
+      raise exceptions.TransferRetryError(response.content)
     if response.status_code in (httplib.OK, httplib.PARTIAL_CONTENT):
       self.stream.write(response.content)
-      self.__progress += len(response)
+      self.__progress += response.length
       if response.info and 'content-encoding' in response.info:
         # TODO: Handle the case where this changes over a download.
         self.__encoding = response.info['content-encoding']
@@ -355,9 +359,9 @@ class Download(_Transfer):
         progress, end = self.__NormalizeStartEnd(start, end)
         progress_end_normalized = True
       response = self.__ProcessResponse(response)
-      progress += len(response)
+      progress += response.length
       if not response:
-        raise exceptions.TransferInvalidError(
+        raise exceptions.TransferRetryError(
             'Zero bytes unexpectedly returned in download response')
 
   def StreamInChunks(self, callback=None, finish_callback=None,
@@ -458,7 +462,7 @@ class Upload(_Transfer):
       upload.auto_transfer = info['auto_transfer']
     upload.strategy = _RESUMABLE_UPLOAD
     upload._Initialize(http, info['url'])  # pylint: disable=protected-access
-    upload._RefreshResumableUploadState()  # pylint: disable=protected-access
+    upload.RefreshResumableUploadState()
     upload.EnsureInitialized()
     if upload.auto_transfer:
       upload.StreamInChunks()
@@ -592,7 +596,13 @@ class Upload(_Transfer):
     msg.set_payload(self.stream.read())
     msg_root.attach(msg)
 
-    http_request.body = msg_root.as_string()
+    # encode the body: note that we can't use `as_string`, because
+    # it plays games with `From ` lines.
+    fp = StringIO.StringIO()
+    g = email_generator.Generator(fp, mangle_from_=False)
+    g.flatten(msg_root, unixfrom=False)
+    http_request.body = fp.getvalue()
+
     multipart_boundary = msg_root.get_boundary()
     http_request.headers['content-type'] = (
         'multipart/related; boundary=%r' % multipart_boundary)
@@ -602,8 +612,12 @@ class Upload(_Transfer):
     if self.total_size is not None:
       http_request.headers['X-Upload-Content-Length'] = str(self.total_size)
 
-  def _RefreshResumableUploadState(self):
-    """Talk to the server and refresh the state of this resumable upload."""
+  def RefreshResumableUploadState(self):
+    """Talk to the server and refresh the state of this resumable upload.
+
+    Returns:
+      Response if the upload is complete.
+    """
     if self.strategy != _RESUMABLE_UPLOAD:
       return
     self.EnsureInitialized()
@@ -614,6 +628,9 @@ class Upload(_Transfer):
     range_header = self._GetRangeHeaderFromResponse(refresh_response)
     if refresh_response.status_code in (httplib.OK, httplib.CREATED):
       self.__complete = True
+      # If we're finished, the refresh response will contain the metadata
+      # originally requested. Return it so the client can use it.
+      return refresh_response
     elif refresh_response.status_code == http_wrapper.RESUME_INCOMPLETE:
       if range_header is None:
         self.__progress = 0
@@ -716,7 +733,7 @@ class Upload(_Transfer):
       self.stream.seek(current_pos)
       if current_pos != end_pos:
         raise exceptions.TransferInvalidError(
-          'Upload complete with additional bytes left in stream')
+            'Upload complete with additional bytes left in stream')
     self._ExecuteCallback(finish_callback, response)
     return response
 
@@ -735,12 +752,13 @@ class Upload(_Transfer):
     if additional_headers:
       request.headers.update(additional_headers)
 
-    response = http_wrapper.MakeRequest(self.bytes_http, request)
+    response = http_wrapper.MakeRequest(
+        self.bytes_http, request, retry_func=self.retry_func)
     if response.status_code not in (httplib.OK, httplib.CREATED,
                                     http_wrapper.RESUME_INCOMPLETE):
       # We want to reset our state to wherever the server left us
       # before this failed request, and then raise.
-      self._RefreshResumableUploadState()
+      self.RefreshResumableUploadState()
       raise exceptions.HttpError.FromResponse(response)
     if response.status_code == http_wrapper.RESUME_INCOMPLETE:
       last_byte = self.__GetLastByte(

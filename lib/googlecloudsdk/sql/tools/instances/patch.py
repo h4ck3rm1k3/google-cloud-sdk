@@ -6,6 +6,7 @@ from apiclient import errors
 from googlecloudsdk.calliope import arg_parsers
 from googlecloudsdk.calliope import base
 from googlecloudsdk.calliope import exceptions
+from googlecloudsdk.core import resources
 from googlecloudsdk.core.util import console_io
 from googlecloudsdk.sql import util
 
@@ -273,6 +274,10 @@ class Patch(base.Command):
     sql = self.context['sql']
     instance_id = util.GetInstanceIdWithoutProject(args.instance)
     project_id = util.GetProjectId(args.instance)
+    # TODO(user): as we deprecate P:I args, simplify the call to .Parse().
+    instance_ref = resources.Parse(
+        instance_id, collection='sql.instances',
+        params={'project': project_id})
     replication = args.replication
     tier = args.tier
     activation_policy = args.activation_policy
@@ -328,11 +333,12 @@ class Patch(base.Command):
     self.SetIpConfiguration(settings, assign_ip, no_assign_ip,
                             authorized_networks, clear_authorized_networks,
                             require_ssl, no_require_ssl)
-    self.SetBackupConfiguration(settings, instance_id, backup_start_time,
-                                enable_bin_log, no_enable_bin_log, no_backup)
+    self.SetBackupConfiguration(settings, instance_ref.instance,
+                                backup_start_time, enable_bin_log,
+                                no_enable_bin_log, no_backup)
     self.SetAuthorizedGaeApps(settings, authorized_gae_apps, clear_gae_apps)
     self.SetDatabaseFlags(settings, database_flags, clear_database_flags)
-    body = {'instance': instance_id, 'settings': settings}
+    body = {'instance': instance_ref.instance, 'settings': settings}
     printer = util.PrettyPrinter(0)
     printer.Print('This command will change the instance settings.')
     printer.Print('All arrays must be fully-specified. '
@@ -358,14 +364,14 @@ class Patch(base.Command):
 
     if not console_io.PromptContinue():
       return util.QUIT
-    request = sql.instances().patch(project=project_id,
-                                    instance=instance_id,
+    request = sql.instances().patch(project=instance_ref.project,
+                                    instance=instance_ref.instance,
                                     body=body)
     try:
       result = request.execute()
-      operations = self.command.ParentGroup().ParentGroup().operations(
-          instance=instance_id)
-      operation = operations.get(operation=result['operation'])
+      operations = self.command.ParentGroup().ParentGroup().operations()
+      operation = operations.get(instance=str(instance_ref),
+                                 operation=result['operation'])
       return operation
     except errors.HttpError as error:
       raise exceptions.HttpException(util.GetError(error))

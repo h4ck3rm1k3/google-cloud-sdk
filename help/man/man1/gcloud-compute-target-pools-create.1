@@ -15,9 +15,10 @@ gcloud-compute-target-pools-create \- Define a load\-balanced pool of virtual ma
   [\-\-description DESCRIPTION]
   [\-\-failover\-ratio FAILOVER_RATIO]
   [\-\-health\-check HEALTH_CHECK]
-  \-\-region REGION
+  [\-\-help]
+  [\-\-region REGION]
   [\-\-session\-affinity SESSION_AFFINITY; default="NONE"]
-  [\-h, \-\-help]
+  [\-h]
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -52,9 +53,14 @@ Together with \(lq\-\-backup\-pool\(rq, defines the fallback behavior of the tar
 Specifies an HTTP health check resource to use to determine the health of instances in this pool\&. If no health check is specified, traffic will be sent to all instances in this target pool as if the instances were healthy, but the health status of this pool will appear as unhealthy as a warning that this target pool does not have a health check\&.
 .RE
 .PP
+\fB\-\-help\fR
+.RS 4
+Display detailed help\&.
+.RE
+.PP
 \fB\-\-region\fR \fIREGION\fR
 .RS 4
-The region in which the forwarding rule will be created\&.
+The region of the target pool to create\&. If omitted and the arguments are not all URIs, you will be prompted to select a region\&.
 .RE
 .PP
 \fB\-\-session\-affinity\fR \fISESSION_AFFINITY\fR
@@ -62,7 +68,7 @@ The region in which the forwarding rule will be created\&.
 Specifies the session affinity option for the connection\&. If \(lqNONE\(rq is selected, then connections from the same client IP address may go to any instance in the target pool\&. If \(lqCLIENT_IP\(rq is selected, then connections from the same client IP address will go to the same instance in the target pool\&. If \(lqCLIENT_IP_PROTO\(rq is selected, then connections from the same client IP with the same IP protocol will go to the same client pool\&. If not specified, then \(lqNONE\(rq is used as a default\&.
 .RE
 .PP
-\fB\-\-help\fR
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE

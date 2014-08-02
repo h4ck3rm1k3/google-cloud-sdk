@@ -3,7 +3,7 @@
 from googlecloudsdk.compute.lib import base_classes
 
 
-class DeleteDisks(base_classes.ZonalDeleter):
+class Delete(base_classes.ZonalDeleter):
   """Delete Google Compute Engine disks."""
 
   @property
@@ -11,11 +11,11 @@ class DeleteDisks(base_classes.ZonalDeleter):
     return self.context['compute'].disks
 
   @property
-  def collection(self):
+  def resource_type(self):
     return 'disks'
 
 
-DeleteDisks.detailed_help = {
+Delete.detailed_help = {
     'brief': 'Delete Google Compute Engine persistent disks',
     'DESCRIPTION': """\
         *{command}* deletes one or more Google Compute Engine

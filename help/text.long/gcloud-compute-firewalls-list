@@ -4,11 +4,11 @@ NAME
 SYNOPSIS
        gcloud compute firewalls list
          [NAME_REGEX ...]
+         [--help]
          [--limit LIMIT]
-         [--raw-links]
          [--sort-by SORT_BY]
          [--uri]
-         [-h, --help]
+         [-h]
 
 POSITIONAL ARGUMENTS
        [NAME_REGEX ...]
@@ -17,16 +17,11 @@ POSITIONAL ARGUMENTS
            https://code.google.com/p/re2/wiki/Syntax).
 
 FLAGS
+       --help
+           Display detailed help.
+
        --limit LIMIT
            The maximum number of results.
-
-       --raw-links
-           If provided, resource references in output from the server will not
-           be condensed for readability. For example, when listing operations,
-           if a targetLink is
-           "https://www.googleapis.com/compute/v1/projects/my-project/zones/us-central2-a/instances/my-instance",
-           "us-central2-a/instances/my-instance" is shown for brevity. This
-           behavior can be turned off using this flag.
 
        --sort-by SORT_BY
            A field to sort by. To perform a descending-order sort, prefix the
@@ -37,6 +32,6 @@ FLAGS
            resources returned. If this flag is not provided, the list command
            will print a human-readable table of useful resource data.
 
-       --help
+       -h
            Print a summary help and exit.
 

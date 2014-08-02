@@ -103,7 +103,7 @@ class Create(base_classes.BaseAsyncMutator):
     return 'Insert'
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return None
 
   def CreateRequests(self, args):
@@ -113,8 +113,8 @@ class Create(base_classes.BaseAsyncMutator):
     if args.next_hop_instance:
       if not args.next_hop_instance_zone:
         raise exceptions.ToolException(
-            'when specifying a next hop instance, the zone of the instance '
-            'must be specified using --next-hop-instance-zone')
+            'When specifying a next hop instance, the zone of the instance '
+            'must be specified using [--next-hop-instance-zone].')
 
       next_hop_instance_uri = self.context['uri-builder'].Build(
           'zones', args.next_hop_instance_zone,
@@ -122,8 +122,8 @@ class Create(base_classes.BaseAsyncMutator):
     else:
       if args.next_hop_instance_zone:
         raise exceptions.ToolException(
-            '--next-hop-instance-zone can only be specified in conjunction '
-            'with --next-hop-instance')
+            '[--next-hop-instance-zone] can only be specified in conjunction '
+            'with [--next-hop-instance].')
       next_hop_instance_uri = None
 
     if args.next_hop_gateway:

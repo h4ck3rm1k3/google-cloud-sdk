@@ -5,7 +5,8 @@ NAME
        "gcloud.auth.login()".
 
 SYNOPSIS
-       gcloud interactive [-h, --help]
+       gcloud interactive
+         [-h, --help]
 
 FLAGS
        --help

@@ -1,3 +1,123 @@
+Release 4.3 (release date: 2014-06-10)
+=======================================
+
+Bug Fixes
+---------
+- Fix acl/defacl ch changing the role of an existing group.
+- Fix unicode and 404 errors when using manifests.
+- Fix parallelism configuration bug that limited gsutil rsync to two threads
+  and could lead to rsync hangs. "gsutil -m rsync" runs much faster, and rsync
+  uploads of large local files are now faster via parallel composite upload.
+  Parallel composite uploads of large files are also faster.
+- Fix rsync bug with parallel composite uploads.
+- Fix TypeError that could occur when running the cp command with no
+  credentials.
+
+Other Changes
+-------------
+- Progress indicators for -m cp/rsync commands are now more readable.
+- Added command being run to gsutil -d/-D output.
+- Lowered default parallelism for 'gsutil -m test' and added hang detection.
+
+Release 4.2 (release date: 2014-06-05)
+=======================================
+
+New Features
+------------
+- Added parallel test execution support to test command, ex: "gsutil -m test"
+
+Bug Fixes
+---------
+- Fix failure during retry of an XML download.
+- Moved to boto release 2.29.1 fixing boto authentication erroneously
+  reporting OAuth2 credentials as invalid.
+- Fix parallel composite uploads when using only a single process and thread.
+- Fix an invalid seek during daisy chain operation that affected file copy
+  from Google Cloud Storage -> S3 for files greater than 8KB in size.
+- Fix "gsutil acl ch" with AllUsers or AllAuthenticatedUsers groups.
+- Fix some copy errors writing new lines to the manifest file.
+- Fix "gsutil test" return code to properly be 0 on success.
+
+Other Changes
+-------------
+- "gsutil cp -z" now ignores whitespace in the extension list.
+
+Release 4.1 (release date: 2014-05-28)
+=======================================
+
+Bug Fixes
+---------
+- Fixed a bug in parallel composite uploads where uploads with
+  existing components would fail.
+- Moved gcs-oauth2-boto-plugin to version 1.5, fixing a bug in the PyPi gsutil
+  distribution that would cause gsutil to unnecessarily attempt to query
+  the Google Compute Engine metadata service.
+
+Other Changes
+-------------
+- Parallel composite uploads no longer specify an if-not-match precondition
+  when uploading component parts.
+- Parallel composite uploads no longer calculate a CRC32c hash prior to
+  uploading component parts (these are still validated by an MD5 hash).
+- Removed apitools dependency on gflags.
+
+Release 4.0 (release date: 2014-05-27)
+=======================================
+
+Major New Gsutil Version - Backwards-Incompatible Changes
+------------------------------
+- The Google Cloud Storage configuration data supported by the acl, cors,
+  and lifecycle commands now uses the JSON format instead of the older XML
+  format. gsutil 4.0 will fail and provide conversion instructions if an XML
+  configuration file is provided as an argument for a gs:// URL.
+- gsutil no longer accepts arbitrary headers via the global -h flag.
+  Documented headers for gsutil commands are still supported; for the
+  full list of supported headers, see "gsutil help command_opts".
+- The compose command will now default the destination object's
+  Content-Type to the Content-Type of the first source object if none
+  is provided via the -h global flag.
+- The long-deprecated -t and -q options have been removed from the cp command.
+- The perfdiag command no longer supports adding a host header.
+- Having OAuth2 User Account credentials and OAuth2 Service Account
+  credentials configured simultaneously will now fail with an error message
+  to avoid confusion.  Also, a single invalid credential will fail with an
+  error message.  See "gsutil help creds" for details.
+- Bucket relocate scripts have been removed.
+- Downloading object names ending with '/' is no longer supported to avoid
+  problems this caused for directores using the Google Cloud Console.
+- rm -r now implies rm -ra (removing all object versions recursively).
+- All commands using the global -m option or a force option (such as 
+  rm -f or cp -c) will now return a non-zero exit code if there are any
+  failures during the operation.
+
+New Features
+------------
+- The Google Cloud Storage JSON API (v1) is now the default API used
+  by gsutil for all commands targeting gs:// URLs. The JSON API is more
+  bandwidth efficient than the older XML API when transferring metadata
+  and does not require separate calls to preserve object ACLs when copying.
+  The XML API will automatically be used when accessing s3:// URLs.
+- The Google Cloud Storage XML API can be used in lieu of the JSON API
+  by setting 'prefer_api = xml' in the GSUtil section of your boto config file.
+- Added the rsync command that can synchronize cloud and local directories.
+- Added the signurl command that can generate Google Cloud Storage signed URLs.
+- The perfdiag command now supports a listing latency test.
+- The rb command now supports a -f flag allowing it to continue when errors
+  are encountered.
+- The test command now supports a -s flag that runs tests against S3.
+
+Other Changes
+-------------
+- All python files not under a third_party directory are now pylint-clean,
+  with the exception of TODO-format and a handful of warnings in root-level
+  files. As part of the de-linting process, many edge-case bugs were
+  identified and fixed.
+- The ls command now operates depth-first (as in Unix ls) instead
+  of breadth-first.
+- Daisy-chain copying does not currently support resumable uploads.
+- Several compatibility improvements for Windows and S3.
+
+
 Release 3.42 (release-date: 2014-01-15)
 =======================================
 

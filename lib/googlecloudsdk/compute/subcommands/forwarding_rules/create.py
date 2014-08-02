@@ -73,7 +73,7 @@ class CreateForwardingRule(utils.ForwardingRulesTargetMutator):
 
     if not args.port_range:
       raise exceptions.ToolException(
-          '--port-range is required for global forwarding rules')
+          '[--port-range] is required for global forwarding rules.')
 
     protocol = self.ConstructProtocol(args)
 

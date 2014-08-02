@@ -10,19 +10,20 @@ as well as diff'ing snapshots.
 
 import collections
 import json
+import os
+import re
 import ssl
 import urllib2
 
 from googlecloudsdk.core import config
+from googlecloudsdk.core import exceptions
 from googlecloudsdk.core import log
+from googlecloudsdk.core.updater import installers
 from googlecloudsdk.core.updater import schemas
 from googlecloudsdk.core.util import console_io
 
 
-TIMEOUT_IN_SEC = 5
-
-
-class Error(Exception):
+class Error(exceptions.Error):
   """Base exception for the snapshots module."""
   pass
 
@@ -35,8 +36,9 @@ class URLFetchError(Error):
 class IncompatibleSchemaVersionError(Error):
   """Error for when we are unable to parse the new version of the snapshot."""
 
-  def __init__(self, schema_version, *args):
-    super(IncompatibleSchemaVersionError, self).__init__(*args)
+  def __init__(self, schema_version):
+    super(IncompatibleSchemaVersionError, self).__init__(
+        'The latest version snapshot is incompatible with this installation.')
     self.schema_version = schema_version
 
 
@@ -62,6 +64,7 @@ class ComponentSnapshot(object):
     components = dict from component id string to schemas.Component, All the
       Components in this snapshot.
   """
+  ABSOLUTE_RE = re.compile(r'^\w+://')
 
   @staticmethod
   def FromFile(snapshot_file):
@@ -75,15 +78,14 @@ class ComponentSnapshot(object):
     """
     with open(snapshot_file) as input_file:
       data = json.load(input_file)
-    return ComponentSnapshot.FromDictionary(data, url='file://' + snapshot_file)
+    return ComponentSnapshot._FromDictionary((data, 'file://' + snapshot_file))
 
   @staticmethod
-  def FromURLs(url, *urls):
+  def FromURLs(*urls):
     """Loads a snapshot from a series of URLs.
 
     Args:
-      url: str, The main URL to load.
-      *urls: str, The additional URLs to the files to load.
+      *urls: str, The URLs to the files to load.
 
     Returns:
       A ComponentSnapshot object.
@@ -92,9 +94,8 @@ class ComponentSnapshot(object):
       URLFetchError: If the URL cannot be fetched.
     """
     # TODO(user) Handle a json parse error here.
-    data = ComponentSnapshot._DictFromURL(url)
-    other_data = [ComponentSnapshot._DictFromURL(u) for u in urls]
-    return ComponentSnapshot.FromDictionary(data, url, *other_data)
+    data = [(ComponentSnapshot._DictFromURL(url), url) for url in urls]
+    return ComponentSnapshot._FromDictionary(*data)
 
   @staticmethod
   def _DictFromURL(url):
@@ -109,12 +110,10 @@ class ComponentSnapshot(object):
     Raises:
       URLFetchError: If the URL cannot be fetched.
     """
-    req = urllib2.Request(url, data=None, headers={'Cache-Control': 'no-cache'})
     try:
-      response = urllib2.urlopen(req, timeout=TIMEOUT_IN_SEC)
-    except (urllib2.HTTPError, urllib2.URLError, ssl.SSLError) as e:
-      log.error('Could not fetch [{url}]: {error}.'.format(
-          url=url, error=e))
+      response = installers.ComponentInstaller.MakeRequest(url)
+    except (urllib2.HTTPError, urllib2.URLError, ssl.SSLError):
+      log.debug('Could not fetch [{url}]'.format(url=url), exc_info=True)
       response = None
     if not response:
       raise URLFetchError(
@@ -122,8 +121,9 @@ class ComponentSnapshot(object):
            ' settings and try again.'))
     code = response.getcode()
     if code and code != 200:
-      raise URLFetchError('Received response code %s while fetching %s.',
-                          code, url)
+      raise URLFetchError(
+          'Received response code %s while component listing from server.',
+          code, url)
     data = json.loads(response.read())
     return data
 
@@ -150,14 +150,11 @@ class ComponentSnapshot(object):
     return ComponentSnapshot(sdk_definition)
 
   @staticmethod
-  def FromDictionary(json_dictionary, url=None, *other_dicts):
+  def _FromDictionary(*data):
     """Loads a snapshot from a dictionary representing the raw JSON data.
 
     Args:
-      json_dictionary: dict, The dictionary to load from.
-      url: str, An optional url to specify where this data came from.
-      *other_dicts: dict, Other json dictionaries that should be merged into the
-        main one.
+      *data: ({}, str), A tuple of parsed JSON data and the URL it came from.
 
     Returns:
       A ComponentSnapshot object.
@@ -166,22 +163,33 @@ class ComponentSnapshot(object):
       IncompatibleSchemaVersionError: If the latest snapshot cannot be parsed
         by this code.
     """
-    # Try to parse just the schema version first, to see if we should continue.
-    schema_version = schemas.SDKDefinition.SchemaVersion(json_dictionary)
-    if (schema_version.version >
-        config.INSTALLATION_CONFIG.snapshot_schema_version):
-      raise IncompatibleSchemaVersionError(
-          schema_version,
-          'The latest version snapshot is incompatible with this installation.')
-    sdk_def = schemas.SDKDefinition.FromDictionary(json_dictionary)
-    for d in other_dicts:
-      other_sdk_def = schemas.SDKDefinition.FromDictionary(d)
-      sdk_def.Merge(other_sdk_def)
-    return ComponentSnapshot(sdk_def, url=url)
+    merged = None
+    for (json_dictionary, url) in data:
+      # Parse just the schema version first, to see if we should continue.
+      schema_version = schemas.SDKDefinition.SchemaVersion(json_dictionary)
+      if (schema_version.version >
+          config.INSTALLATION_CONFIG.snapshot_schema_version):
+        raise IncompatibleSchemaVersionError(schema_version)
 
-  def __init__(self, sdk_definition, url=None):
+      sdk_def = schemas.SDKDefinition.FromDictionary(json_dictionary)
+
+      # Convert relative data sources into absolute URLs if a URL is given.
+      if url:
+        for c in sdk_def.components:
+          if not c.data or not c.data.source:
+            continue
+          if not ComponentSnapshot.ABSOLUTE_RE.search(c.data.source):
+            # This is a relative path, look relative to the snapshot file.
+            c.data.source = os.path.dirname(url) + '/' + c.data.source
+
+      if not merged:
+        merged = sdk_def
+      else:
+        merged.Merge(sdk_def)
+    return ComponentSnapshot(merged)
+
+  def __init__(self, sdk_definition):
     self.sdk_definition = sdk_definition
-    self.url = url
     self.revision = sdk_definition.revision
     self.components = dict((c.id, c) for c in sdk_definition.components)
     deps = dict((c.id, set(c.dependencies)) for c in sdk_definition.components)

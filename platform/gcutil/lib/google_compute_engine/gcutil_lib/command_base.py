@@ -156,10 +156,10 @@ DatedResourceEntry = collections.namedtuple(
 WINDOWS_IMAGE_PROJECTS = ['windows-cloud']
 STANDARD_IMAGE_PROJECTS = ['debian-cloud',
                            'centos-cloud',
+                           'coreos-cloud',
                            'rhel-cloud',
                            'suse-cloud',
                            'opensuse-cloud'] + WINDOWS_IMAGE_PROJECTS
-STANDARD_KERNEL_PROJECTS = ['google']
 
 
 def NewestResourcesFilter(resource_list):
@@ -184,6 +184,10 @@ def NewestResourcesFilter(resource_list):
     # Strip the -v from the base name since some images do not have this.
     base_name = match.group(1).rstrip('v').rstrip('-')
     resource_date = match.group(2)
+
+    # Filter out deprecated images from the standard projects.
+    if 'deprecated' in resource:
+      continue
 
     # Remove the date from the resource to group them.  Remember only
     # the newest one.
@@ -215,16 +219,8 @@ def NewestImagesFilter(flag_values, images):
   return NewestResourcesFilter(images)
 
 
-def NewestKernelsFilter(flag_values, kernels):
-  """Filter out all kernels that are not newest, governed by flags."""
-  if 'old_kernels' not in flag_values:
-    return kernels
-  if flag_values.old_kernels:
-    return kernels
-  return NewestResourcesFilter(kernels)
-
-
-def ResolveImageTrackOrImage(images_api, project, image_name, presenter):
+def ResolveImageTrackOrImageToResource(
+    images_api, project, image_name, presenter):
   if not image_name:
     return image_name
 
@@ -272,12 +268,36 @@ def ResolveImageTrackOrImage(images_api, project, image_name, presenter):
     if not choice:
       choice = ResolveResult(results['items'], False)
 
+  if choice:
+    LOGGER.info('Resolved %s to %s', image_name, presenter(choice))
+  return choice
+
+
+def ResolveImageTrackOrImage(images_api, project, image_name, presenter):
+  """Resolve the image or track name to the newest version of the given image.
+
+      It is similar to ResolveImageTrackOrImageToResource, but returns the
+      selfLink of the image instead of the image resource.
+
+  Args:
+    images_api: The images api.
+    project: The customer project.
+    image_name: The image name.
+    presenter: Present the image resource.
+
+  Returns:
+    The selfLink of image resource.
+
+  Raises:
+    CommandError: If we find multiple matches for the input image_name.
+  """
+  choice = ResolveImageTrackOrImageToResource(
+      images_api, project, image_name, presenter)
   if not choice:
     # Looks like we couldn't find the user's image.  Just pass along what
     # they gave us.
     return image_name
 
-  LOGGER.info('Resolved %s to %s', image_name, presenter(choice))
   return choice['selfLink']
 
 
@@ -384,21 +404,6 @@ class Presenter(object):
     choices = NewestImagesFilter(self._flags, choices)
     print 'Select an image:'
     return self.PromptForChoice(choices, 'image')
-
-  def PromptForKernel(self, kernels_api):
-    """Prompt the user to select an image from the current list.
-
-    Args:
-      kernels_api: The kernel api.
-    Returns:
-      An image resource as selected by the user, or None.
-    """
-    projects = list(set([self._flags.project] + STANDARD_KERNEL_PROJECTS))
-    choices = sum((self._List(kernels_api, project)['items']
-                   for project in projects), [])
-    choices = NewestKernelsFilter(self._flags, choices)
-    print 'Select a kernel:'
-    return self.PromptForChoice(choices, 'kernel', allow_none=True)
 
   def PromptForRegion(self, regions_api):
     """Prompt the user to select a region from the current list.
@@ -632,6 +637,10 @@ class Presenter(object):
         # Return <collection>/<resource>, since resource need not be unique.
         return '/'.join(parts[4:])
 
+    # PD diskTypes
+    if len(parts) == 6 and parts[4] == 'diskTypes':
+      return parts[-1]
+
     # Not in the same zone|region as our flags, so leave the zone|region there.
     # Return <zone|region>/<collection>/<resource>[...]
     return '/'.join(parts[3:])
@@ -693,7 +702,7 @@ class GoogleComputeCommand(appcommands.Cmd):
 
   Attributes:
     GOOGLE_PROJECT_PATH: The common 'google' project used for storage of shared
-        images and kernels.
+        images.
     operation_print_spec: A resource print specification describing how to print
         an operation resource.
     safety_prompt: A boolean indicating whether the command requires user
@@ -1025,7 +1034,7 @@ class GoogleComputeCommand(appcommands.Cmd):
 
     Returns:
       The base API URL.  For example,
-      https://www.googleapis.com/compute/v1beta16.
+      https://www.googleapis.com/compute/v1.
     """
     return '%scompute/%s' % (self._flags.api_host, self._flags.service_version)
 

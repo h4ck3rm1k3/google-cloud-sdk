@@ -5,10 +5,11 @@ NAME
 SYNOPSIS
        gcloud compute instances set-scheduling
          INSTANCE
+         [--help]
          [--maintenance-policy MAINTENANCE_POLICY]
          [--no-restart-on-failure | --restart-on-failure]
-         --zone ZONE
-         [-h, --help]
+         [--zone ZONE]
+         [-h]
 
 DESCRIPTION
        $gcloud compute instances set-scheduling is used to configure
@@ -19,6 +20,9 @@ POSITIONAL ARGUMENTS
            The name of the instance for which to change scheduling options.
 
 FLAGS
+       --help
+           Display detailed help.
+
        --maintenance-policy MAINTENANCE_POLICY
            Specifies the behavior of the instances when their host machines
            undergo maintenance. TERMINATE indicates that the instances should
@@ -39,8 +43,10 @@ FLAGS
            performed by the user.
 
        --zone ZONE
-           The zone of the instance.
+           The zone of the instance to set scheduling settings for. If omitted
+           and the arguments are not all URIs, you will be prompted to select
+           a zone.
 
-       --help
+       -h
            Print a summary help and exit.
 

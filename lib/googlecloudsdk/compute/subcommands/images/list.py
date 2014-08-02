@@ -4,8 +4,8 @@ from googlecloudsdk.compute.lib import base_classes
 from googlecloudsdk.compute.lib import image_utils
 
 
-class ListImages(image_utils.ImageResourceFetcher,
-                 base_classes.GlobalLister):
+class List(image_utils.ImageResourceFetcher,
+           base_classes.GlobalLister):
   """List Google Compute Engine images."""
 
   @staticmethod
@@ -18,5 +18,5 @@ class ListImages(image_utils.ImageResourceFetcher,
     return self.context['compute'].images
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'images'

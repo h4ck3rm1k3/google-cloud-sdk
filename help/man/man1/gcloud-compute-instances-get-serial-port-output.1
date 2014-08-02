@@ -11,8 +11,9 @@ gcloud-compute-instances-get-serial-port-output \- Read output from a virtual ma
 .nf
 \fBgcloud compute instances get\-serial\-port\-output\fR
   NAME
-  \-\-zone ZONE
-  [\-h, \-\-help]
+  [\-\-help]
+  [\-\-zone ZONE]
+  [\-h]
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -25,12 +26,17 @@ The name of the instance\&.
 .RE
 .SH "FLAGS"
 .PP
-\fB\-\-zone\fR \fIZONE\fR
+\fB\-\-help\fR
 .RS 4
-Specifies the zone of the instance\&.
+Display detailed help\&.
 .RE
 .PP
-\fB\-\-help\fR
+\fB\-\-zone\fR \fIZONE\fR
+.RS 4
+The zone of the instance to get serial port output for\&. If omitted and the arguments are not all URIs, you will be prompted to select a zone\&.
+.RE
+.PP
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE

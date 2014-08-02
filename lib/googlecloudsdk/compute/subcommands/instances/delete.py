@@ -3,7 +3,7 @@
 from googlecloudsdk.compute.lib import base_classes
 
 
-class DeleteInstances(base_classes.ZonalDeleter):
+class Delete(base_classes.ZonalDeleter):
   """Delete Google Compute Engine virtual machine instances."""
 
   @property
@@ -11,11 +11,11 @@ class DeleteInstances(base_classes.ZonalDeleter):
     return self.context['compute'].instances
 
   @property
-  def collection(self):
+  def resource_type(self):
     return 'instances'
 
 
-DeleteInstances.detailed_help = {
+Delete.detailed_help = {
     'brief': 'Delete Google Compute Engine virtual machine instances',
     'DESCRIPTION': """\
         *{command}* deletes one or more Google Compute Engine virtual machine

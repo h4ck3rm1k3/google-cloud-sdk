@@ -21,7 +21,8 @@ class ReplicapoolV1beta1(base_api.BaseApiClient):
   def __init__(self, url='', credentials=None,
                get_credentials=True, http=None, model=None,
                log_request=False, log_response=False,
-               credentials_args=None, default_global_params=None):
+               credentials_args=None, default_global_params=None,
+               additional_http_headers=None):
     """Create a new replicapool handle."""
     url = url or u'https://www.googleapis.com/replicapool/v1beta1/'
     super(ReplicapoolV1beta1, self).__init__(
@@ -29,12 +30,15 @@ class ReplicapoolV1beta1(base_api.BaseApiClient):
         get_credentials=get_credentials, http=http, model=model,
         log_request=log_request, log_response=log_response,
         credentials_args=credentials_args,
-        default_global_params=default_global_params)
+        default_global_params=default_global_params,
+        additional_http_headers=additional_http_headers)
     self.pools = self.PoolsService(self)
     self.replicas = self.ReplicasService(self)
 
   class PoolsService(base_api.BaseApiService):
     """Service class for the pools resource."""
+
+    _NAME = u'pools'
 
     def __init__(self, client):
       super(ReplicapoolV1beta1.PoolsService, self).__init__(client)
@@ -196,6 +200,8 @@ class ReplicapoolV1beta1(base_api.BaseApiClient):
 
   class ReplicasService(base_api.BaseApiService):
     """Service class for the replicas resource."""
+
+    _NAME = u'replicas'
 
     def __init__(self, client):
       super(ReplicapoolV1beta1.ReplicasService, self).__init__(client)

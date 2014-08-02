@@ -5,10 +5,10 @@ NAME
 SYNOPSIS
        gcloud compute target-pools add-instances
          NAME
+         [--help]
          --instances INSTANCE [INSTANCE ...]
-         --region REGION
-         --zone ZONE
-         [-h, --help]
+         [--zone ZONE]
+         [-h]
 
 DESCRIPTION
        gcloud compute target-pools add-instances is used to add one or more
@@ -21,15 +21,17 @@ POSITIONAL ARGUMENTS
            The name of the target pool to which to add the instances.
 
 FLAGS
+       --help
+           Display detailed help.
+
        --instances INSTANCE [INSTANCE ...]
            Specifies a list of instances to add to the target pool.
 
-       --region REGION
-           The region of the target pool.
-
        --zone ZONE
-           The zone of the instances.
+           The zone of the instances to add to the target pool. If omitted and
+           the arguments are not all URIs, you will be prompted to select a
+           zone.
 
-       --help
+       -h
            Print a summary help and exit.
 

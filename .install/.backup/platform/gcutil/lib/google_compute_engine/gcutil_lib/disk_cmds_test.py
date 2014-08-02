@@ -28,7 +28,6 @@ import unittest
 
 from google.apputils import app
 
-from gcutil_lib import command_base
 from gcutil_lib import disk_cmds
 from gcutil_lib import gcutil_unittest
 from gcutil_lib import mock_api
@@ -63,6 +62,8 @@ class DiskCmdsTest(gcutil_unittest.GcutilTestCase):
         'sleep_between_polls': 0.1,
         'source_snapshot': source_snapshot
         }
+    expected_disk_type = 'pd-ssd'
+    set_flags['disk_type'] = expected_disk_type
 
     command = self._CreateAndInitializeCommand(
         disk_cmds.AddDisk, 'adddisk', service_version, set_flags)
@@ -138,6 +139,13 @@ class DiskCmdsTest(gcutil_unittest.GcutilTestCase):
       self.assertEqual(expected_project, parameters['project'])
       self.assertEqual(expected_kind, body['kind'])
       self.assertEqual(expected_description, body['description'])
+      if self.version >= version.get('v1'):
+        expected_normalized_disk_type = command.NormalizePerZoneResourceName(
+            expected_project,
+            expected_zone,
+            'diskTypes',
+            expected_disk_type)
+        self.assertEqual(expected_normalized_disk_type, body['type'])
       self.assertEqual(expected_zone, parameters['zone'])
       self.assertFalse('zone' in body)
 
@@ -149,7 +157,7 @@ class DiskCmdsTest(gcutil_unittest.GcutilTestCase):
       elif source_image:
         self.assertTrue(parameters['sourceImage'].endswith(source_image))
       elif not size:
-        self.assertEqual('500', body['sizeGb'])
+        self.assertEqual('100', body['sizeGb'])
 
       self.assertTrue(body['name'] in remaining_disks)
       remaining_disks = [disk for disk in remaining_disks
@@ -202,7 +210,6 @@ class DiskCmdsTest(gcutil_unittest.GcutilTestCase):
     expected_disk = 'test_disk'
     expected_description = 'test disk'
     expected_size = '20'
-    submitted_version = command_base.CURRENT_VERSION
     selected_zone = 2
 
     set_flags = {
@@ -212,7 +219,7 @@ class DiskCmdsTest(gcutil_unittest.GcutilTestCase):
         }
 
     command = self._CreateAndInitializeCommand(
-        disk_cmds.AddDisk, 'adddisk', submitted_version, set_flags=set_flags)
+        disk_cmds.AddDisk, 'adddisk', self.version, set_flags=set_flags)
 
     self.mock.Respond('compute.zones.list',
                       {

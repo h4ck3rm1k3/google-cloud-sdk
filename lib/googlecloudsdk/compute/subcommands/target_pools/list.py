@@ -3,7 +3,7 @@
 from googlecloudsdk.compute.lib import base_classes
 
 
-class ListTargetPools(base_classes.RegionalLister):
+class List(base_classes.RegionalLister):
   """List target pools."""
 
   @property
@@ -11,11 +11,11 @@ class ListTargetPools(base_classes.RegionalLister):
     return self.context['compute'].targetPools
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'targetPools'
 
 
-ListTargetPools.detailed_help = {
+List.detailed_help = {
     'brief': 'List Google Compute Engine target pools',
     'DESCRIPTION': """\
         *{command}* lists summary information for the target pools in

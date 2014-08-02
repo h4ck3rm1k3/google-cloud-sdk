@@ -22,9 +22,7 @@ from google.apputils import appcommands
 import gflags as flags
 
 from gcutil_lib import command_base
-from gcutil_lib import gcutil_errors
 from gcutil_lib import gcutil_flags
-from gcutil_lib import kernel_cmds
 from gcutil_lib import version
 
 
@@ -52,14 +50,12 @@ class ImageCommand(command_base.GoogleComputeCommand):
       field_mappings=(
           ('name', 'selfLink'),
           ('description', 'description'),
-          ('kernel', 'preferredKernel'),
           ('deprecation', 'deprecated.state'),
           ('status', 'status')),
       detail=(
           ('name', 'name'),
           ('description', 'description'),
           ('creation-time', 'creationTimestamp'),
-          ('kernel', 'preferredKernel'),
           ('deprecation', 'deprecated.state'),
           ('replacement', 'deprecated.replacement'),
           ('status', 'status'),
@@ -72,6 +68,13 @@ class ImageCommand(command_base.GoogleComputeCommand):
   def __init__(self, name, flag_values):
     super(ImageCommand, self).__init__(name, flag_values)
 
+  def _AutoDetectZone(self):
+    """Causes this command to auto detect zone."""
+    def _GetZoneContext(unused_object_type, context):
+      return self.GetZoneForResource(
+          self.api.disks, context['disk'], context['project'])
+
+    self._context_parser.context_prompt_fxns['zone'] = _GetZoneContext
 
 
 class AddImage(ImageCommand):
@@ -90,19 +93,20 @@ class AddImage(ImageCommand):
                         '',
                         'An optional image description.',
                         flag_values=flag_values)
-    flags.DEFINE_string('preferred_kernel',
+    flags.DEFINE_string('source_disk',
                         None,
-                        '[Deprecated] Specifies the kernel to use for this '
-                        'image. For example, '
-                        '\'--kernel=projects/google/global/kernels/'
-                        '<kernel-name>\'. For a list of kernels, run '
-                        '\'gcutil listkernels\'.',
+                        'Specifies the source disk from which to '
+                        'create the image from. For example, "--source_disk='
+                        'my-disk" --zone="us-central1-a".',
                         flag_values=flag_values)
-    kernel_cmds.RegisterCommonKernelFlags(flag_values)
+    flags.DEFINE_string('zone',
+                        None,
+                        'The zone of the disk.',
+                        flag_values=flag_values)
 
   def Handle(self,
              image_name,
-             root_source_tarball):
+             root_source_tarball=None):
     """Add the specified image.
 
     Args:
@@ -117,6 +121,17 @@ class AddImage(ImageCommand):
     image_context = self._context_parser.ParseContextOrPrompt('images',
                                                               image_name)
 
+    # Source Tarball and Source Disk are mutually exclusive parameters.
+    if self.api.version >= version.get('v1'):
+      if root_source_tarball and self._flags.source_disk:
+        raise app.UsageError('You cannot specify both root_source_tarball and '
+                             'source_disk. Only one or the other.')
+
+      if not root_source_tarball and not self._flags.source_disk:
+        raise app.UsageError('You must specify either a root_source_tarball or '
+                             'a source_disk.')
+    elif not root_source_tarball:
+      raise app.UsageError('You must specify a root_source_tarball.')
 
     image_resource = {
         'kind': self._GetResourceApiKind('image'),
@@ -134,23 +149,11 @@ class AddImage(ImageCommand):
           'source': root_source_tarball,
           'containerType': 'TAR',
       }
-
-    if self.api.version <= version.get('v1beta16'):
-      if self._flags['preferred_kernel'].present:
-        if self._flags.preferred_kernel:
-          image_resource['preferredKernel'] = (
-              self._context_parser.NormalizeOrPrompt(
-                  'kernels',
-                  self._flags.preferred_kernel))
-      else:
-        kernel = self._presenter.PromptForKernel(self.api.kernels)
-        if kernel is not None:
-          image_resource['preferredKernel'] = kernel['selfLink']
-    else:
-      if self._flags.preferred_kernel:
-        raise gcutil_errors.UnsupportedCommand(
-            '--preferred_kernel is deprecated in v1. You may still specify '
-            'a preferred kernel by using --service_version=v1beta16')
+    elif self._flags.source_disk:
+      self._AutoDetectZone()
+      disk_url = self._context_parser.NormalizeOrPrompt(
+          'disks', self._flags.source_disk)
+      image_resource['sourceDisk'] = disk_url
 
     image_request = self.api.images.insert(project=image_context['project'],
                                            body=image_resource)

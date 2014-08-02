@@ -11,6 +11,7 @@ from apiclient import errors
 
 from googlecloudsdk.calliope import base
 from googlecloudsdk.calliope import exceptions
+from googlecloudsdk.core import resources
 from googlecloudsdk.sql import util
 
 
@@ -65,6 +66,10 @@ class Import(base.Command):
     sql = self.context['sql']
     instance_id = util.GetInstanceIdWithoutProject(args.instance)
     project_id = util.GetProjectId(args.instance)
+    # TODO(user): as we deprecate P:I args, simplify the call to .Parse().
+    instance_ref = resources.Parse(
+        instance_id, collection='sql.instances',
+        params={'project': project_id})
     database = args.database
     uris_list = args.uri
     uris = ''
@@ -77,12 +82,12 @@ class Import(base.Command):
       import_context += ',"database" : "%s"' % database
     body = json.loads('{ "importContext" : { %s }}' % import_context)
     request = sql.instances().import_(
-        project=project_id, instance=instance_id, body=body)
+        project=instance_ref.project, instance=instance_ref.instance, body=body)
     try:
       result = request.execute()
-      operations = self.command.ParentGroup().ParentGroup().operations(
-          instance=instance_id)
-      operation = operations.get(operation=result['operation'])
+      operations = self.command.ParentGroup().ParentGroup().operations()
+      operation = operations.get(instance=str(instance_ref),
+                                 operation=result['operation'])
       return operation
     except errors.HttpError as error:
       raise exceptions.HttpException(util.GetError(error))

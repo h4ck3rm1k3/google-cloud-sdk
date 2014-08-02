@@ -147,7 +147,7 @@ class OldProjectCmdsTest(unittest.TestCase):
 
     expected_project = 'test_project'
     flag_values.project = expected_project
-    flag_values.service_version = 'v1beta16'
+    flag_values.service_version = 'v1'
     handle, path = tempfile.mkstemp()
     try:
       with os.fdopen(handle, 'w') as metadata_file:
@@ -180,7 +180,7 @@ class OldProjectCmdsTest(unittest.TestCase):
 
     expected_project = 'test_project'
     flag_values.project = expected_project
-    flag_values.service_version = 'v1beta16'
+    flag_values.service_version = 'v1'
     command.SetFlags(flag_values)
     command.SetApi(old_mock_api.CreateMockApi())
     command._InitializeContextParser()

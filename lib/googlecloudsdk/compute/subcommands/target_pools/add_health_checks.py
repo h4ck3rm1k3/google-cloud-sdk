@@ -2,6 +2,8 @@
 """Command for adding health checks to target pools."""
 from googlecloudapis.compute.v1 import compute_v1_messages as messages
 from googlecloudsdk.compute.lib import base_classes
+from googlecloudsdk.compute.lib import utils
+from googlecloudsdk.core import resources
 
 
 class AddHealthChecks(base_classes.BaseAsyncMutator):
@@ -16,10 +18,10 @@ class AddHealthChecks(base_classes.BaseAsyncMutator):
         metavar='HEALTH_CHECK',
         required=True)
 
-    parser.add_argument(
-        '--region',
-        help='The region of the target pool.',
-        required=True)
+    utils.AddRegionFlag(
+        parser,
+        resource_type='target pool',
+        operation_type='add health checks to')
 
     parser.add_argument(
         'name',
@@ -34,21 +36,23 @@ class AddHealthChecks(base_classes.BaseAsyncMutator):
     return 'AddHealthCheck'
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'targetPools'
 
   def CreateRequests(self, args):
-    http_health_check_uri = self.context['uri-builder'].Build(
-        'global', 'httpHealthChecks', args.http_health_check)
+    health_check_ref = resources.Parse(
+        args.http_health_check, collection='compute.httpHealthChecks')
+
+    target_pool_ref = self.CreateRegionalReference(args.name, args.region)
 
     request = messages.ComputeTargetPoolsAddHealthCheckRequest(
-        region=args.region,
+        region=target_pool_ref.region,
         project=self.context['project'],
-        targetPool=args.name,
+        targetPool=target_pool_ref.Name(),
         targetPoolsAddHealthCheckRequest=(
             messages.TargetPoolsAddHealthCheckRequest(
                 healthChecks=[messages.HealthCheckReference(
-                    healthCheck=http_health_check_uri)])))
+                    healthCheck=health_check_ref.SelfLink())])))
 
     return [request]
 

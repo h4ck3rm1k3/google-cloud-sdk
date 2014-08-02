@@ -24,6 +24,7 @@ path_initializer.InitSysPath()
 import copy
 import json
 
+from google.apputils import app
 import gflags as flags
 import unittest
 
@@ -39,6 +40,7 @@ FLAGS = flags.FLAGS
 
 
 class ImageCmdsTest(gcutil_unittest.GcutilTestCase):
+
   def setUp(self):
     self.mock, self.api = mock_api.CreateApi(self.version)
 
@@ -58,7 +60,8 @@ class ImageCmdsTest(gcutil_unittest.GcutilTestCase):
     self.assertRaises(gcutil_errors.UnsupportedCommand,
                       command.Handle, 'image', 'source')
 
-  def _DoTestAddImageGeneratesCorrectRequest(
+
+  def _DoTestAddImageFromSourceTarballGeneratesCorrectRequest(
       self, requested_source, expected_source, submitted_kernel,
       expected_kernel, requested_image, expected_image, project_flag,
       expected_project):
@@ -141,7 +144,7 @@ class ImageCmdsTest(gcutil_unittest.GcutilTestCase):
     }]
 
     for test_case in test_cases:
-      self._DoTestAddImageGeneratesCorrectRequest(**test_case)
+      self._DoTestAddImageFromSourceTarballGeneratesCorrectRequest(**test_case)
 
   def testSkipProjectsNotFound(self):
     flag_values = copy.deepcopy(FLAGS)

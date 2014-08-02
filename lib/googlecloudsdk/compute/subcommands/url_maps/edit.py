@@ -20,7 +20,7 @@ class Edit(base_classes.BaseEdit):
     return self.context['compute'].urlMaps
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'urlMaps'
 
   @property

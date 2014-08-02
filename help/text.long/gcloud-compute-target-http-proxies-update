@@ -4,8 +4,9 @@ NAME
 SYNOPSIS
        gcloud compute target-http-proxies update
          NAME
+         [--help]
          --url-map URL_MAP
-         [-h, --help]
+         [-h]
 
 DESCRIPTION
        gcloud compute target-http-proxies update is used to change the URL map
@@ -20,11 +21,14 @@ POSITIONAL ARGUMENTS
            The name of the target HTTP proxy.
 
 FLAGS
+       --help
+           Display detailed help.
+
        --url-map URL_MAP
            A reference to a URL map resource that will define the mapping of
            URLs to backend services. The URL map must exist and cannot be
            deleted while referenced by a target HTTP proxy.
 
-       --help
+       -h
            Print a summary help and exit.
 

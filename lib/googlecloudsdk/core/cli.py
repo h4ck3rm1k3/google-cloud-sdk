@@ -10,7 +10,7 @@ import sys
 import httplib2
 
 
-from googlecloudsdk import calliope
+from googlecloudsdk.calliope import cli as calliope
 from googlecloudsdk.core import config
 from googlecloudsdk.core.credentials import store as c_store
 

@@ -35,6 +35,25 @@ FLAGS = flags.FLAGS
 LOGGER = gcutil_logging.LOGGER
 
 
+def _DefineUsageExportFlags(flag_values):
+  flags.DEFINE_string('bucket', None,
+                      ('The name of an existing bucket in Google Storage where '
+                       'the usage report object is stored. The Google Service '
+                       'Account is granted write access to this bucket. This is'
+                       ' simply the bucket name, with no "gs://" or '
+                       '"https://storage.googleapis.com/" in front of it.'),
+                      flag_values=flag_values)
+
+  flags.DEFINE_string('prefix', None,
+                      ('An optional prefix for the name of the usage report '
+                       'object stored in bucket. If not supplied, '
+                       'defaults to "usage_".  The report is stored as a CSV '
+                       'file named <report_name_prefix>_gce_<YYYYMMDD>.csv. '
+                       'where <YYYYMMDD> is the day of the usage according to '
+                       'Pacific Time. The prefix should conform to Google '
+                       'Storage object naming conventions.'),
+                      flag_values=flag_values)
+
 
 class ProjectCommand(command_base.GoogleComputeCommand):
   """Base command for working with the projects collection."""
@@ -48,7 +67,9 @@ class ProjectCommand(command_base.GoogleComputeCommand):
       detail=(
           ('name', 'name'),
           ('description', 'description'),
-          ('creation-time', 'creationTimestamp')),
+          ('creation-time', 'creationTimestamp'),
+          ('common-instance-metadata-fingerprint',
+           'commonInstanceMetadata.fingerprint')),
       sort_by='name')
 
   def __init__(self, name, flag_values):
@@ -96,6 +117,14 @@ class ProjectCommand(command_base.GoogleComputeCommand):
             metadata_entry.get('key'),
             metadata_entry.get('value')))
       data.append(('common-instance-metadata', metadata_info))
+      data.append(('common-instance-metadata-fingerprint',
+                   result.get('commonInstanceMetadata', {}).get('fingerprint')))
+
+    usage_export = result.get('usageExportLocation', [])
+    if usage_export:
+      data.append(('usageExportLocation',
+                   [('bucketName', usage_export['bucketName']),
+                    ('reportNamePrefix', usage_export['reportNamePrefix'])]))
 
     return data
 
@@ -126,7 +155,28 @@ class GetProject(ProjectCommand):
     return project_request.execute()
 
 
-class SetCommonInstanceMetadata(ProjectCommand):
+class OptimisticallyLockedProjectCommand(ProjectCommand):
+  """Base class for project commands that optionally use a fingerprint."""
+
+  def __init__(self, name, flag_values):
+    super(OptimisticallyLockedProjectCommand, self).__init__(name, flag_values)
+
+    flags.DEFINE_string('fingerprint',
+                        None,
+                        '[Optional] Fingerprint of the data to be '
+                        'overwritten. This fingerprint provides optimistic '
+                        'locking. Data will only be set if a fingerprint '
+                        'is not provided or if the given '
+                        'fingerprint matches the state of the data prior to '
+                        'this request.',
+                        flag_values=flag_values)
+
+  def Handle(self):
+    """Invokes the HandleCommand method of the subclass."""
+    return self.HandleCommand()
+
+
+class SetCommonInstanceMetadata(OptimisticallyLockedProjectCommand):
   """Set the commonInstanceMetadata field for a Google Compute Engine project.
 
   This is a blanket overwrite of all of the project wide metadata.
@@ -143,7 +193,7 @@ class SetCommonInstanceMetadata(ProjectCommand):
     self._metadata_flags_processor = metadata.MetadataFlagsProcessor(
         flag_values)
 
-  def Handle(self):
+  def HandleCommand(self):
     """Set the metadata common to all instances in the specified project.
 
     Args:
@@ -178,15 +228,86 @@ class SetCommonInstanceMetadata(ProjectCommand):
             '\n\nRe-run with the -f flag to force the update.' %
             ', '.join(list(dropped_keys)))
 
+    metadata_resource = {'kind': self._GetResourceApiKind('metadata'),
+                         'items': new_metadata}
+    if self._flags.fingerprint:
+      metadata_resource['fingerprint'] = self._flags.fingerprint
+
     project_request = self.api.projects.setCommonInstanceMetadata(
         project=project_context['project'],
-        body={'kind': self._GetResourceApiKind('metadata'),
-              'items': new_metadata})
+        body=metadata_resource)
     return project_request.execute()
 
 
+class UsageExportCommand(ProjectCommand):
+  """Abstract command containing helper method for Usage Export Commands."""
+
+  def ExecuteUsageExportRequest(self, bucket_name, report_name_prefix):
+    project = self._flags.project
+    project_context = self._context_parser.ParseContextOrPrompt('projects',
+                                                                project)
+    body = {'kind': self._GetResourceApiKind('usageExportLocation')}
+    if bucket_name:
+      body['bucketName'] = bucket_name
+    if report_name_prefix:
+      body['reportNamePrefix'] = report_name_prefix
+
+    set_usage_export_request = (
+        self.api.projects.setUsageExportBucket(
+            project=project_context['project'],
+            body=body))
+    return set_usage_export_request.execute()
+
+
+class SetUsageExportBucket(UsageExportCommand):
+  """Set the usageExportLocation field for a Google Compute Engine project."""
+
+  def __init__(self, name, flag_values):
+    super(SetUsageExportBucket, self).__init__(name, flag_values)
+    _DefineUsageExportFlags(flag_values)
+
+  def Handle(self):
+    """Set the cloud storage bucket where usage reports will be exported to.
+
+    Args:
+      None.
+
+    Returns:
+      The result of setting the cloud storage bucket.
+
+    Raises:
+
+      UsageError: If user does not specify a bucket.
+
+    """
+    if not self._flags['bucket'].present:
+      raise app.UsageError('You must specify a bucket name. '
+                           'To unset this feature run clearusagebucket')
+
+    return self.ExecuteUsageExportRequest(
+        self._flags.bucket,
+        self._flags.prefix if self._flags['prefix'].present else None)
+
+
+class ClearUsageExportBucket(UsageExportCommand):
+  """Convenience method for clearing the usageExportLocation field."""
+
+  def Handle(self):
+    """Set the cloud storage bucket where usage reports will be exported to.
+
+    Args:
+      None.
+
+    Returns:
+      The result of setting the cloud storage bucket.
+
+    """
+    return self.ExecuteUsageExportRequest(None, None)
 
 
 def AddCommands():
   appcommands.AddCmd('getproject', GetProject)
   appcommands.AddCmd('setcommoninstancemetadata', SetCommonInstanceMetadata)
+  appcommands.AddCmd('setusagebucket', SetUsageExportBucket)
+  appcommands.AddCmd('clearusagebucket', ClearUsageExportBucket)
+

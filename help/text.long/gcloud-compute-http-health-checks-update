@@ -7,12 +7,13 @@ SYNOPSIS
          [--check-interval CHECK_INTERVAL]
          [--description DESCRIPTION]
          [--healthy-threshold HEALTHY_THRESHOLD]
+         [--help]
          [--host HOST]
          [--port PORT]
          [--request-path REQUEST_PATH]
          [--timeout TIMEOUT]
          [--unhealthy-threshold UNHEALTHY_THRESHOLD]
-         [-h, --help]
+         [-h]
 
 DESCRIPTION
        gcloud compute http-health-checks update is used to update an existing
@@ -37,6 +38,9 @@ FLAGS
        --healthy-threshold HEALTHY_THRESHOLD
            The number of consecutive successful health checks before an
            unhealthy instance is marked as healthy.
+
+       --help
+           Display detailed help.
 
        --host HOST
            The value of the host header used in this HTTP health check
@@ -65,6 +69,6 @@ FLAGS
            The number of consecutive health check failures before a healthy
            instance is marked as unhealthy.
 
-       --help
+       -h
            Print a summary help and exit.
 

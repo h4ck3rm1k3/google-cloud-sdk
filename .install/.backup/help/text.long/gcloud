@@ -2,9 +2,13 @@ NAME
        gcloud - manage Google Cloud Platform resources
 
 SYNOPSIS
-       gcloud GROUP|COMMAND [--project PROJECT] [--quiet, -q]
-       [--user-output-enabled USER_OUTPUT_ENABLED] [--verbosity VERBOSITY]
-       [-h, --help]
+       gcloud
+         GROUP|COMMAND
+         [--project PROJECT]
+         [--quiet, -q]
+         [--user-output-enabled USER_OUTPUT_ENABLED]
+         [--verbosity VERBOSITY]
+         [-h, --help]
 
 DESCRIPTION
        The gcloud CLI manages authentication and local configuration, as well
@@ -60,6 +64,9 @@ COMMANDS
 
        help
            Print a detailed help message.
+
+       info
+           Prints out information about your current gcloud environment.
 
        init
            Initialize a gcloud workspace in the current directory.

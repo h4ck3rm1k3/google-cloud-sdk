@@ -45,7 +45,6 @@ class ComputeApi(object):
                'http_health_checks',
                'images',
                'instances',
-               'kernels',
                'machine_types',
                'networks',
                'projects',
@@ -74,8 +73,6 @@ class ComputeApi(object):
     self.http_health_checks = GetCollectionOrNone(api, 'httpHealthChecks')
     self.images = api.images()
     self.instances = api.instances()
-    if api_version < version.get('v1'):
-      self.kernels = api.kernels()
     self.machine_types = api.machineTypes()
     self.networks = api.networks()
     self.projects = api.projects()

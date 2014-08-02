@@ -13,8 +13,9 @@ gcloud-compute-target-pools-set-backup \- Set a backup pool for a target pool
   NAME
   \-\-backup\-pool [BACKUP_POOL]
   [\-\-failover\-ratio FAILOVER_RATIO]
-  \-\-region REGION
-  [\-h, \-\-help]
+  [\-\-help]
+  [\-\-region REGION]
+  [\-h]
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -37,12 +38,17 @@ Name of the target pool that will serve as backup\&. If this flag is provided wi
 The new failover ratio value for the target pool\&. This must be a float in the range of [0, 1]\&.
 .RE
 .PP
-\fB\-\-region\fR \fIREGION\fR
+\fB\-\-help\fR
 .RS 4
-The region of the target pool\&.
+Display detailed help\&.
 .RE
 .PP
-\fB\-\-help\fR
+\fB\-\-region\fR \fIREGION\fR
+.RS 4
+The region of the target pool to set a backup pool for\&. If omitted and the arguments are not all URIs, you will be prompted to select a region\&.
+.RE
+.PP
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE

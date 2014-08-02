@@ -7,11 +7,12 @@ SYNOPSIS
          NAME
          --allow PROTOCOL[:PORT[-PORT]] [PROTOCOL[:PORT[-PORT]] ...]
          [--description DESCRIPTION]
+         [--help]
          [--network NETWORK; default="default"]
          [--source-ranges CIDR_RANGE [CIDR_RANGE ...]]
          [--source-tags TAG [TAG ...]]
          [--target-tags TAG [TAG ...]]
-         [-h, --help]
+         [-h]
 
 DESCRIPTION
        gcloud compute firewalls create is used to create firewall rules to
@@ -44,6 +45,9 @@ FLAGS
        --description DESCRIPTION
            An optional, textual description for the firewall.
 
+       --help
+           Display detailed help.
+
        --network NETWORK
            The network to which this rule is attached. If omitted, the rule is
            attached to the "default" network.
@@ -72,6 +76,6 @@ FLAGS
 
            Tags can be assigned to instances during instance creation.
 
-       --help
+       -h
            Print a summary help and exit.
 

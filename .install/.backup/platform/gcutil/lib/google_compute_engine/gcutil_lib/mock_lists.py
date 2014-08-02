@@ -381,3 +381,38 @@ def GetSampleRegionListCall(unused_command, mock_server, num_responses=2,
         True)
 
   return mock_server.RespondF('compute.regions.list', ListResponse)
+
+
+def GetSampleDiskTypeListCall(command, mock_server, num_responses=2):
+  """Registers a sample disk type list call on the mock server.
+
+  Args:
+    command: The gcutil command that this call is based on.
+    mock_server:  The mock server to register the list call on.
+    num_responses:  The size of the desired call.
+
+  Returns:
+    The created server call object.
+  """
+  def ListResponse(unused_uri, unused_http_method, parameters, unused_body):
+    return mock_server.MOCK_RESPONSE(
+        {
+            'kind': 'compute#diskTypeList',
+            'items': [{
+                'description': 'Disk type description %d' % x,
+                'kind': 'compute#diskType',
+                'name': 'disk_type_%d' % x,
+                'validDiskSize': '10GB-10TB',
+                'selfLink': command.NormalizeGlobalResourceName(
+                    parameters['project'],
+                    'diskTypes',
+                    'disk_type_%d' % x),
+                'zone': command.NormalizeGlobalResourceName(
+                    parameters['project'],
+                    'zones',
+                    parameters['zone'] if 'zone' in parameters else 'default')
+                } for x in xrange(num_responses)]
+        },
+        True)
+
+  return mock_server.RespondF('compute.diskTypes.list', ListResponse)

@@ -5,12 +5,12 @@
 
 import argparse
 import os
-import os.path
 import StringIO
 import subprocess
 import sys
 import textwrap
 
+from googlecloudsdk.core import log
 from googlecloudsdk.core.util import files as file_utils
 
 
@@ -107,18 +107,24 @@ def GenerateRcFile(prefix, prompt, subcommands, interactive, buf):
       esac
       """))
 
+  if os.sep == '\\':
+    # Workaround for UWIN ksh(1) PATH lookup on pure windows paths.
+    # The embeded '/' means "this is literal, don't do PATH lookup".
+    executable = '/'.join(sys.executable.rsplit('\\', 1))
+  else:
+    executable = sys.executable
   buf.write(textwrap.dedent(
       """
-      PYTHONPATH={pythonpath}
+      PYTHONPATH='{pythonpath}'
 
       python() {{
-        {python} "$@"
+        '{python}' "$@"
       }}
       gcloud() {{
-        python "{actual_gcloud}" "$@"
+        python '{actual_gcloud}' "$@"
       }}
-      """).format(python=sys.executable,
-                  pythonpath=':'.join(sys.path),
+      """).format(python=executable,
+                  pythonpath=os.pathsep.join(sys.path),
                   actual_gcloud=actual_gcloud))
 
   if interactive:
@@ -133,8 +139,9 @@ def GenerateRcFile(prefix, prompt, subcommands, interactive, buf):
           echo "{table}"
         }}
         """).format(prefix=prefix,
-                    table=EqualSpacedColmunTable(sorted(subcommands),
-                                                 table_width=64)))
+                    table=EqualSpacedColmunTable(
+                        sorted(subcommands + ['-h', '--help']),
+                        table_width=64)))
     buf.write(textwrap.dedent(
         """
         case $_gcloud_shell in
@@ -192,14 +199,13 @@ def GenerateRcFile(prefix, prompt, subcommands, interactive, buf):
     buf.write('PS1="" PS2=""\n')
 
 
-def ShellAction(subcommands, loader):
+def ShellAction(subcommands, cli):
   """Get an argparse action that launches a subshell.
 
   Args:
     subcommands: [str], List of the commands and subgroups that will be turned
         into aliases in the subshell.
-    loader: calliope.CommandLoader, the CommandLoader hosting this calliope
-        session.
+    cli: calliope.CLI, The CLI hosting this calliope session.
 
   Returns:
     argparse.Action, the action to use.
@@ -213,9 +219,22 @@ def ShellAction(subcommands, loader):
     def __call__(self, parser, namespace, values, option_string=None):
       alias_args = ['gcloud']
 
-      shell = values or os.environ.get('SHELL', '/bin/bash')
+      # subprocess.call() below handles 'shell not found' diagnostics
+      if values:
+        shell = values
+      else:
+        shell = os.environ.get('SHELL')
+        if not shell:
+          # search for a default for SHELL, biased from left to right
+          for shell in ['bash', 'ksh', 'sh', 'zsh', 'dash']:
+            path = file_utils.FindExecutableOnPath(shell)
+            if path:
+              shell = path
+              break
+          else:
+            shell = 'sh'
 
-      for arg in loader.argv:
+      for arg in cli.argv:
         if arg == '--shell' or arg.startswith('--shell='):
           # Only things up to, and not including, the first --shell.
           # TODO(user): This search can have false positives. eg,
@@ -240,7 +259,8 @@ def ShellAction(subcommands, loader):
       exit_code = 0
       with file_utils.TemporaryDirectory() as tmpdir:
         # link or symlink not available on all targets so we make N copies.
-        for rcfile in ['.bashrc', '.zshrc', '.gcloudenv']:
+        envfile = '.gcloudenv'
+        for rcfile in ['.bashrc', '.zshrc', envfile]:
           path = os.path.join(tmpdir, rcfile)
           with open(path, 'w') as f:
             f.write(buf.getvalue())
@@ -257,7 +277,13 @@ def ShellAction(subcommands, loader):
           env['_GCLOUD_RESTORE_'] = restore
           env['HOME'] = tmpdir
           env['ZDOTDIR'] = tmpdir
-          env['ENV'] = path
+          if os.sep == '\\':
+            # Workaround for UWIN ksh(1) PATH lookup on pure windows paths.
+            # The embeded '/' means "this is literal, don't do PATH lookup".
+            # Also handles the eval of $ENV that eliminates \'s.
+            env['ENV'] = '/'.join([tmpdir, envfile]).replace('\\', '\\\\')
+          else:
+            env['ENV'] = path
           # Why print terminal escape sequences if stdout is not a terminal?
           if not sys.stdout.isatty():
             env['TERM'] = 'dumb'
@@ -268,17 +294,14 @@ def ShellAction(subcommands, loader):
           # complain about no tty in -i mode, so zsh is special-cased.
           if not interactive and os.path.basename(shell).startswith('zsh'):
             # eventually change preexec_fn=os.setsid to start_new_session=True
-            exit_code = subprocess.Popen(cmd, env=env,
-                                         preexec_fn=os.setsid).wait()
+            exit_code = subprocess.call(cmd, env=env, preexec_fn=os.setsid)
           else:
-            exit_code = subprocess.Popen(cmd, env=env).wait()
+            exit_code = subprocess.call(cmd, env=env)
         except OSError as e:
-          print e
-          print """\
-There was a problem running the desired shell. To use this feature, make sure
-that [{shell}] is installed and available in your system PATH, or that the
-$SHELL environment variable points to the correct program.
-""".format(shell=shell)
+          log.error("""\
+could not run the shell [{shell}] -- \
+make sure it is installed and on the system PATH [{e}]\
+""".format(e=e, shell=shell))
           exit_code = 1
 
       sys.exit(exit_code)

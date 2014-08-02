@@ -2,7 +2,6 @@
 
 """Common utility functions for sql tool."""
 import os.path
-import re
 
 from oauth2client.anyjson import simplejson
 
@@ -358,9 +357,11 @@ def GetInstanceIdWithoutProject(instance_name):
   Returns:
     A string that represents the instance id without project id part.
   """
-  match = re.findall(r'(?::?)([a-z0-9\-]+)', instance_name)
+  if instance_name.startswith('https://'):
+    return instance_name
+  split_id = instance_name.split(':')
   # The part after the last colon corresponds to instance name.
-  return match[-1]
+  return split_id[-1]
 
 
 def GetProjectId(instance_name):
@@ -376,11 +377,12 @@ def GetProjectId(instance_name):
   Returns:
     A string that represents the project id of the given instance.
   """
-  match = re.findall(r'(?::?)([a-z0-9\-\.]+)', instance_name)
-  # The part before the last colon corresponds to instance name.
-  if len(match) == 2:
-    return match[0]
-  elif len(match) == 3:
-    return match[0] + ':' + match[1]
+  split_id = instance_name.split(':')
+  # The final string from the split is the instance name, e.g.
+  # domain:project:instance returns instance
+  if len(split_id) == 2:
+    return split_id[0]
+  elif len(split_id) == 3:
+    return split_id[0] + ':' + split_id[1]
   else:
     return properties.VALUES.core.project.Get(required=True)

@@ -10,6 +10,8 @@ from googlecloudsdk.compute.lib import uri_builder
 from googlecloudsdk.core import cli
 from googlecloudsdk.core import exceptions
 from googlecloudsdk.core import properties
+from googlecloudsdk.core import resolvers
+from googlecloudsdk.core import resources
 
 
 class Compute(base.Group):
@@ -28,7 +30,17 @@ class Compute(base.Group):
     context['uri-builder'] = uri_builder.UriBuilder(
         compute_url, project=project)
 
+    context['resource-views-uri-builder'] = uri_builder.UriBuilder(
+        'https://www.googleapis.com/resourceviews/v1beta1/',
+        project=project)
+
     context['batch-url'] = urlparse.urljoin(api_host, 'batch')
+
+    resources.SetParamDefault(
+        api='compute',
+        collection=None,
+        param='project',
+        resolver=resolvers.FromProperty(properties.VALUES.core.project))
 
     v1_compute = compute_v1_client.ComputeV1(
         url=compute_url,

@@ -77,17 +77,25 @@ _cloudsdk_root_dir() {
     _cloudsdk_dir=1
     _cloudsdk_path=$(dirname "$_cloudsdk_path")
   done
-  case $_cloudsdk_path in
-  */bin)  dirname "$_cloudsdk_path" ;;
-  *)      echo "$_cloudsdk_path" ;;
-  esac
+  while :
+  do  case $_cloudsdk_path in
+      */.)    _cloudsdk_path=$(dirname "$_cloudsdk_path")
+              ;;
+      */bin)  dirname "$_cloudsdk_path"
+              break
+              ;;
+      *)      echo "$_cloudsdk_path"
+              break
+              ;;
+      esac
+  done
 }
 CLOUDSDK_ROOT_DIR=$(_cloudsdk_root_dir "$0")
 
 [ -z "$CLOUDSDK_PYTHON" ] &&
   CLOUDSDK_PYTHON=python
 
-[ -n "$_always_use_site_packages" ] && CLOUDSDK_PYTHON_SITEPACKAGES=1
+[ -n "$_always_use_site_packages" ] && export CLOUDSDK_PYTHON_SITEPACKAGES=1
 
 [ -z "$CLOUDSDK_PYTHON_ARGS" -a -z "$CLOUDSDK_PYTHON_SITEPACKAGES" ] &&
   CLOUDSDK_PYTHON_ARGS=-S
@@ -112,6 +120,8 @@ class InstallationConfig(object):
     disable_updater: bool, True to disable the component manager for this
       installation.  We do this for distributions through another type of
       package manager like apt-get.
+    disable_usage_reporting: bool, True to disable the sending of usage data by
+      default.
     snapshot_schema_version: int, The version of the snapshot schema this code
       understands.
     release_channel: str, The release channel for this Cloud SDK distribution.
@@ -135,8 +145,8 @@ class InstallationConfig(object):
     return InstallationConfig(**data)
 
   def __init__(self, version, user_agent, documentation_url, snapshot_url,
-               disable_updater, snapshot_schema_version, release_channel,
-               config_suffix):
+               disable_updater, disable_usage_reporting,
+               snapshot_schema_version, release_channel, config_suffix):
     # JSON returns all unicode.  We know these are regular strings and using
     # unicode in environment variables on Windows doesn't work.
     self.version = str(version)
@@ -144,6 +154,7 @@ class InstallationConfig(object):
     self.documentation_url = str(documentation_url)
     self.snapshot_url = str(snapshot_url)
     self.disable_updater = disable_updater
+    self.disable_usage_reporting = disable_usage_reporting
     # This one is an int, no need to convert
     self.snapshot_schema_version = snapshot_schema_version
     self.release_channel = str(release_channel)

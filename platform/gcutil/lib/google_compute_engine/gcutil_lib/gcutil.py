@@ -41,7 +41,6 @@ from gcutil_lib import forwarding_rule_cmds
 from gcutil_lib import http_health_check_cmds
 from gcutil_lib import image_cmds
 from gcutil_lib import instance_cmds
-from gcutil_lib import kernel_cmds
 from gcutil_lib import machine_type_cmds
 from gcutil_lib import move_cmds
 from gcutil_lib import network_cmds
@@ -83,7 +82,6 @@ def main(unused_argv):
   firewall_cmds.AddCommands()
   image_cmds.AddCommands()
   instance_cmds.AddCommands()
-  kernel_cmds.AddCommands()
   machine_type_cmds.AddCommands()
   move_cmds.AddCommands()
   network_cmds.AddCommands()

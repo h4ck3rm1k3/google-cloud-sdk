@@ -21,7 +21,8 @@ class ComputeV1(base_api.BaseApiClient):
   def __init__(self, url='', credentials=None,
                get_credentials=True, http=None, model=None,
                log_request=False, log_response=False,
-               credentials_args=None, default_global_params=None):
+               credentials_args=None, default_global_params=None,
+               additional_http_headers=None):
     """Create a new compute handle."""
     url = url or u'https://www.googleapis.com/compute/v1/'
     super(ComputeV1, self).__init__(
@@ -29,7 +30,8 @@ class ComputeV1(base_api.BaseApiClient):
         get_credentials=get_credentials, http=http, model=model,
         log_request=log_request, log_response=log_response,
         credentials_args=credentials_args,
-        default_global_params=default_global_params)
+        default_global_params=default_global_params,
+        additional_http_headers=additional_http_headers)
     self.addresses = self.AddressesService(self)
     self.backendServices = self.BackendServicesService(self)
     self.diskTypes = self.DiskTypesService(self)
@@ -59,6 +61,8 @@ class ComputeV1(base_api.BaseApiClient):
 
   class AddressesService(base_api.BaseApiService):
     """Service class for the addresses resource."""
+
+    _NAME = u'addresses'
 
     def __init__(self, client):
       super(ComputeV1.AddressesService, self).__init__(client)
@@ -195,6 +199,8 @@ class ComputeV1(base_api.BaseApiClient):
 
   class BackendServicesService(base_api.BaseApiService):
     """Service class for the backendServices resource."""
+
+    _NAME = u'backendServices'
 
     def __init__(self, client):
       super(ComputeV1.BackendServicesService, self).__init__(client)
@@ -382,6 +388,8 @@ class ComputeV1(base_api.BaseApiClient):
   class DiskTypesService(base_api.BaseApiService):
     """Service class for the diskTypes resource."""
 
+    _NAME = u'diskTypes'
+
     def __init__(self, client):
       super(ComputeV1.DiskTypesService, self).__init__(client)
       self._method_configs = {
@@ -467,6 +475,8 @@ class ComputeV1(base_api.BaseApiClient):
 
   class DisksService(base_api.BaseApiService):
     """Service class for the disks resource."""
+
+    _NAME = u'disks'
 
     def __init__(self, client):
       super(ComputeV1.DisksService, self).__init__(client)
@@ -629,6 +639,8 @@ class ComputeV1(base_api.BaseApiClient):
   class FirewallsService(base_api.BaseApiService):
     """Service class for the firewalls resource."""
 
+    _NAME = u'firewalls'
+
     def __init__(self, client):
       super(ComputeV1.FirewallsService, self).__init__(client)
       self._method_configs = {
@@ -789,6 +801,8 @@ class ComputeV1(base_api.BaseApiClient):
 
   class ForwardingRulesService(base_api.BaseApiService):
     """Service class for the forwardingRules resource."""
+
+    _NAME = u'forwardingRules'
 
     def __init__(self, client):
       super(ComputeV1.ForwardingRulesService, self).__init__(client)
@@ -951,6 +965,8 @@ class ComputeV1(base_api.BaseApiClient):
   class GlobalAddressesService(base_api.BaseApiService):
     """Service class for the globalAddresses resource."""
 
+    _NAME = u'globalAddresses'
+
     def __init__(self, client):
       super(ComputeV1.GlobalAddressesService, self).__init__(client)
       self._method_configs = {
@@ -1061,6 +1077,8 @@ class ComputeV1(base_api.BaseApiClient):
 
   class GlobalForwardingRulesService(base_api.BaseApiService):
     """Service class for the globalForwardingRules resource."""
+
+    _NAME = u'globalForwardingRules'
 
     def __init__(self, client):
       super(ComputeV1.GlobalForwardingRulesService, self).__init__(client)
@@ -1198,6 +1216,8 @@ class ComputeV1(base_api.BaseApiClient):
   class GlobalOperationsService(base_api.BaseApiService):
     """Service class for the globalOperations resource."""
 
+    _NAME = u'globalOperations'
+
     def __init__(self, client):
       super(ComputeV1.GlobalOperationsService, self).__init__(client)
       self._method_configs = {
@@ -1308,6 +1328,8 @@ class ComputeV1(base_api.BaseApiClient):
 
   class HttpHealthChecksService(base_api.BaseApiService):
     """Service class for the httpHealthChecks resource."""
+
+    _NAME = u'httpHealthChecks'
 
     def __init__(self, client):
       super(ComputeV1.HttpHealthChecksService, self).__init__(client)
@@ -1470,6 +1492,8 @@ class ComputeV1(base_api.BaseApiClient):
   class ImagesService(base_api.BaseApiService):
     """Service class for the images resource."""
 
+    _NAME = u'images'
+
     def __init__(self, client):
       super(ComputeV1.ImagesService, self).__init__(client)
       self._method_configs = {
@@ -1605,6 +1629,8 @@ class ComputeV1(base_api.BaseApiClient):
 
   class InstancesService(base_api.BaseApiService):
     """Service class for the instances resource."""
+
+    _NAME = u'instances'
 
     def __init__(self, client):
       super(ComputeV1.InstancesService, self).__init__(client)
@@ -1992,6 +2018,8 @@ class ComputeV1(base_api.BaseApiClient):
   class LicensesService(base_api.BaseApiService):
     """Service class for the licenses resource."""
 
+    _NAME = u'licenses'
+
     def __init__(self, client):
       super(ComputeV1.LicensesService, self).__init__(client)
       self._method_configs = {
@@ -2027,6 +2055,8 @@ class ComputeV1(base_api.BaseApiClient):
 
   class MachineTypesService(base_api.BaseApiService):
     """Service class for the machineTypes resource."""
+
+    _NAME = u'machineTypes'
 
     def __init__(self, client):
       super(ComputeV1.MachineTypesService, self).__init__(client)
@@ -2113,6 +2143,8 @@ class ComputeV1(base_api.BaseApiClient):
 
   class NetworksService(base_api.BaseApiService):
     """Service class for the networks resource."""
+
+    _NAME = u'networks'
 
     def __init__(self, client):
       super(ComputeV1.NetworksService, self).__init__(client)
@@ -2225,6 +2257,8 @@ class ComputeV1(base_api.BaseApiClient):
   class ProjectsService(base_api.BaseApiService):
     """Service class for the projects resource."""
 
+    _NAME = u'projects'
+
     def __init__(self, client):
       super(ComputeV1.ProjectsService, self).__init__(client)
       self._method_configs = {
@@ -2310,6 +2344,8 @@ class ComputeV1(base_api.BaseApiClient):
 
   class RegionOperationsService(base_api.BaseApiService):
     """Service class for the regionOperations resource."""
+
+    _NAME = u'regionOperations'
 
     def __init__(self, client):
       super(ComputeV1.RegionOperationsService, self).__init__(client)
@@ -2397,6 +2433,8 @@ class ComputeV1(base_api.BaseApiClient):
   class RegionsService(base_api.BaseApiService):
     """Service class for the regions resource."""
 
+    _NAME = u'regions'
+
     def __init__(self, client):
       super(ComputeV1.RegionsService, self).__init__(client)
       self._method_configs = {
@@ -2457,6 +2495,8 @@ class ComputeV1(base_api.BaseApiClient):
 
   class RoutesService(base_api.BaseApiService):
     """Service class for the routes resource."""
+
+    _NAME = u'routes'
 
     def __init__(self, client):
       super(ComputeV1.RoutesService, self).__init__(client)
@@ -2569,6 +2609,8 @@ class ComputeV1(base_api.BaseApiClient):
   class SnapshotsService(base_api.BaseApiService):
     """Service class for the snapshots resource."""
 
+    _NAME = u'snapshots'
+
     def __init__(self, client):
       super(ComputeV1.SnapshotsService, self).__init__(client)
       self._method_configs = {
@@ -2654,6 +2696,8 @@ class ComputeV1(base_api.BaseApiClient):
 
   class TargetHttpProxiesService(base_api.BaseApiService):
     """Service class for the targetHttpProxies resource."""
+
+    _NAME = u'targetHttpProxies'
 
     def __init__(self, client):
       super(ComputeV1.TargetHttpProxiesService, self).__init__(client)
@@ -2791,6 +2835,8 @@ class ComputeV1(base_api.BaseApiClient):
   class TargetInstancesService(base_api.BaseApiService):
     """Service class for the targetInstances resource."""
 
+    _NAME = u'targetInstances'
+
     def __init__(self, client):
       super(ComputeV1.TargetInstancesService, self).__init__(client)
       self._method_configs = {
@@ -2926,6 +2972,8 @@ class ComputeV1(base_api.BaseApiClient):
 
   class TargetPoolsService(base_api.BaseApiService):
     """Service class for the targetPools resource."""
+
+    _NAME = u'targetPools'
 
     def __init__(self, client):
       super(ComputeV1.TargetPoolsService, self).__init__(client)
@@ -3213,6 +3261,8 @@ class ComputeV1(base_api.BaseApiClient):
   class UrlMapsService(base_api.BaseApiService):
     """Service class for the urlMaps resource."""
 
+    _NAME = u'urlMaps'
+
     def __init__(self, client):
       super(ComputeV1.UrlMapsService, self).__init__(client)
       self._method_configs = {
@@ -3399,6 +3449,8 @@ class ComputeV1(base_api.BaseApiClient):
   class ZoneOperationsService(base_api.BaseApiService):
     """Service class for the zoneOperations resource."""
 
+    _NAME = u'zoneOperations'
+
     def __init__(self, client):
       super(ComputeV1.ZoneOperationsService, self).__init__(client)
       self._method_configs = {
@@ -3484,6 +3536,8 @@ class ComputeV1(base_api.BaseApiClient):
 
   class ZonesService(base_api.BaseApiService):
     """Service class for the zones resource."""
+
+    _NAME = u'zones'
 
     def __init__(self, client):
       super(ComputeV1.ZonesService, self).__init__(client)

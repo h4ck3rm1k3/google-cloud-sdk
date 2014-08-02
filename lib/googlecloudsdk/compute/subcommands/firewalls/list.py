@@ -3,7 +3,7 @@
 from googlecloudsdk.compute.lib import base_classes
 
 
-class ListFirewalls(base_classes.GlobalLister):
+class List(base_classes.GlobalLister):
   """List Google Compute Engine firewalls."""
 
   @property
@@ -11,5 +11,5 @@ class ListFirewalls(base_classes.GlobalLister):
     return self.context['compute'].firewalls
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'firewalls'

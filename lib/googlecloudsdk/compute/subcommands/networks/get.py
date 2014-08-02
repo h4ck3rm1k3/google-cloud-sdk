@@ -3,7 +3,7 @@
 from googlecloudsdk.compute.lib import base_classes
 
 
-class GetNetworks(base_classes.GlobalGetter):
+class Get(base_classes.GlobalGetter):
   """Get Google Compute Engine networks."""
 
   @staticmethod
@@ -16,11 +16,11 @@ class GetNetworks(base_classes.GlobalGetter):
     return self.context['compute'].networks
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'networks'
 
 
-GetNetworks.detailed_help = {
+Get.detailed_help = {
     'brief': 'Get Google Compute Engine networks',
     'DESCRIPTION': """\
         *{command}* displays all data associated with Google Compute

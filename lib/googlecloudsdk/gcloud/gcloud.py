@@ -57,32 +57,11 @@ from googlecloudsdk.core import cli
 from googlecloudsdk.core import log
 from googlecloudsdk.core import metrics
 from googlecloudsdk.core import properties
-from googlecloudsdk.core import resources
 from googlecloudsdk.core.updater import local_state
 from googlecloudsdk.core.updater import update_manager
+from googlecloudsdk.core.util import resource_registration
 
-
-def RegisterAPIs():
-  """Register all the bundled Cloud APIs."""
-  # pylint:disable=g-import-not-at-top
-  from googlecloudapis.compute import v1 as compute_v1
-  from googlecloudapis.dns import v1beta1 as dns_v1beta1
-  from googlecloudapis.manager import v1beta2 as manager_v1beta2
-  from googlecloudapis.replicapool import v1beta1 as replicapool_v1beta1
-  from googlecloudapis.resourceviews import v1beta1 as resourceviews_v1beta1
-  from googlecloudapis.sqladmin import v1beta3 as sqladmin_v1beta3
-  resources.RegisterAPI(compute_v1.ComputeV1(get_credentials=False))
-  resources.RegisterAPI(dns_v1beta1.DnsV1beta1(get_credentials=False))
-  resources.RegisterAPI(manager_v1beta2.ManagerV1beta2(get_credentials=False))
-  resources.RegisterAPI(
-      replicapool_v1beta1.ReplicapoolV1beta1(get_credentials=False))
-  resources.RegisterAPI(
-      resourceviews_v1beta1.ResourceviewsV1beta1(get_credentials=False))
-  resources.RegisterAPI(sqladmin_v1beta3.SqladminV1beta3(get_credentials=False))
-
-RegisterAPIs()
-
-
+resource_registration.RegisterReleasedAPIs()
 
 
 # Don't know stack traces when people kill a command.

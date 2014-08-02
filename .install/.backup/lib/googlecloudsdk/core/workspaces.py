@@ -11,6 +11,7 @@ import os
 import os.path
 import re
 import subprocess
+import textwrap
 import uritemplate
 
 from googlecloudsdk.core import config
@@ -26,7 +27,11 @@ _HEAD_BRANCH_RE = re.compile(r'HEAD branch: (?P<branch>.*)')
 # This regular expression is used to extract the URL of the 'origin' remote by
 # scraping 'git remote show origin'.
 _ORIGIN_URL_RE = re.compile(r'remote origin\n.*Fetch URL: (?P<url>.+)\n', re.M)
-
+# This regular expression is used to extract the version number from a string
+# containing dd.dd.dd.
+# This is the minimum version of git required
+_VERSION_MIN = (1, 8, 1)
+_TAGS_MIN = (1, 9, 0)
 
 DEFAULT_REPOSITORY_ALIAS = 'default'
 
@@ -57,6 +62,7 @@ class NoSuchCategoryException(Error):
 
 
 class InvalidWorkspaceException(Error):
+
   def __init__(self, path, gcloud_path):
     """Creates a new InvalidWorkspaceException.
 
@@ -75,6 +81,7 @@ class InvalidWorkspaceException(Error):
 
 
 class NoWorkspaceException(Error):
+
   def __init__(self, path):
     """Creates a new NoWorkspaceException.
 
@@ -90,6 +97,7 @@ class NoWorkspaceException(Error):
 
 
 class CannotCreateWorkspaceException(Error):
+
   def __init__(self, path):
     """Creates a new CannotCreateWorkspaceException.
 
@@ -102,6 +110,7 @@ class CannotCreateWorkspaceException(Error):
 
 
 class NoContainingWorkspaceException(Error):
+
   def __init__(self, path):
     """Creates a new NoContainingWorkspaceException.
 
@@ -113,12 +122,69 @@ class NoContainingWorkspaceException(Error):
     super(NoContainingWorkspaceException, self).__init__(message)
 
 
+class GitVersionException(Error):
+  """Exceptions for when git version is too old."""
+
+  def __init__(self, fmtstr, cur_version, min_version):
+    super(GitVersionException, self).__init__(
+        fmtstr.format(cur_version=cur_version, min_version=min_version))
+
+
+class InvalidGitException(Error):
+  """Exceptions for when git version is empty or invalid."""
+
+  def __init__(self, message):
+    super(InvalidGitException, self).__init__(message)
+
+
+def CheckGitVersion(version_lower_bound):
+  """Returns true when version of git is >= min_version.
+
+  Args:
+    version_lower_bound: str, The lowest allowed version.
+
+  Returns:
+    True if version >= min_version.
+  """
+  try:
+    output = subprocess.check_output(['git', 'version'])
+    if not output:
+      raise InvalidGitException('The git version string is empty.')
+    if not output.startswith('git version '):
+      raise InvalidGitException(('The git version string must start with '
+                                 'git version .'))
+    match = re.search(r'(\d+)\.(\d+)\.(\d+)', output)
+    if not match:
+      raise InvalidGitException('The git version string must contain a '
+                                'version number.')
+    cur_version = match.group(1, 2, 3)
+    current_version = tuple([int(item) for item in cur_version])
+    if current_version <= version_lower_bound:
+      min_version = '.'.join(str(i) for i in version_lower_bound)
+      cur_version = '.'.join(cur_version)
+      raise GitVersionException(
+          ('Your git version {cur_version} is older than the minimum version '
+           '{min_version}. Please install a newer version of git.'),
+          cur_version, min_version)
+  except OSError as e:
+    if e.errno == 2:
+      raise NoGitException()
+    else:
+      raise
+  return True
+
+
 class NoGitException(Error):
   """Exceptions for when git is not available."""
 
   def __init__(self):
     super(NoGitException, self).__init__(
-        'Cannot find git. Please install git and try again.')
+        textwrap.dedent("""\
+        Cannot find git. Please install git and try again.
+
+        You can find git installers at [http://git-scm.com/downloads], or use
+        your favorite package manager to install it on your computer.
+        """))
 
 
 def EnsureGit(func):
@@ -134,6 +200,7 @@ def EnsureGit(func):
     NoGitException: If git cannot be run.
   """
   def GitFunc(*args, **kwargs):
+    CheckGitVersion(_VERSION_MIN)
     try:
       func(*args, **kwargs)
     except OSError as e:
@@ -368,7 +435,13 @@ class Workspace(object):
 
       subprocess.check_call(['git', 'remote', 'add', 'origin', repository_url])
       try:
-        subprocess.check_call(['git', 'fetch', '--tags', 'origin'])
+        try:
+          # With 1.9.0, --tags fetches all tags and branches. Before, only tags.
+          CheckGitVersion(_TAGS_MIN)
+          subprocess.check_call(['git', 'fetch', '--tags', 'origin'])
+        except GitVersionException:
+          subprocess.check_call(['git', 'fetch', 'origin'])
+          subprocess.check_call(['git', 'fetch', '--tags', 'origin'])
       except subprocess.CalledProcessError:
         # This is specifically the only git invocation that we're catching,
         # because it can go wrong without there being a bug in this code.

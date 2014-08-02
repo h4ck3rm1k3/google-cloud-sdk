@@ -11,10 +11,11 @@ gcloud-compute-config-ssh \- Populate SSH config files with Host entries from ea
 .nf
 \fBgcloud compute config\-ssh\fR
   [\-\-dry\-run]
+  [\-\-help]
   [\-\-remove]
   [\-\-ssh\-config\-file SSH_CONFIG_FILE]
   [\-\-ssh\-key\-file SSH_KEY_FILE]
-  [\-h, \-\-help]
+  [\-h]
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -66,6 +67,11 @@ Whenever instances are added, removed, or their external IP addresses are change
 If provided, the proposed changes to the SSH config file are printed to standard out and no actual changes are made\&.
 .RE
 .PP
+\fB\-\-help\fR
+.RS 4
+Display detailed help\&.
+.RE
+.PP
 \fB\-\-remove\fR
 .RS 4
 If provided, any changes made to the SSH config file by this tool are reverted\&.
@@ -81,7 +87,7 @@ Specifies an alternative per\-user SSH configuration file\&. By default, this is
 The path to the SSH key file\&. By deault, this is \(lq~/\&.ssh/google_compute_engine\(rq\&.
 .RE
 .PP
-\fB\-\-help\fR
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE

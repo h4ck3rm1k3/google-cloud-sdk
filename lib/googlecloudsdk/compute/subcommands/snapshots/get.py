@@ -3,7 +3,7 @@
 from googlecloudsdk.compute.lib import base_classes
 
 
-class GetSnapshots(base_classes.GlobalGetter):
+class Get(base_classes.GlobalGetter):
   """Get Google Compute Engine snapshots."""
 
   @staticmethod
@@ -16,11 +16,11 @@ class GetSnapshots(base_classes.GlobalGetter):
     return self.context['compute'].snapshots
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'snapshots'
 
 
-GetSnapshots.detailed_help = {
+Get.detailed_help = {
     'brief': 'Get Google Compute Engine snapshots',
     'DESCRIPTION': """\
         *{command}* displays all data associated with Google Compute

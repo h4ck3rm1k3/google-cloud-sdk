@@ -3,6 +3,40 @@ All rights reserved.
 
 App Engine Java SDK - Release Notes
 
+Version 1.9.6
+=============
+- Fixed an issue with the dev_appserver Search API for atom fields that contain
+  whitespace or punctuation characters in their values (e.g., email addresses).
+    https://code.google.com/p/googleappengine/issues/detail?id=7962
+    https://code.google.com/p/googleappengine/issues/detail?id=10251
+- Fixed an issue with PermGen running out of space when using DeferredTasks
+  in the dev_appserver.
+    https://code.google.com/p/googleappengine/issues/detail?id=8377
+- Fixed an issue with date-valued HTTP headers such as If-Modified-Since
+  getting a ClassCastException.
+    https://code.google.com/p/googleappengine/issues/detail?id=8415
+- Fixed an issue with Datastore cursors in dev_appserver getting the wrong
+  cursor value for keys only queries.
+    https://code.google.com/p/googleappengine/issues/detail?id=10943
+
+Version 1.9.5
+=============
+- Fixed an issue with the Search API where searching for geo points whose
+  distance from a fixed point is greater than some value returns documents that
+  do not include that field.
+- Fixed an issue with appstats generating a ClassCastException in the
+  dev_appserver.
+    https://code.google.com/p/googleappengine/issues/detail?id=6071
+    https://code.google.com/p/googleappengine/issues/detail?id=7052
+    https://code.google.com/p/googleappengine/issues/detail?id=10661
+- Fixed an issue with the dev_appserver Search API not finding atoms with
+  spaces in them.
+    https://code.google.com/p/googleappengine/issues/detail?id=7962
+    https://code.google.com/p/googleappengine/issues/detail?id=10251
+- Fixed an issue with the Search API where querying for a field that does not
+  exist returns an error instead of returning zero matches on that field.
+    https://code.google.com/p/googleappengine/issues/detail?id=10407
+
 Version 1.9.4
 =============
 - Speed up memcache API deserialization by using Class.forName instead of

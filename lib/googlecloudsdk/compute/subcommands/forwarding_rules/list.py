@@ -4,8 +4,8 @@ from googlecloudsdk.compute.lib import base_classes
 from googlecloudsdk.compute.lib import forwarding_rules_utils as utils
 
 
-class ListForwardingRules(utils.ForwardingRulesFetcher,
-                          base_classes.BaseLister):
+class List(utils.ForwardingRulesFetcher,
+           base_classes.BaseLister):
   """List forwarding rules."""
 
   @staticmethod
@@ -14,7 +14,7 @@ class ListForwardingRules(utils.ForwardingRulesFetcher,
     utils.ForwardingRulesFetcher.Args(parser)
 
 
-ListForwardingRules.detailed_help = {
+List.detailed_help = {
     'brief': 'List forwarding rules',
     'DESCRIPTION': """\
         *{command}* lists summary information of forwarding rules in a

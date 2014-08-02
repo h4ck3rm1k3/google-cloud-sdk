@@ -6,9 +6,13 @@ NAME
 
 SYNOPSIS
        gcloud interactive
-         [-h, --help]
+         [--help]
+         [-h]
 
 FLAGS
        --help
+           Display detailed help.
+
+       -h
            Print a summary help and exit.
 

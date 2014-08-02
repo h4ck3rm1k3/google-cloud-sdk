@@ -1,44 +1,10 @@
 # Copyright 2014 Google Inc. All Rights Reserved.
 """Module for making API requests."""
-import cStringIO
 
-from googlecloudsdk.calliope import exceptions as calliope_exceptions
 from googlecloudsdk.compute.lib import batch_helper
-from googlecloudsdk.compute.lib import constants
+from googlecloudsdk.compute.lib import utils
 from googlecloudsdk.compute.lib import waiters
 from googlecloudsdk.core import log
-from googlecloudsdk.core.util import console_io
-
-
-def _ConstructList(title, items):
-  """Returns a string displaying the items and a title."""
-  buf = cStringIO.StringIO()
-  printer = console_io.ListPrinter(title)
-  printer.Print(sorted(set(items)), output_stream=buf)
-  return buf.getvalue()
-
-
-def _RaiseToolException(problems, error_message=None):
-  """Raises a ToolException with the given list of messages."""
-  tips = []
-  errors = []
-  for code, message in problems:
-    errors.append(message)
-
-    new_tips = constants.HTTP_ERROR_TIPS.get(code)
-    if new_tips:
-      tips.extend(new_tips)
-
-  if tips:
-    advice = _ConstructList(
-        '\nhere are some tips that may help fix these problems:', tips)
-  else:
-    advice = ''
-
-  raise calliope_exceptions.ToolException(
-      _ConstructList(
-          error_message or 'some requests did not succeed:',
-          errors) + advice)
 
 
 def MakeRequests(requests, http, batch_url, custom_get_requests=None):
@@ -123,7 +89,8 @@ def MakeRequests(requests, http, batch_url, custom_get_requests=None):
       yield response
 
     if warnings:
-      log.warn(_ConstructList('some requests generated warnings:', warnings))
+      log.warn(utils.ConstructList('Some requests generated warnings:',
+                                   warnings))
 
   if errors:
-    _RaiseToolException(errors)
+    utils.RaiseToolException(errors)

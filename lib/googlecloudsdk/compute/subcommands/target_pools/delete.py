@@ -3,7 +3,7 @@
 from googlecloudsdk.compute.lib import base_classes
 
 
-class DeleteTargetPools(base_classes.RegionalDeleter):
+class Delete(base_classes.RegionalDeleter):
   """Delete target pools."""
 
   @property
@@ -11,11 +11,11 @@ class DeleteTargetPools(base_classes.RegionalDeleter):
     return self.context['compute'].targetPools
 
   @property
-  def collection(self):
+  def resource_type(self):
     return 'targetPools'
 
 
-DeleteTargetPools.detailed_help = {
+Delete.detailed_help = {
     'brief': 'Delete target pools',
     'DESCRIPTION': """\
         *{command}* deletes one or more Google Compute Engine target pools.

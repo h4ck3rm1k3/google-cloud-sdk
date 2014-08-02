@@ -2,7 +2,9 @@ NAME
        gcloud-auth-git-helper - ==SUPPRESS==
 
 SYNOPSIS
-       gcloud auth git-helper METHOD [-h, --help]
+       gcloud auth git-helper
+         METHOD
+         [-h, --help]
 
 POSITIONAL ARGUMENTS
        METHOD

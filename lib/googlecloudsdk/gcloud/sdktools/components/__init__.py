@@ -4,6 +4,7 @@
 
 import argparse
 import os
+import textwrap
 
 from googlecloudsdk.calliope import base
 from googlecloudsdk.calliope import exceptions
@@ -14,7 +15,42 @@ from googlecloudsdk.core.util import platforms
 
 
 class Components(base.Group):
-  """Install, update, or remove the tools in the Google Cloud SDK."""
+  """List, install, update, or remove Google Cloud SDK components or packages.
+  """
+
+  detailed_help = {
+      'DESCRIPTION': textwrap.dedent("""\
+          List, install, update, or remove Google Cloud SDK tools.
+
+          Because you might need only some of the tools in the Cloud SDK to do
+          your work, you can control which tools are installed on your
+          workstation. You can install new tools on your workstation when you
+          find that you need them, and remove tools that you no longer need.
+          The gcloud command regularly checks whether updates are available for
+          the tools you already have installed, and gives you the opportunity to
+          upgrade to the latest version.
+
+          Tools can be installed as individual components or as preconfigured
+          _packages_ of components that are typically all used together to
+          perform a particular task (such as developing a PHP application on
+          App Engine).
+
+          Certain components _depend_ on other components. When you install a
+          component that you need, all components upon which it directly or
+          indirectly depends, and that are not already present on your
+          workstation, are installed automatically. When you remove a component,
+          all components that depend on the removed component are also removed.
+
+             * The `list` command shows you all the tools in the Cloud SDK,
+               whether they are installed on your machine, and whether an
+               installed tool needs updating.
+             * The `update` command installs a tool for the first time, or
+               upgrades to the latest version.
+             * The `remove` command removes an individual component.
+             * The `restore` command undoes the effect of the most recent update
+               or remove command.
+      """),
+  }
 
   @staticmethod
   def Args(parser):

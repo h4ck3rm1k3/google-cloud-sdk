@@ -21,7 +21,8 @@ class ManagerV1beta2(base_api.BaseApiClient):
   def __init__(self, url='', credentials=None,
                get_credentials=True, http=None, model=None,
                log_request=False, log_response=False,
-               credentials_args=None, default_global_params=None):
+               credentials_args=None, default_global_params=None,
+               additional_http_headers=None):
     """Create a new manager handle."""
     url = url or u'https://www.googleapis.com/manager/v1beta2/'
     super(ManagerV1beta2, self).__init__(
@@ -29,12 +30,15 @@ class ManagerV1beta2(base_api.BaseApiClient):
         get_credentials=get_credentials, http=http, model=model,
         log_request=log_request, log_response=log_response,
         credentials_args=credentials_args,
-        default_global_params=default_global_params)
+        default_global_params=default_global_params,
+        additional_http_headers=additional_http_headers)
     self.deployments = self.DeploymentsService(self)
     self.templates = self.TemplatesService(self)
 
   class DeploymentsService(base_api.BaseApiService):
     """Service class for the deployments resource."""
+
+    _NAME = u'deployments'
 
     def __init__(self, client):
       super(ManagerV1beta2.DeploymentsService, self).__init__(client)
@@ -146,6 +150,8 @@ class ManagerV1beta2(base_api.BaseApiClient):
 
   class TemplatesService(base_api.BaseApiService):
     """Service class for the templates resource."""
+
+    _NAME = u'templates'
 
     def __init__(self, client):
       super(ManagerV1beta2.TemplatesService, self).__init__(client)

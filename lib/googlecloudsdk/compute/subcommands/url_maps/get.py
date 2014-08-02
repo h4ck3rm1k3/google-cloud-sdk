@@ -16,7 +16,7 @@ class Get(base_classes.GlobalGetter):
     return self.context['compute'].urlMaps
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'urlMaps'
 
 

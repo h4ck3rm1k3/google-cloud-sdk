@@ -1,5 +1,6 @@
 # Copyright 2014 Google Inc. All Rights Reserved.
 """Defines tool-wide constants."""
+import collections
 import httplib
 
 BYTES_IN_ONE_GB = 2 ** 30
@@ -16,18 +17,26 @@ DEFAULT_NETWORK = 'default'
 
 DEFAULT_IMAGE = 'debian-7-backports'
 
+ImageAlias = collections.namedtuple('ImageAlias', ['project', 'name_prefix'])
+
 IMAGE_ALIASES = {
-    'centos-6': ('centos-cloud', 'centos-6-v20140415'),
-    'debian-7': ('debian-cloud', 'debian-7-wheezy-v20140415'),
-    'debian-7-backports': ('debian-cloud',
-                           'backports-debian-7-wheezy-v20140415'),
-    'rhel-6': ('rhel-cloud', 'rhel-6-v20140415'),
-    'sles-11': ('suse-cloud', 'sles-11-sp3-v20140306'),
+    'centos-6': ImageAlias(project='centos-cloud', name_prefix='centos-6'),
+    'coreos': ImageAlias(project='coreos-cloud', name_prefix='coreos-beta'),
+    'debian-7': ImageAlias(project='debian-cloud',
+                           name_prefix='debian-7-wheezy'),
+    'debian-7-backports': ImageAlias(project='debian-cloud',
+                                     name_prefix='backports-debian-7-wheezy'),
+    'opensuse-13': ImageAlias(project='opensuse-cloud',
+                              name_prefix='opensuse-13-1'),
+    'rhel-6': ImageAlias(project='rhel-cloud', name_prefix='rhel-6'),
+    'sles-11': ImageAlias(project='suse-cloud', name_prefix='sles-11'),
 }
 
 IMAGE_PROJECTS = [
     'centos-cloud',
+    'coreos-cloud',
     'debian-cloud',
+    'opensuse-cloud',
     'rhel-cloud',
     'suse-cloud',
 ]
@@ -42,23 +51,23 @@ PER_USER_SSH_CONFIG_FILE = '~/.ssh/config'
 # Custom help for HTTP error messages.
 HTTP_ERROR_TIPS = {
     httplib.UNAUTHORIZED: [
-        'try logging in using "gcloud auth login"'
+        'Try logging in using [gcloud auth login].'
         ],
     httplib.NOT_FOUND: [
-        'ensure that resources referenced are spelled correctly',
-        ('ensure that the Google Compute Engine API is enabled for '
-         'this project at https://cloud.google.com/console'),
-        ('ensure that your account is a member of this project at '
-         'https://cloud.google.com/console'),
-        'ensure that any resources referenced exist',
+        'Ensure that resources referenced are spelled correctly.',
+        ('Ensure that the Google Compute Engine API is enabled for '
+         'this project at https://cloud.google.com/console.'),
+        ('Ensure that your account is a member of this project at '
+         'https://cloud.google.com/console.'),
+        'Ensure that any resources referenced exist.',
         ],
     httplib.INTERNAL_SERVER_ERROR: [
-        ('these are probably transient errors: try running the command again '
-         'in a few minutes'),
+        ('These are probably transient errors. Try running the command again '
+         'in a few minutes.'),
         ],
     httplib.BAD_REQUEST: [
-        'ensure that you spelled everything correctly',
-        'ensure that any resources referenced exist',
+        'Ensure that you spelled everything correctly.',
+        'Ensure that any resources referenced exist.',
         ],
 }
 

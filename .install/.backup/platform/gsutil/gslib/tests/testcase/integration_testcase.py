@@ -11,21 +11,24 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Contains gsutil base integration test case class."""
 
-import base
-import boto
-import gslib
-import gslib.tests.util as util
+from contextlib import contextmanager
 import logging
 import subprocess
 import sys
 
-from boto.exception import GSResponseError
-from contextlib import contextmanager
-from gslib.project_id import ProjectIdHandler
-from gslib.tests.util import SetBotoConfigForTest
+import boto
+from boto.exception import StorageResponseError
+from boto.s3.deletemarker import DeleteMarker
+import gslib
+from gslib.project_id import GOOG_PROJ_ID_HDR
+from gslib.project_id import PopulateProjectId
+from gslib.tests.testcase import base
+import gslib.tests.util as util
+from gslib.tests.util import ObjectToURI as suri
+from gslib.tests.util import RUN_S3_TESTS
+from gslib.tests.util import SetBotoConfigFileForTest
 from gslib.tests.util import unittest
 from gslib.util import IS_WINDOWS
 from gslib.util import Retry
@@ -41,39 +44,65 @@ BOTO_CONFIG_CONTENTS_IGNORE_ANON_WARNING = """
 bypass_anonymous_access_warning = True
 """
 
+
+def SkipForGS(reason):
+  if not RUN_S3_TESTS:
+    return unittest.skip(reason)
+  else:
+    return lambda func: func
+
+
+def SkipForS3(reason):
+  if RUN_S3_TESTS:
+    return unittest.skip(reason)
+  else:
+    return lambda func: func
+
+
 @unittest.skipUnless(util.RUN_INTEGRATION_TESTS,
                      'Not running integration tests.')
 class GsUtilIntegrationTestCase(base.GsUtilTestCase):
   """Base class for gsutil integration tests."""
   GROUP_TEST_ADDRESS = 'gs-discussion@googlegroups.com'
-  GROUP_TEST_ID = '00b4903a97d097895ab58ef505d535916a712215b79c3e54932c2eb502ad97f5'
+  GROUP_TEST_ID = (
+      '00b4903a97d097895ab58ef505d535916a712215b79c3e54932c2eb502ad97f5')
   USER_TEST_ADDRESS = 'gs-team@google.com'
-  USER_TEST_ID = '00b4903a9703325c6bfc98992d72e75600387a64b3b6bee9ef74613ef8842080'
+  USER_TEST_ID = (
+      '00b4903a9703325c6bfc98992d72e75600387a64b3b6bee9ef74613ef8842080')
   DOMAIN_TEST = 'google.com'
-  # No one can create this bucket without owning the google.com domain, and we
+  # No one can create this bucket without owning the gmail.com domain, and we
   # won't create this bucket, so it shouldn't exist.
-  NONEXISTENT_BUCKET_NAME = 'nonexistent-bucket-foobar.google.com'
+  # It would be nice to use google.com here but JSON API disallows
+  # 'google' in resource IDs.
+  nonexistent_bucket_name = 'nonexistent-bucket-foobar.gmail.com'
 
   def setUp(self):
+    """Creates base configuration for integration tests."""
     super(GsUtilIntegrationTestCase, self).setUp()
     self.bucket_uris = []
 
     # Set up API version and project ID handler.
     self.api_version = boto.config.get_value(
         'GSUtil', 'default_api_version', '1')
-    self.proj_id_handler = ProjectIdHandler()
+
+    if util.RUN_S3_TESTS:
+      self.nonexistent_bucket_name = (
+          'nonexistentbucket-asf801rj3r9as90mfnnkjxpo02')
 
   # Retry with an exponential backoff if a server error is received. This
   # ensures that we try *really* hard to clean up after ourselves.
-  @Retry(GSResponseError, tries=6, timeout_secs=1)
+  # TODO: As long as we're still using boto to do the teardown,
+  # we decorate with boto exceptions.  Eventually this should be migrated
+  # to CloudApi exceptions.
+  @Retry(StorageResponseError, tries=7, timeout_secs=1)
   def tearDown(self):
     super(GsUtilIntegrationTestCase, self).tearDown()
 
     while self.bucket_uris:
       bucket_uri = self.bucket_uris[-1]
       try:
-        bucket_list = list(bucket_uri.list_bucket(all_versions=True))
-      except GSResponseError, e:
+        bucket_list = self._ListBucket(bucket_uri)
+      except StorageResponseError, e:
         # This can happen for tests of rm -r command, which for bucket-only
         # URIs delete the bucket at the end.
         if e.status == 404:
@@ -85,8 +114,12 @@ class GsUtilIntegrationTestCase(base.GsUtilTestCase):
         error = None
         for k in bucket_list:
           try:
-            k.delete()
-          except GSResponseError, e:
+            if isinstance(k, DeleteMarker):
+              bucket_uri.get_bucket().delete_key(k.name,
+                                                 version_id=k.version_id)
+            else:
+              k.delete()
+          except StorageResponseError, e:
             # This could happen if objects that have already been deleted are
             # still showing up in the listing due to eventual consistency. In
             # that case, we continue on until we've tried to deleted every
@@ -96,10 +129,45 @@ class GsUtilIntegrationTestCase(base.GsUtilTestCase):
             else:
               raise
         if error:
-          raise error
-        bucket_list = list(bucket_uri.list_bucket(all_versions=True))
+          raise error  # pylint: disable=raising-bad-type
+        bucket_list = self._ListBucket(bucket_uri)
       bucket_uri.delete_bucket()
       self.bucket_uris.pop()
+
+  def _ListBucket(self, bucket_uri):
+    if bucket_uri.scheme == 's3':
+      # storage_uri will omit delete markers from bucket listings, but
+      # these must be deleted before we can remove an S3 bucket.
+      return list(v for v in bucket_uri.get_bucket().list_versions())
+    return list(bucket_uri.list_bucket(all_versions=True))
+
+  def AssertNObjectsInBucket(self, bucket_uri, num_objects, versioned=False):
+    """Checks (with retries) that 'ls bucket_uri/**' returns num_objects.
+
+    This is a common test pattern to deal with eventual listing consistency for
+    tests that rely on a set of objects to be listed.
+
+    Args:
+      bucket_uri: storage_uri for the bucket.
+      num_objects: number of objects expected in the bucket.
+      versioned: If True, perform a versioned listing.
+
+    Raises:
+      AssertionError if number of objects does not match expected value.
+
+    Returns:
+      Listing split across lines.
+    """
+    # Use @Retry as hedge against bucket listing eventual consistency.
+    @Retry(AssertionError, tries=3, timeout_secs=1)
+    def _Check1():
+      command = ['ls', '-a'] if versioned else ['ls']
+      b_uri = [suri(bucket_uri) + '/**'] if num_objects else [suri(bucket_uri)]
+      listing = self.RunGsUtil(command + b_uri, return_stdout=True).split('\n')
+      # num_objects + one trailing newline.
+      self.assertEquals(len(listing), num_objects + 1)
+      return listing
+    return _Check1()
 
   def CreateBucket(self, bucket_name=None, test_objects=0, storage_class=None,
                    provider=None):
@@ -119,21 +187,27 @@ class GsUtilIntegrationTestCase(base.GsUtilTestCase):
       StorageUri for the created bucket.
     """
     if not provider:
-      provider = 'gs'
+      provider = self.default_provider
     bucket_name = bucket_name or self.MakeTempName('bucket')
 
     bucket_uri = boto.storage_uri('%s://%s' % (provider, bucket_name.lower()),
                                   suppress_consec_slashes=False)
-    
+
     if provider == 'gs':
       # Apply API version and project ID headers if necessary.
       headers = {'x-goog-api-version': self.api_version}
-      self.proj_id_handler.FillInProjectHeaderIfNeeded(
-          'test', bucket_uri, headers)
+      headers[GOOG_PROJ_ID_HDR] = PopulateProjectId()
     else:
       headers = {}
 
-    bucket_uri.create_bucket(storage_class=storage_class, headers=headers)
+    # Parallel tests can easily run into bucket creation quotas.
+    # Retry with exponential backoff so that we create them as fast as we
+    # reasonably can.
+    @Retry(StorageResponseError, tries=7, timeout_secs=1)
+    def _CreateBucketWithExponentialBackoff():
+      bucket_uri.create_bucket(storage_class=storage_class, headers=headers)
+
+    _CreateBucketWithExponentialBackoff()
     self.bucket_uris.append(bucket_uri)
     for i in range(test_objects):
       self.CreateObject(bucket_uri=bucket_uri,
@@ -164,8 +238,8 @@ class GsUtilIntegrationTestCase(base.GsUtilTestCase):
     """Creates a test object.
 
     Args:
-      bucket: The URI of the bucket to place the object in. If not specified, a
-              new temporary bucket is created.
+      bucket_uri: The URI of the bucket to place the object in. If not
+                  specified, a new temporary bucket is created.
       object_name: The name to use for the object. If not specified, a temporary
                    test object name is constructed.
       contents: The contents to write to the object. If not specified, the key
@@ -200,7 +274,7 @@ class GsUtilIntegrationTestCase(base.GsUtilTestCase):
       A tuple containing the desired return values specified by the return_*
       arguments.
     """
-    cmd = [gslib.GSUTIL_PATH] + cmd
+    cmd = [gslib.GSUTIL_PATH] + ['--testexceptiontraces'] + cmd
     if IS_WINDOWS:
       cmd = [sys.executable] + cmd
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -230,10 +304,10 @@ class GsUtilIntegrationTestCase(base.GsUtilTestCase):
       return toreturn[0]
     elif toreturn:
       return tuple(toreturn)
-    
+
   @contextmanager
   def SetAnonymousBotoCreds(self):
     boto_config_path = self.CreateTempFile(
-          contents=BOTO_CONFIG_CONTENTS_IGNORE_ANON_WARNING)
-    with SetBotoConfigForTest(boto_config_path):
+        contents=BOTO_CONFIG_CONTENTS_IGNORE_ANON_WARNING)
+    with SetBotoConfigFileForTest(boto_config_path):
       yield

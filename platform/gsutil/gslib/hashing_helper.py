@@ -11,28 +11,32 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Helper functions for copy functionality.
-
-Currently, the cp command and boto_translation use this functionality.
-"""
+"""Helper functions for hashing functionality."""
 
 import base64
 import binascii
 from hashlib import md5
 import os
-import re
 
 from boto import config
 import crcmod
 
 from gslib.exception import CommandException
+from gslib.progress_callback import ProgressCallbackWithBackoff
 from gslib.util import DEFAULT_FILE_BUFFER_SIZE
 from gslib.util import MIN_SIZE_COMPUTE_LOGGING
 from gslib.util import TRANSFER_BUFFER_SIZE
 from gslib.util import UsingCrcmodExtension
 
 
-SLOW_CRC_WARNING = """
+SLOW_CRCMOD_WARNING = """
+WARNING: You have requested checksumming but your crcmod installation isn't
+using the module's C extension, so checksumming will run very slowly. For help
+installing the extension, please see:
+  $ gsutil help crcmod"""
+
+
+_SLOW_CRCMOD_DOWNLOAD_WARNING = """
 WARNING: Downloading this composite object requires integrity checking with
 CRC32c, but your crcmod installation isn't using the module's C extension,
 so the hash computation will likely throttle download performance. For help
@@ -42,7 +46,7 @@ To disable slow integrity checking, see the "check_hashes" option in your
 boto config file.
 """
 
-SLOW_CRC_EXCEPTION_TEXT = """
+_SLOW_CRC_EXCEPTION_TEXT = """
 Downloading this composite object requires integrity checking with CRC32c,
 but your crcmod installation isn't using the module's C extension, so the
 hash computation will likely throttle download performance. For help
@@ -53,9 +57,9 @@ checks, see the "check_hashes" option in your boto config file.
 NOTE: It is strongly recommended that you not disable integrity checks. Doing so
 could allow data corruption to go undetected during uploading/downloading."""
 
-SLOW_CRC_EXCEPTION = CommandException(SLOW_CRC_EXCEPTION_TEXT)
+_SLOW_CRC_EXCEPTION = CommandException(_SLOW_CRC_EXCEPTION_TEXT)
 
-NO_HASH_CHECK_WARNING = """
+_NO_HASH_CHECK_WARNING = """
 WARNING: This download will not be validated since your crcmod installation
 doesn't use the module's C extension, so the hash computation would likely
 throttle download performance. For help in installing the extension, please
@@ -66,35 +70,13 @@ file.
 """
 
 
-MD5_REGEX = re.compile(r'^"*[a-fA-F0-9]{32}"*$')
-
-
 def CalculateB64EncodedCrc32cFromContents(fp):
-  return CalculateB64EncodedHashFromContents(
+  return _CalculateB64EncodedHashFromContents(
       fp, crcmod.predefined.Crc('crc-32c'))
 
 
 def CalculateB64EncodedMd5FromContents(fp):
-  return CalculateB64EncodedHashFromContents(fp, md5())
-
-
-def CalculateB64EncodedHashFromContents(fp, hash_alg):
-  return base64.encodestring(binascii.unhexlify(
-      CalculateHashFromContents(fp, hash_alg))).rstrip('\n')
-
-
-def _CalculateCrc32cFromContents(fp):
-  """Calculates the Crc32c hash of the contents of a file.
-
-  This function resets the file pointer to position 0.
-
-  Args:
-    fp: An already-open file object.
-
-  Returns:
-    CRC32C digest of the file in hex string format.
-  """
-  return CalculateHashFromContents(fp, crcmod.predefined.Crc('crc-32c'))
+  return _CalculateB64EncodedHashFromContents(fp, md5())
 
 
 def CalculateMd5FromContents(fp):
@@ -108,11 +90,19 @@ def CalculateMd5FromContents(fp):
   Returns:
     MD5 digest of the file in hex string format.
   """
-  return CalculateHashFromContents(fp, md5())
+  return _CalculateHashFromContents(fp, md5())
 
 
-def CalculateHashFromContents(fp, hash_alg):
-  """Calculates the MD5 hash of the contents of a file.
+def Base64EncodeHash(digest_value):
+  return base64.encodestring(binascii.unhexlify(digest_value)).rstrip('\n')
+
+
+def _CalculateB64EncodedHashFromContents(fp, hash_alg):
+  return Base64EncodeHash(_CalculateHashFromContents(fp, hash_alg))
+
+
+def _CalculateHashFromContents(fp, hash_alg):
+  """Calculates a hash of the contents of a file.
 
   This function resets the file pointer to position 0.
 
@@ -123,14 +113,36 @@ def CalculateHashFromContents(fp, hash_alg):
   Returns:
     Hash of the file in hex string format.
   """
+  hash_dict = {'placeholder': hash_alg}
   fp.seek(0)
+  CalculateHashesFromContents(fp, hash_dict)
+  fp.seek(0)
+  return hash_dict['placeholder'].hexdigest()
+
+
+def CalculateHashesFromContents(fp, hash_dict, size=None, progress_func=None):
+  """Calculates hashes of the contents of a file.
+
+  Args:
+    fp: An already-open file object (stream will be consumed).
+    hash_dict: Dict of (string alg_name: initialized hashing class)
+               Hashing class will be populated with digests upon return.
+    size: Size of fp, if known, for outputting progress.
+    progress_func: Function with arguments (int bytes_processed,
+                                            int total_size).
+                   If present, called to report progress.
+  """
+  callback_processor = None
+  if progress_func:
+    callback_processor = ProgressCallbackWithBackoff(size, progress_func)
   while True:
     data = fp.read(DEFAULT_FILE_BUFFER_SIZE)
     if not data:
       break
-    hash_alg.update(data)
-  fp.seek(0)
-  return hash_alg.hexdigest()
+    for hash_alg in hash_dict.itervalues():
+      hash_alg.update(data)
+    if callback_processor:
+      callback_processor.Progress(len(data))
 
 
 def GetUploadHashAlgs():
@@ -173,18 +185,18 @@ def GetDownloadHashAlgs(logger, src_md5=False, src_crc32c=False):
   if src_md5:
     hash_algs['md5'] = md5
   # If the cloud provider supplies a CRC, we'll compute a checksum to
-  # validate if we're using a native crcmod installation or MD5 isn't
+  # validate if we're using a native crcmod installation and MD5 isn't
   # offered as an alternative.
-  if src_crc32c:
+  elif src_crc32c:
     if UsingCrcmodExtension(crcmod):
       hash_algs['crc32c'] = lambda: crcmod.predefined.Crc('crc-32c')
     elif not hash_algs:
       if check_hashes_config == 'if_fast_else_fail':
-        raise SLOW_CRC_EXCEPTION
+        raise _SLOW_CRC_EXCEPTION
       elif check_hashes_config == 'if_fast_else_skip':
-        logger.warn(NO_HASH_CHECK_WARNING)
+        logger.warn(_NO_HASH_CHECK_WARNING)
       elif check_hashes_config == 'always':
-        logger.warn(SLOW_CRC_WARNING)
+        logger.warn(_SLOW_CRCMOD_DOWNLOAD_WARNING)
         hash_algs['crc32c'] = lambda: crcmod.predefined.Crc('crc-32c')
       else:
         raise CommandException(

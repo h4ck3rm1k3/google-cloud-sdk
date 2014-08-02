@@ -10,7 +10,8 @@ SYNOPSIS
        gcloud auth activate-refresh-token
          ACCOUNT
          [TOKEN]
-         [-h, --help]
+         [--help]
+         [-h]
 
 POSITIONAL ARGUMENTS
        ACCOUNT
@@ -21,5 +22,8 @@ POSITIONAL ARGUMENTS
 
 FLAGS
        --help
+           Display detailed help.
+
+       -h
            Print a summary help and exit.
 

@@ -7,8 +7,9 @@ SYNOPSIS
          INSTANCE
          [--auto-delete | --no-auto-delete]
          [--device-name DEVICE_NAME | --disk DISK]
-         --zone ZONE
-         [-h, --help]
+         [--help]
+         [--zone ZONE]
+         [-h]
 
 DESCRIPTION
        $gcloud compute instances set-disk-auto-delete is used to configure the
@@ -38,12 +39,17 @@ FLAGS
            then you must not specify its device name using the "--device-name"
            flag.
 
+       --help
+           Display detailed help.
+
        --no-auto-delete
            Set auto-delete for the given disk to false.
 
        --zone ZONE
-           The zone of the instance.
+           The zone of the instance to configure disk auto-delete for. If
+           omitted and the arguments are not all URIs, you will be prompted to
+           select a zone.
 
-       --help
+       -h
            Print a summary help and exit.
 

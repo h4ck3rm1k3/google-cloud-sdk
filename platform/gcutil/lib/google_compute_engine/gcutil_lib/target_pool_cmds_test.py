@@ -34,7 +34,6 @@ FLAGS = flags.FLAGS
 
 
 class TargetPoolCmdsTests(gcutil_unittest.GcutilTestCase):
-  _SUPPORTED_API_VERSIONS = ('v1beta16',)
 
   def setUp(self):
     self.mock, self.api = mock_api.CreateApi(self.version)
@@ -154,7 +153,7 @@ class TargetPoolCmdsTests(gcutil_unittest.GcutilTestCase):
                     'kind': 'compute#instance',
                     'name': 'instance1',
                     'description': '',
-                    'selfLink': 'https://www.googleapis.com/compute/v1beta16/'
+                    'selfLink': 'https://www.googleapis.com/compute/v1/'
                                 'projects/test-project/zones/zone1/instances/'
                                 'instance1'
                     }],
@@ -305,7 +304,7 @@ class TargetPoolCmdsTests(gcutil_unittest.GcutilTestCase):
     command = self._CreateAndInitializeCommand(
         target_pool_cmds.GetTargetPool, 'gettargetpool', set_flags=set_flags)
 
-    url_prefix = ('https://www.googleapis.com/compute/v1beta16/projects/' +
+    url_prefix = ('https://www.googleapis.com/compute/v1/projects/' +
                   expected_project + '/zones/us-west1-a/instances')
 
     self.mock.Respond('compute.targetPools.get', {
@@ -350,7 +349,7 @@ class TargetPoolCmdsTests(gcutil_unittest.GcutilTestCase):
                     'kind': 'compute#instance',
                     'name': 'instance1',
                     'description': '',
-                    'selfLink': 'https://www.googleapis.com/compute/v1beta16/'
+                    'selfLink': 'https://www.googleapis.com/compute/v1/'
                                 'projects/test-project/zones/zone1/instances/'
                                 'instance1'
                     }],

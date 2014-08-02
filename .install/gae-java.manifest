@@ -8,7 +8,7 @@ platform/appengine-java-sdk/COPYING
 platform/appengine-java-sdk/ABOUT
 platform/appengine-java-sdk/src/
 platform/appengine-java-sdk/src/user/
-platform/appengine-java-sdk/src/user/appengine-api-1.0-sdk-1.9.6-src.zip
+platform/appengine-java-sdk/src/user/appengine-api-1.0-sdk-1.9.7-src.zip
 platform/appengine-java-sdk/src/orm/
 platform/appengine-java-sdk/src/orm/jdo2-api-2.3-SNAPSHOT-src.zip
 platform/appengine-java-sdk/src/orm/datanucleus-jpa-1.1.5-src.zip
@@ -38,9 +38,9 @@ platform/appengine-java-sdk/lib/appengine-remote-api.jar
 platform/appengine-java-sdk/lib/user/
 platform/appengine-java-sdk/lib/user/libservice.jar
 platform/appengine-java-sdk/lib/user/jsr107cache-1.1.jar
-platform/appengine-java-sdk/lib/user/appengine-jsr107cache-1.9.6.jar
-platform/appengine-java-sdk/lib/user/appengine-api-labs-1.9.6.jar
-platform/appengine-java-sdk/lib/user/appengine-api-1.0-sdk-1.9.6.jar
+platform/appengine-java-sdk/lib/user/appengine-jsr107cache-1.9.7.jar
+platform/appengine-java-sdk/lib/user/appengine-api-labs-1.9.7.jar
+platform/appengine-java-sdk/lib/user/appengine-api-1.0-sdk-1.9.7.jar
 platform/appengine-java-sdk/lib/user/orm/
 platform/appengine-java-sdk/lib/user/orm/jdo2-api-2.3-eb.jar
 platform/appengine-java-sdk/lib/user/orm/geronimo-jta_1.1_spec-1.1.1.jar
@@ -84,7 +84,7 @@ platform/appengine-java-sdk/lib/opt/user/
 platform/appengine-java-sdk/lib/opt/user/jsr107/
 platform/appengine-java-sdk/lib/opt/user/jsr107/v1/
 platform/appengine-java-sdk/lib/opt/user/jsr107/v1/jsr107cache-1.1.jar
-platform/appengine-java-sdk/lib/opt/user/jsr107/v1/appengine-jsr107cache-1.9.6.jar
+platform/appengine-java-sdk/lib/opt/user/jsr107/v1/appengine-jsr107cache-1.9.7.jar
 platform/appengine-java-sdk/lib/opt/user/datanucleus/
 platform/appengine-java-sdk/lib/opt/user/datanucleus/v2/
 platform/appengine-java-sdk/lib/opt/user/datanucleus/v2/jta-1.1.jar
@@ -435,14 +435,6 @@ platform/appengine-java-sdk/docs/testing/javadoc/com/google/appengine/api/datast
 platform/appengine-java-sdk/docs/testing/javadoc/com/google/appengine/api/datastore/dev/package-tree.html
 platform/appengine-java-sdk/docs/testing/javadoc/com/google/appengine/api/datastore/dev/package-summary.html
 platform/appengine-java-sdk/docs/testing/javadoc/com/google/appengine/api/datastore/dev/package-frame.html
-platform/appengine-java-sdk/docs/testing/javadoc/com/google/appengine/api/datastore/dev/WriteLatencyAdjuster.html
-platform/appengine-java-sdk/docs/testing/javadoc/com/google/appengine/api/datastore/dev/LocalDatastoreV4Service.html
-platform/appengine-java-sdk/docs/testing/javadoc/com/google/appengine/api/datastore/dev/LocalDatastoreService.html
-platform/appengine-java-sdk/docs/testing/javadoc/com/google/appengine/api/datastore/dev/LocalDatastoreService.AutoIdAllocationPolicy.html
-platform/appengine-java-sdk/docs/testing/javadoc/com/google/appengine/api/datastore/dev/LocalDatastoreCostAnalysis.html
-platform/appengine-java-sdk/docs/testing/javadoc/com/google/appengine/api/datastore/dev/HighRepJobPolicy.html
-platform/appengine-java-sdk/docs/testing/javadoc/com/google/appengine/api/datastore/dev/DefaultHighRepJobPolicy.html
-platform/appengine-java-sdk/docs/testing/javadoc/com/google/appengine/api/datastore/dev/CreationCostAnalysis.html
 platform/appengine-java-sdk/docs/testing/javadoc/com/google/appengine/api/capabilities/
 platform/appengine-java-sdk/docs/testing/javadoc/com/google/appengine/api/capabilities/dev/
 platform/appengine-java-sdk/docs/testing/javadoc/com/google/appengine/api/capabilities/dev/package-tree.html

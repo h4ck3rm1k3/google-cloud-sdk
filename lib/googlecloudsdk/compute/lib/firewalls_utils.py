@@ -26,7 +26,7 @@ def ParseAllowed(allowed):
     match = LEGAL_SPECS.match(spec)
     if not match:
       raise calliope_exceptions.ToolException(
-          'firewall rules must be of the form {0}; received: {1}'
+          'Firewall rules must be of the form {0}; received [{1}].'
           .format(ALLOWED_METAVAR, spec))
     if match.group('ports'):
       ports = [match.group('ports')]
@@ -37,4 +37,3 @@ def ParseAllowed(allowed):
         ports=ports))
 
   return allowed_value_list
-

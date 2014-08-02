@@ -6,9 +6,10 @@ SYNOPSIS
        gcloud compute disks snapshot
          DISK_NAME [DISK_NAME ...]
          [--description DESCRIPTION]
+         [--help]
          [--snapshot-names SNAPSHOT_NAME [SNAPSHOT_NAME ...]]
-         --zone ZONE
-         [-h, --help]
+         [--zone ZONE]
+         [-h]
 
 DESCRIPTION
        gcloud compute disks snapshot creates snapshots of persistent disks.
@@ -21,6 +22,9 @@ POSITIONAL ARGUMENTS
 FLAGS
        --description DESCRIPTION
            An optional, textual description for the snapshots being created.
+
+       --help
+           Display detailed help.
 
        --snapshot-names SNAPSHOT_NAME [SNAPSHOT_NAME ...]
            Names to assign to the snapshots. Without this option, the name of
@@ -35,8 +39,9 @@ FLAGS
            "my-disk-2" as "snapshot-2", and so on.
 
        --zone ZONE
-           The zone of the disks.
+           The zone of the disks to snapshot. If omitted and the arguments are
+           not all URIs, you will be prompted to select a zone.
 
-       --help
+       -h
            Print a summary help and exit.
 

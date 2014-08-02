@@ -11,6 +11,7 @@ And writes out a session to stdout that looks a lot like:
 
 When the provided host is wrong, no username or password will be provided.
 """
+import os
 import re
 import sys
 import textwrap
@@ -76,7 +77,29 @@ class GitHelper(base.Command):
 
     cred.refresh(httplib2.Http())
 
+    self._CheckNetrc()
+
     sys.stdout.write(textwrap.dedent("""\
         username={username}
         password={password}
         """).format(username=account, password=cred.access_token))
+
+  def _CheckNetrc(self):
+    def Check(p):
+      if not os.path.exists(p):
+        return
+      try:
+        with open(p) as f:
+          data = f.read()
+          if ('code.google.com' in data or
+              'source.developers.google.com' in data):
+            sys.stderr.write(textwrap.dedent("""\
+You have credentials for your Google repository in [{path}]. This repository's
+git credential helper is set correctly, so the credentials in [{path}] will not
+be used, but you may want to remove them to avoid confusion.
+""".format(path=p)))
+      # pylint:disable=broad-except, If something went wrong, forget about it.
+      except Exception:
+        pass
+    Check(os.path.expanduser(os.path.join('~', '.netrc')))
+    Check(os.path.expanduser(os.path.join('~', '_netrc')))

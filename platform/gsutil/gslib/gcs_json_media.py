@@ -24,29 +24,37 @@ import httplib2
 from httplib2 import parse_uri
 
 from gslib.cloud_api import BadRequestException
+from gslib.progress_callback import ProgressCallbackWithBackoff
 from gslib.third_party.storage_apitools import exceptions as apitools_exceptions
 from gslib.util import TRANSFER_BUFFER_SIZE
 
+# By default, the timeout for ssl read errors is infinite. This could
+# cause gsutil to hang on network disconnect, so pick a more reasonable
+# timeout.
+SSL_TIMEOUT = 60
 
-class BytesUploadedContainer(object):
-  """Container class for passing number of bytes uploaded to lower layers.
 
-  We don't know the total number of bytes uploaded until we've queried
-  the server, but we need to create the connection class to pass to httplib2
-  before we can query the server. This container object allows us to pass a
-  reference into UploadCallbackConnection.
+class BytesTransferredContainer(object):
+  """Container class for passing number of bytes transferred to lower layers.
+
+  For resumed transfers or connection rebuilds in the middle of a transfer, we
+  need to rebuild the connection class with how much we've transferred so far.
+  For uploads, we don't know the total number of bytes uploaded until we've
+  queried the server, but we need to create the connection class to pass to
+  httplib2 before we can query the server. This container object allows us to
+  pass a reference into Upload/DownloadCallbackConnection.
   """
 
   def __init__(self):
-    self.__bytes_uploaded = 0
+    self.__bytes_transferred = 0
 
   @property
-  def bytes_uploaded(self):
-    return self.__bytes_uploaded
+  def bytes_transferred(self):
+    return self.__bytes_transferred
 
-  @bytes_uploaded.setter
-  def bytes_uploaded(self, value):
-    self.__bytes_uploaded = value
+  @bytes_transferred.setter
+  def bytes_transferred(self, value):
+    self.__bytes_transferred = value
 
 
 class UploadCallbackConnectionClassFactory(object):
@@ -59,11 +67,10 @@ class UploadCallbackConnectionClassFactory(object):
 
   def __init__(self, bytes_uploaded_container,
                buffer_size=TRANSFER_BUFFER_SIZE,
-               total_size=0, callback_per_bytes=0, progress_callback=None):
+               total_size=0, progress_callback=None):
     self.bytes_uploaded_container = bytes_uploaded_container
     self.buffer_size = buffer_size
     self.total_size = total_size
-    self.callback_per_bytes = callback_per_bytes
     self.progress_callback = progress_callback
 
   def GetConnectionClass(self):
@@ -71,7 +78,6 @@ class UploadCallbackConnectionClassFactory(object):
     outer_bytes_uploaded_container = self.bytes_uploaded_container
     outer_buffer_size = self.buffer_size
     outer_total_size = self.total_size
-    outer_callback_per_bytes = self.callback_per_bytes
     outer_progress_callback = self.progress_callback
 
     class UploadCallbackConnection(httplib2.HTTPSConnectionWithTimeout):
@@ -80,19 +86,24 @@ class UploadCallbackConnectionClassFactory(object):
       # After we instantiate this class, apitools will check with the server
       # to find out how many bytes remain for a resumable upload.  This allows
       # us to update our progress once based on that number.
-      got_bytes_uploaded_from_server = False
-      total_bytes_uploaded = 0
+      processed_initial_bytes = False
       GCS_JSON_BUFFER_SIZE = outer_buffer_size
-      bytes_sent_since_callback = 0
-      callback_per_bytes = outer_callback_per_bytes
+      callback_processor = None
       size = outer_total_size
+
+      def __init__(self, *args, **kwargs):
+        kwargs['timeout'] = SSL_TIMEOUT
+        httplib2.HTTPSConnectionWithTimeout.__init__(self, *args, **kwargs)
 
       def send(self, data):
         """Overrides HTTPConnection.send."""
-        if not self.got_bytes_uploaded_from_server:
-          self.total_bytes_uploaded = (
-              self.bytes_uploaded_container.bytes_uploaded)
-          self.got_bytes_uploaded_from_server = True
+        if not self.processed_initial_bytes:
+          self.processed_initial_bytes = True
+          if outer_progress_callback:
+            self.callback_processor = ProgressCallbackWithBackoff(
+                outer_total_size, outer_progress_callback)
+            self.callback_processor.Progress(
+                self.bytes_uploaded_container.bytes_transferred)
         # httplib.HTTPConnection.send accepts either a string or a file-like
         # object (anything that implements read()).
         if isinstance(data, basestring):
@@ -106,12 +117,19 @@ class UploadCallbackConnectionClassFactory(object):
           while partial_buffer:
             httplib2.HTTPSConnectionWithTimeout.send(self, partial_buffer)
             send_length = len(partial_buffer)
-            self.total_bytes_uploaded += send_length
-            if outer_progress_callback:
-              self.bytes_sent_since_callback += send_length
-              if self.bytes_sent_since_callback >= self.callback_per_bytes:
-                outer_progress_callback(self.total_bytes_uploaded, self.size)
-                self.bytes_sent_since_callback = 0
+            if self.callback_processor:
+              # This is the only place where gsutil has control over making a
+              # callback, but here we can't differentiate the metadata bytes
+              # (such as headers and OAuth2 refreshes) sent during an upload
+              # from the actual upload bytes, so we will actually report
+              # slightly more bytes than desired to the callback handler.
+              #
+              # One considered/rejected alternative is to move the callbacks
+              # into the HashingFileUploadWrapper which only processes reads on
+              # the bytes. This has the disadvantages of being removed from
+              # where we actually send the bytes and unnecessarily
+              # multi-purposing that class.
+              self.callback_processor.Progress(send_length)
             partial_buffer = full_buffer.read(self.GCS_JSON_BUFFER_SIZE)
         finally:
           self.set_debuglevel(old_debug)
@@ -154,26 +172,30 @@ class DownloadCallbackConnectionClassFactory(object):
   gzip hash in the cloud.
   """
 
-  def __init__(self, buffer_size=TRANSFER_BUFFER_SIZE,
-               total_size=0, callback_per_bytes=0, progress_callback=None,
-               digesters=None):
+  def __init__(self, bytes_downloaded_container,
+               buffer_size=TRANSFER_BUFFER_SIZE, total_size=0,
+               progress_callback=None, digesters=None):
     self.buffer_size = buffer_size
     self.total_size = total_size
-    self.callback_per_bytes = callback_per_bytes
     self.progress_callback = progress_callback
     self.digesters = digesters
+    self.bytes_downloaded_container = bytes_downloaded_container
 
   def GetConnectionClass(self):
     """Returns a connection class that overrides getresponse."""
 
     class DownloadCallbackConnection(httplib2.HTTPSConnectionWithTimeout):
       """Connection class override for downloads."""
-      bytes_read_since_callback = 0
-      outer_callback_per_bytes = self.callback_per_bytes
       outer_total_size = self.total_size
-      total_bytes_downloaded = 0
       outer_digesters = self.digesters
       outer_progress_callback = self.progress_callback
+      outer_bytes_downloaded_container = self.bytes_downloaded_container
+      processed_initial_bytes = False
+      callback_processor = None
+
+      def __init__(self, *args, **kwargs):
+        kwargs['timeout'] = SSL_TIMEOUT
+        httplib2.HTTPSConnectionWithTimeout.__init__(self, *args, **kwargs)
 
       def getresponse(self, buffering=False):
         """Wraps an HTTPResponse to perform callbacks and hashing.
@@ -211,6 +233,14 @@ class DownloadCallbackConnectionClassFactory(object):
           else:
             amt = amt or TRANSFER_BUFFER_SIZE
 
+          if not self.processed_initial_bytes:
+            self.processed_initial_bytes = True
+            if self.outer_progress_callback:
+              self.callback_processor = ProgressCallbackWithBackoff(
+                  self.outer_total_size, self.outer_progress_callback)
+              self.callback_processor.Progress(
+                  self.outer_bytes_downloaded_container.bytes_transferred)
+
           old_debug = self.debuglevel
           # If we fail partway through this function, we'll retry the entire
           # read and therefore we need to restart our hash digesters from the
@@ -220,14 +250,8 @@ class DownloadCallbackConnectionClassFactory(object):
             self.set_debuglevel(0)
             data = orig_read_func(amt)
             read_length = len(data)
-            self.total_bytes_downloaded += read_length
-            if self.outer_progress_callback:
-              self.bytes_read_since_callback += read_length
-              if (self.bytes_read_since_callback >=
-                  self.outer_callback_per_bytes):
-                self.outer_progress_callback(self.total_bytes_downloaded,
-                                             self.outer_total_size)
-                self.bytes_read_since_callback = 0
+            if self.callback_processor:
+              self.callback_processor.Progress(read_length)
             if self.outer_digesters:
               for alg in self.outer_digesters:
                 self.outer_digesters[alg].update(data)

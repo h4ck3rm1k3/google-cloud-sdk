@@ -3,7 +3,7 @@
 from googlecloudsdk.compute.lib import base_classes
 
 
-class ListRegions(base_classes.GlobalLister):
+class List(base_classes.GlobalLister):
   """List Google Compute Engine regions."""
 
   @property
@@ -11,5 +11,5 @@ class ListRegions(base_classes.GlobalLister):
     return self.context['compute'].regions
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'regions'

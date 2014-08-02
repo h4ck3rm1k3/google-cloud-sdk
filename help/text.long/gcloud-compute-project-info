@@ -5,10 +5,14 @@ NAME
 SYNOPSIS
        gcloud compute project-info
          COMMAND
-         [-h, --help]
+         [--help]
+         [-h]
 
 FLAGS
        --help
+           Display detailed help.
+
+       -h
            Print a summary help and exit.
 
 COMMANDS
@@ -22,4 +26,7 @@ COMMANDS
 
        remove-metadata
            Remove project-wide metadata entries.
+
+       set-usage-bucket
+           Set the usage reporting bucket for a project.
 

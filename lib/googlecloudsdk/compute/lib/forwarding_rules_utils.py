@@ -44,7 +44,7 @@ class ForwardingRulesMutator(base_classes.BaseAsyncMutator):
       return self.context['compute'].forwardingRules
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'forwardingRules'
 
   @abc.abstractmethod
@@ -111,12 +111,12 @@ class ForwardingRulesTargetMutator(ForwardingRulesMutator):
 
     if args.target_instance:
       raise exceptions.ToolException(
-          'you cannot specify --target-instance for a global '
-          'forwarding rule')
+          'You cannot specify [--target-instance] for a global '
+          'forwarding rule.')
     if args.target_pool:
       raise exceptions.ToolException(
-          'you cannot specify --target-pool for a global '
-          'forwarding rule')
+          'You cannot specify [--target-pool] for a global '
+          'forwarding rule.')
 
     return self.context['uri-builder'].Build(
         'global', 'targetHttpProxies', args.target_http_proxy)
@@ -126,12 +126,12 @@ class ForwardingRulesTargetMutator(ForwardingRulesMutator):
 
     if args.target_instance and not args.target_instance_zone:
       raise exceptions.ToolException(
-          'you must specify --target-instance-zone when specifying '
-          '--target-instance')
+          'You must specify [--target-instance-zone] when specifying '
+          '[--target-instance].')
     if args.target_instance_zone and not args.target_instance:
       raise exceptions.ToolException(
-          'you cannot specify --target-instance-zone unless you are specifying '
-          '--target-instance')
+          'You cannot specify [--target-instance-zone] unless you are '
+          'specifying [--target-instance].')
 
     if args.target_pool:
       return self.context['uri-builder'].Build(
@@ -168,7 +168,7 @@ class ForwardingRulesFetcher(object):
         default=False)
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'forwardingRules'
 
   def GetResources(self, args, errors):

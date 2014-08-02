@@ -47,9 +47,10 @@ def BatchList(requests, http, batch_url, errors):
 
       next_page_token = response.nextPageToken
       if next_page_token:
-        new_request = copy.deepcopy(requests[i])
-        new_request.pageToken = next_page_token
-        new_requests.append(new_request)
+        service, request_message = requests[i]
+        new_request_message = copy.deepcopy(request_message)
+        new_request_message.pageToken = next_page_token
+        new_requests.append((service, new_request_message))
 
     requests = new_requests
 

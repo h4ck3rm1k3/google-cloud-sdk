@@ -38,6 +38,7 @@ class ComputeApi(object):
                # All collections
                'addresses',
                'disks',
+               'disk_types',
                'firewalls',
                'forwarding_rules',
                'global_operations',
@@ -66,6 +67,7 @@ class ComputeApi(object):
 
     self.addresses = GetCollectionOrNone(api, 'addresses')
     self.disks = api.disks()
+    self.disk_types = GetCollectionOrNone(api, 'diskTypes')
     self.firewalls = api.firewalls()
     self.forwarding_rules = GetCollectionOrNone(api, 'forwardingRules')
     self.global_operations = api.globalOperations()

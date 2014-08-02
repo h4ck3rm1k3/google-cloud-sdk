@@ -335,10 +335,11 @@ class Backend(messages.Message):
       Valid range is [0, 1e6].
     description: An optional textual description of the resource, which is
       provided by the client when the resource is created.
-    group: URL of a zonal Cloud Resource View resource. This resoure view
+    group: URL of a zonal Cloud Resource View resource. This resource view
       defines the list of instances that serve traffic. Member virtual machine
       instances from each resource view must live in the same zone as the
-      resource view itself.
+      resource view itself. No two backends in a backend service are allowed
+      to use same Resource View resource.
     maxRate: The max RPS of the group. Can be used with either balancing mode,
       but required if RATE mode. For RATE mode, either maxRate or
       maxRatePerInstance must be set.
@@ -2940,7 +2941,7 @@ class ForwardingRule(messages.Message):
 
   Enums:
     IPProtocolValueValuesEnum: The IP protocol to which this rule applies,
-      valid options are 'TCP', 'UDP', 'ESP', 'AH' or 'SCTP'
+      valid options are 'TCP', 'UDP', 'ESP', 'AH' or 'SCTP'.
 
   Fields:
     IPAddress: Value of the reserved IP address that this forwarding rule is
@@ -2949,7 +2950,7 @@ class ForwardingRule(messages.Message):
       same region as the forwarding rule. If left empty (default value), an
       ephemeral IP from the same scope (global or regional) will be assigned.
     IPProtocol: The IP protocol to which this rule applies, valid options are
-      'TCP', 'UDP', 'ESP', 'AH' or 'SCTP'
+      'TCP', 'UDP', 'ESP', 'AH' or 'SCTP'.
     creationTimestamp: Creation timestamp in RFC3339 text format (output
       only).
     description: An optional textual description of the resource; provided by
@@ -2963,7 +2964,7 @@ class ForwardingRule(messages.Message):
       only packets addressed to ports in the specified range will be forwarded
       to 'target'. If 'portRange' is left empty (default value), all ports are
       forwarded. Forwarding rules with the same [IPAddress, IPProtocol] pair
-      must have disjoint port ranges. @pattern: \d+(?:-\d+)?
+      must have disjoint port ranges.
     region: URL of the region where the regional forwarding rule resides
       (output only). This field is not applicable to global forwarding rules.
     selfLink: Server defined URL for the resource (output only).
@@ -2975,7 +2976,7 @@ class ForwardingRule(messages.Message):
 
   class IPProtocolValueValuesEnum(messages.Enum):
     """The IP protocol to which this rule applies, valid options are 'TCP',
-    'UDP', 'ESP', 'AH' or 'SCTP'
+    'UDP', 'ESP', 'AH' or 'SCTP'.
 
     Values:
       AH: <no description>
@@ -3192,9 +3193,9 @@ class HostRule(messages.Message):
 
   Fields:
     description: A string attribute.
-    hosts: The list of host patterns to match. They must be FQDN except that
-      it may start with ?*.? or ?*-?. The ?*? acts like a glob and will match
-      any string of atoms (separated by .?s and -?s) to the left.
+    hosts: The list of host patterns to match. They must be valid hostnames
+      except that they may start with *. or *-. The * acts like a glob and
+      will match any string of atoms (separated by .s and -s) to the left.
     pathMatcher: The name of the PathMatcher to match the path portion of the
       URL, if the this HostRule matches the URL's host portion.
   """
@@ -3304,6 +3305,12 @@ class Image(messages.Message):
       created. The name must be 1-63 characters long, and comply with RFC1035.
     rawDisk: The raw disk image parameters.
     selfLink: Server defined URL for the resource (output only).
+    sourceDisk: The source disk used to create this image. Once the source
+      disk has been deleted from the system, this field will be cleared, and
+      will not be set even if a disk with the same name has been re-created.
+    sourceDiskId: The 'id' value of the disk used to create this image. This
+      value may be used to determine whether the image was taken from the
+      current or a previous instance of a given disk name.
     sourceType: Must be "RAW"; provided by the client when the disk image is
       created.
     status: Status of the image (output only). It will be one of the following
@@ -3384,8 +3391,10 @@ class Image(messages.Message):
   name = messages.StringField(9)
   rawDisk = messages.MessageField('RawDiskValue', 10)
   selfLink = messages.StringField(11)
-  sourceType = messages.EnumField('SourceTypeValueValuesEnum', 12, default=u'RAW')
-  status = messages.EnumField('StatusValueValuesEnum', 13)
+  sourceDisk = messages.StringField(12)
+  sourceDiskId = messages.StringField(13)
+  sourceType = messages.EnumField('SourceTypeValueValuesEnum', 14, default=u'RAW')
+  status = messages.EnumField('StatusValueValuesEnum', 15)
 
 
 class ImageList(messages.Message):
@@ -4333,10 +4342,10 @@ class PathRule(messages.Message):
   BackendService to handle the traffic arriving at this URL.
 
   Fields:
-    paths: The list of path patterns to match. Each must start with ?/" and
-      the only place a "*" is allowed is at the end following a "/". The
-      string fed to the path matcher does not include any text after the first
-      "?" or "#", and those chars are not allowed here.
+    paths: The list of path patterns to match. Each must start with / and the
+      only place a * is allowed is at the end following a /. The string fed to
+      the path matcher does not include any text after the first ? or #, and
+      those chars are not allowed here.
     service: The URL of the BackendService resource if this rule is matched.
   """
 
@@ -4513,7 +4522,8 @@ class ResourceGroupReference(messages.Message):
   """A ResourceGroupReference object.
 
   Fields:
-    group: A string attribute.
+    group: A URI referencing one of the resource views listed in the backend
+      service.
   """
 
   group = messages.StringField(1)

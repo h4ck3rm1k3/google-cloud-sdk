@@ -11,7 +11,7 @@ class List(base_classes.ZonalLister):
     return self.context['compute'].targetInstances
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'targetInstances'
 
 

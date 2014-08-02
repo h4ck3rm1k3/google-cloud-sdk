@@ -6,10 +6,11 @@ SYNOPSIS
          NAME
          [--allow [PROTOCOL[:PORT[-PORT]] ...]]
          [--description DESCRIPTION]
+         [--help]
          [--source-ranges [CIDR_RANGE ...]]
          [--source-tags [TAG ...]]
          [--target-tags [TAG ...]]
-         [-h, --help]
+         [-h]
 
 DESCRIPTION
        gcloud compute firewalls update is used to update firewall rules that
@@ -45,6 +46,9 @@ FLAGS
            A textual description for the firewall. Set to an empty string to
            clear existing description.
 
+       --help
+           Display detailed help.
+
        --source-ranges [CIDR_RANGE ...]
            A list of IP address blocks that are allowed to make inbound
            connections that match the firewall rule to the instances on the
@@ -79,6 +83,6 @@ FLAGS
 
                $ gcloud compute firewalls update my-rule --target-tags
 
-       --help
+       -h
            Print a summary help and exit.
 

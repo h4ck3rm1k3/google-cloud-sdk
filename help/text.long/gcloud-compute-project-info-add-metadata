@@ -4,9 +4,10 @@ NAME
 
 SYNOPSIS
        gcloud compute project-info add-metadata
+         [--help]
          [--metadata KEY=VALUE [KEY=VALUE ...]]
          [--metadata-from-file KEY=LOCAL_FILE_PATH [KEY=LOCAL_FILE_PATH ...]]
-         [-h, --help]
+         [-h]
 
 DESCRIPTION
        gcloud compute project-info add-metadata can be used to add or update
@@ -21,6 +22,9 @@ DESCRIPTION
        entries will remain unaffected.
 
 FLAGS
+       --help
+           Display detailed help.
+
        --metadata KEY=VALUE [KEY=VALUE ...]
            Metadata to be made available to the guest operating system running
            on the instances. Each metadata entry is a key/value pair separated
@@ -45,6 +49,6 @@ FLAGS
            read from a local file. This is useful for values that are too
            large such as "startup-script" contents.
 
-       --help
+       -h
            Print a summary help and exit.
 

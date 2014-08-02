@@ -5,12 +5,12 @@ SYNOPSIS
        gcloud compute forwarding-rules list
          [NAME_REGEX ...]
          [--global]
+         [--help]
          [--limit LIMIT]
-         [--raw-links]
          [--regions [REGION ...]]
          [--sort-by SORT_BY]
          [--uri]
-         [-h, --help]
+         [-h]
 
 DESCRIPTION
        gcloud compute forwarding-rules list lists summary information of
@@ -32,16 +32,11 @@ FLAGS
        --global
            If provided, global forwarding rules are shown.
 
+       --help
+           Display detailed help.
+
        --limit LIMIT
            The maximum number of results.
-
-       --raw-links
-           If provided, resource references in output from the server will not
-           be condensed for readability. For example, when listing operations,
-           if a targetLink is
-           "https://www.googleapis.com/compute/v1/projects/my-project/zones/us-central2-a/instances/my-instance",
-           "us-central2-a/instances/my-instance" is shown for brevity. This
-           behavior can be turned off using this flag.
 
        --regions [REGION ...]
            If provided, forwarding rules from the given regions are shown.
@@ -55,7 +50,7 @@ FLAGS
            resources returned. If this flag is not provided, the list command
            will print a human-readable table of useful resource data.
 
-       --help
+       -h
            Print a summary help and exit.
 
 EXAMPLES

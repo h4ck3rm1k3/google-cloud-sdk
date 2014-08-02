@@ -11,7 +11,7 @@ class Delete(base_classes.GlobalDeleter):
     return self.context['compute'].targetHttpProxies
 
   @property
-  def collection(self):
+  def resource_type(self):
     return 'targetHttpProxies'
 
 

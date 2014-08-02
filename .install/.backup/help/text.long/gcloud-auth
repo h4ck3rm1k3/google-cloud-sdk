@@ -2,7 +2,9 @@ NAME
        gcloud-auth - Manage oauth2 credentials for the Google Cloud SDK.
 
 SYNOPSIS
-       gcloud auth COMMAND [-h, --help]
+       gcloud auth
+         COMMAND
+         [-h, --help]
 
 FLAGS
        --help
@@ -21,7 +23,8 @@ COMMANDS
            List the accounts for known credentials.
 
        login
-           Get credentials via Google's oauth2 web flow.
+           Get credentials for the tools in the Google Cloud SDK via a web
+           flow.
 
        revoke
            Revoke authorization for credentials.

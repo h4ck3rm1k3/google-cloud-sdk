@@ -6,6 +6,7 @@ from apiclient import errors
 from googlecloudsdk.calliope import arg_parsers
 from googlecloudsdk.calliope import base
 from googlecloudsdk.calliope import exceptions
+from googlecloudsdk.core import resources
 from googlecloudsdk.sql import util
 
 
@@ -161,6 +162,10 @@ class Create(base.Command):
     sql = self.context['sql']
     instance_id = util.GetInstanceIdWithoutProject(args.instance)
     project_id = util.GetProjectId(args.instance)
+    # TODO(user): as we deprecate P:I args, simplify the call to .Parse().
+    instance_ref = resources.Parse(
+        instance_id, collection='sql.instances',
+        params={'project': project_id})
     activation_policy = args.activation_policy
     assign_ip = args.assign_ip
     authorized_gae_apps = args.authorized_gae_apps
@@ -213,15 +218,20 @@ class Create(base.Command):
       self.SetDatabaseFlags(settings, database_flags)
 
 
-    body = {'instance': instance_id, 'project': project_id, 'region': region,
-            'databaseVersion': database_version, 'settings': settings}
-    request = sql.instances().insert(project=project_id,
+    body = {
+        'instance': instance_ref.instance,
+        'project': instance_ref.project,
+        'region': region,
+        'databaseVersion': database_version,
+        'settings': settings,
+    }
+    request = sql.instances().insert(project=instance_ref.project,
                                      body=body)
     try:
       result = request.execute()
-      operations = self.command.ParentGroup().ParentGroup().operations(
-          instance=instance_id)
-      operation = operations.get(operation=result['operation'])
+      operations = self.command.ParentGroup().ParentGroup().operations()
+      operation = operations.get(instance=str(instance_ref),
+                                 operation=result['operation'])
       return operation
     except errors.HttpError as error:
       raise exceptions.HttpException(util.GetError(error))

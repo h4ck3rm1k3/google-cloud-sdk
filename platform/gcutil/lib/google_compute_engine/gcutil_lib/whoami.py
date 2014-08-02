@@ -36,7 +36,7 @@ class WhoAmI(appcommands.Cmd):
   def Run(self, unused_argv):
     """Identifies the authenticated user."""
 
-    LOGGER.warn('This command and deprecated and will be removed in a '
+    LOGGER.warn('This command is deprecated and will be removed in a '
                 'later version. Please use "gcloud auth" for your '
                 'authentication needs and "gcloud config list" to determine '
                 'the currently logged-in user.')

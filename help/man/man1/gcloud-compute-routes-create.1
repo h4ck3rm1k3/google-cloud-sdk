@@ -13,12 +13,13 @@ gcloud-compute-routes-create \- Create a new route
   NAME
   [\-\-description DESCRIPTION]
   \-\-destination\-range DESTINATION_RANGE
+  [\-\-help]
   [\-\-network NETWORK; default="default"]
   [\-\-next\-hop\-address NEXT_HOP_ADDRESS | \-\-next\-hop\-gateway NEXT_HOP_GATEWAY | \-\-next\-hop\-instance NEXT_HOP_INSTANCE]
   [\-\-next\-hop\-instance\-zone NEXT_HOP_INSTANCE_ZONE]
   [\-\-priority PRIORITY; default="1000"]
   [\-\-tags TAG [TAG \&...]]
-  [\-h, \-\-help]
+  [\-h]
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -41,6 +42,11 @@ An optional, textual description for the route\&.
 \fB\-\-destination\-range\fR \fIDESTINATION_RANGE\fR
 .RS 4
 The destination range of outgoing packets that the route will apply to\&. To match all traffic, use \(lq0\&.0\&.0\&.0/0\(rq\&.
+.RE
+.PP
+\fB\-\-help\fR
+.RS 4
+Display detailed help\&.
 .RE
 .PP
 \fB\-\-network\fR \fINETWORK\fR
@@ -79,7 +85,7 @@ Specifies the priority of this route relative to other routes with the same spec
 Identifies the set of instances that this route will apply to\&. If no tags are provided, the route will apply to all instances in the network\&.
 .RE
 .PP
-\fB\-\-help\fR
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE

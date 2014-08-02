@@ -249,6 +249,7 @@ class ProcessHolder(object):
 def _GetToolEnv():
   env = dict(os.environ)
   env['CLOUDSDK_WRAPPER'] = '1'
+  env['CLOUDSDK_VERSION'] = config.CLOUD_SDK_VERSION
   env['CLOUDSDK_PYTHON'] = _GetPythonExecutable()
   if 'CLOUDSDK_PYTHON_ARGS' not in env:
     if setup.import_site_packages:
@@ -397,9 +398,8 @@ def CheckUpdates():
   """Check for updates and inform the user.
 
   """
-  manager = update_manager.UpdateManager()
   try:
-    manager.PerformUpdateCheck()
+    update_manager.UpdateManager().PerformUpdateCheck()
   # pylint:disable=broad-except, We never want this to escape, ever. Only
   # messages printed should reach the user.
   except Exception:

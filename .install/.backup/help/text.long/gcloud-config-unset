@@ -5,8 +5,10 @@ NAME
        global properties is --global-only is set.
 
 SYNOPSIS
-       gcloud config unset PROPERTY [--global-only] [--section SECTION, -s
-       SECTION; default="core"] [-h, --help]
+       gcloud config unset
+         PROPERTY
+         [--global-only]
+         [-h, --help]
 
 POSITIONAL ARGUMENTS
        PROPERTY
@@ -15,9 +17,6 @@ POSITIONAL ARGUMENTS
 FLAGS
        --global-only
            Unset option in the global properties file.
-
-       --section SECTION
-           The section containing the option to be unset.
 
        --help
            Print a summary help and exit.

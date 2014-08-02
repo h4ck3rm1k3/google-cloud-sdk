@@ -33,7 +33,6 @@ FLAGS = flags.FLAGS
 
 
 class HttpHealthCheckCmdsTest(gcutil_unittest.GcutilTestCase):
-  _SUPPORTED_API_VERSIONS = ('v1beta16',)
 
   def setUp(self):
     self.mock, self.api = mock_api.CreateApi(self.version)

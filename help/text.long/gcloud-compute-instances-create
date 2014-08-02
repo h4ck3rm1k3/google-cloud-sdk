@@ -7,10 +7,13 @@ SYNOPSIS
          NAME [NAME ...]
          [--boot-disk-device-name BOOT_DISK_DEVICE_NAME]
          [--boot-disk-size BOOT_DISK_SIZE]
+         [--boot-disk-type BOOT_DISK_TYPE]
          [--can-ip-forward]
          [--description DESCRIPTION]
          [--disk PROPERTY=VALUE [PROPERTY=VALUE ...]]
+         [--help]
          [--image IMAGE]
+         [--image-project IMAGE_PROJECT]
          [--machine-type MACHINE_TYPE; default="n1-standard-1"]
          [--maintenance-policy MAINTENANCE_POLICY; default="MIGRATE"]
          [--metadata KEY=VALUE [KEY=VALUE ...]]
@@ -21,8 +24,8 @@ SYNOPSIS
          [--no-restart-on-failure]
          [--no-scopes | --scopes [ACCOUNT=]SCOPE [[ACCOUNT=]SCOPE ...]]
          [--tags TAG [TAG ...]]
-         --zone ZONE
-         [-h, --help]
+         [--zone ZONE]
+         [-h]
 
 DESCRIPTION
        gcloud compute instances create facilitates the creation of Google
@@ -48,19 +51,27 @@ FLAGS
 
        --boot-disk-device-name BOOT_DISK_DEVICE_NAME
            The name the guest operating system will see for the boot disk as.
-           This option can only be specified when using "--image". When
+           This option can only be specified if a new boot disk is being
+           created (as opposed to mounting an existing persistent disk). When
            creating more than one instance, the value of the device name will
            apply to all of the instances' boot disks.
 
        --boot-disk-size BOOT_DISK_SIZE
-           The size of the boot disk. This option can only be specified when
-           using "--image". The value must be a whole number followed by a
+           The size of the boot disk. This option can only be specified if a
+           new boot disk is being created (as opposed to mounting an existing
+           persistent disk). The value must be a whole number followed by a
            size unit of "KB" for kilobyte, "MB" for megabyte, "GB" for
            gigabyte, or "TB" for terabyte. For example, "10GB" will produce a
            10 gigabyte disk. If omitted, a default size of 200 GB is used. The
-           minimum size a disk can have is 1 GB. Disk size must be a multiple
-           of 1 GB. When creating more than one instance, the size will apply
-           to all of the instances' boot disks.
+           minimum size a boot disk can have is 10 GB. Disk size must be a
+           multiple of 1 GB. When creating more than one instance, the size
+           will apply to all of the instances' boot disks.
+
+       --boot-disk-type BOOT_DISK_TYPE
+           The type of the boot disk. This option can only be specified if a
+           new boot disk is being created (as opposed to mounting an existing
+           persistent disk). To get a list of available disk types, run gcloud
+           compute disk-types list.
 
        --can-ip-forward
            If provided, allows the instances to send and receive packets with
@@ -101,37 +112,47 @@ FLAGS
                detached from the instance, this option won't apply. The
                default value for this is "no".
 
+       --help
+           Display detailed help.
+
        --image IMAGE
            Specifies the boot image for the instances. For each instance, a
            new boot disk will be created from the given image. Each boot disk
            will have the same name as the instance.
 
-           The value for this option can be the name of an image in the
-           current project, a URI when referring to an image in another
-           project, or an alias from the table below.
+           The value for this option can be the name of an image or an alias
+           from the table below.
 
-           Alias                Project        Image Name
-           centos-6             centos-cloud   centos-6-v20140415
-           debian-7             debian-cloud   debian-7-wheezy-v20140415
-           debian-7-backports   debian-cloud   backports-debian-7-wheezy-v20140415
-           rhel-6               rhel-cloud     rhel-6-v20140415
-           sles-11              suse-cloud     sles-11-sp3-v20140306
+           Alias                Project          Image Name
+           centos-6             centos-cloud     centos-6
 
-           As new images are released, these aliases will be updated. If using
-           this tool in a script where depending on a specific version of an
-           image is necessary, then do not use the aliases. Instead, use the
-           URI of the desired image.
+           coreos               coreos-cloud     coreos-beta
+           debian-7             debian-cloud     debian-7-wheezy
+           debian-7-backports   debian-cloud     backports-debian-7-wheezy
+           opensuse-13          opensuse-cloud   opensuse-13-1
+           rhel-6               rhel-cloud       rhel-6
+           sles-11              suse-cloud       sles-11
 
-           Aliases are expanded first, so avoid creating images in your
-           project whose names are in the set of aliases. If you do create an
-           image whose name matches an alias, you can refer to it by using its
-           URI.
+           When the value is an alias, this tool will query the public image
+           project that contains the image type to find the latest image
+           matching the alias. The user's project is also queried for an image
+           with the same name as the alias. If a conflict exists, the user
+           will be prompted to resolve the conflict.
+
+           To specify an image in another project for which there is no alias,
+           use "--image-project". When "--image-project" is present, no API
+           calls are made to resolve the image. This property is useful for
+           scripts.
 
            When using this option, "--boot-disk-device-name" and
            "--boot-disk-size" can be used to override the boot disk's device
            name and size, respectively.
 
            By default, "debian-7-backports" is assumed for this flag.
+
+       --image-project IMAGE_PROJECT
+           The project against which all image references will be resolved.
+           See "--image" for more details.
 
        --machine-type MACHINE_TYPE
            Specifies the machine type used for the instances. To get a list of
@@ -232,9 +253,10 @@ FLAGS
            gcloud-compute-firewalls-create(1) for more details.
 
        --zone ZONE
-           The zone to create the instances in.
+           The zone of the instances to create. If omitted and the arguments
+           are not all URIs, you will be prompted to select a zone.
 
-       --help
+       -h
            Print a summary help and exit.
 
 EXAMPLES

@@ -11,7 +11,7 @@ class List(base_classes.GlobalLister):
     return self.context['compute'].backendServices
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'backendServices'
 
 

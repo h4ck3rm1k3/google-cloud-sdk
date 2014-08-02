@@ -3,7 +3,9 @@ NAME
        whether or not they're installed or have updates available.
 
 SYNOPSIS
-       gcloud components list [--show-versions] [-h, --help]
+       gcloud components list
+         [--show-versions]
+         [-h, --help]
 
 FLAGS
        --show-versions

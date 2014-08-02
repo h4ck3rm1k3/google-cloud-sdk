@@ -5,6 +5,7 @@ from apiclient import errors
 
 from googlecloudsdk.calliope import base
 from googlecloudsdk.calliope import exceptions
+from googlecloudsdk.core import resources
 from googlecloudsdk.sql import util
 
 
@@ -20,6 +21,11 @@ class Get(base.Command):
           on the command line after this command. Positional arguments are
           allowed.
     """
+    parser.add_argument(
+        '--instance',
+        '-i',
+        required=True,
+        help='Cloud SQL instance ID.')
     parser.add_argument(
         'operation',
         help='An identifier that uniquely identifies the operation.')
@@ -43,10 +49,17 @@ class Get(base.Command):
     sql = self.context['sql']
     instance_id = util.GetInstanceIdWithoutProject(args.instance)
     project_id = util.GetProjectId(args.instance)
-    operation_id = args.operation
-    request = sql.operations().get(project=project_id,
-                                   instance=instance_id,
-                                   operation=operation_id)
+    instance_ref = resources.Parse(
+        instance_id, collection='sql.instances',
+        params={'project': project_id})
+    # TODO(user): as we deprecate P:I args, simplify the call to .Parse().
+    operation_ref = resources.Parse(
+        args.operation, collection='sql.operations',
+        params={'project': instance_ref.project,
+                'instance': instance_ref.instance})
+    request = sql.operations().get(project=operation_ref.project,
+                                   instance=operation_ref.instance,
+                                   operation=operation_ref.operation)
     try:
       result = request.execute()
       return result

@@ -11,20 +11,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Additional help about types of credentials and authentication."""
 
-from gslib.help_provider import HELP_NAME
-from gslib.help_provider import HELP_NAME_ALIASES
-from gslib.help_provider import HELP_ONE_LINE_SUMMARY
 from gslib.help_provider import HelpProvider
-from gslib.help_provider import HELP_TEXT
-from gslib.help_provider import HelpType
-from gslib.help_provider import HELP_TYPE
 
 _detailed_help_text = ("""
 <B>OVERVIEW</B>
   gsutil currently supports four types of credentials/authentication, as well as
   the ability to access public data anonymously (see "gsutil help anon" for more
   on anonymous access).
+
+  Note that when using the JSON API (which is the default behavior), you can
+  configure at most one of the following types of GCS credentials in a single
+  boto config file: OAuth2 User Account, OAuth2 Service Account. In addition to
+  these, you may also have S3 HMAC credentials (necessary for using s3:// URLs)
+  and GCE Internal Service Account credentials. GCE Internal Service Account
+  credentials are used only when OAuth2 credentials are not present.
 
   OAuth2 User Account:
     This is the preferred type of credentials for authenticating requests on
@@ -62,31 +64,26 @@ _detailed_help_text = ("""
 
     It is important to note that a service account is considered an Editor by
     default for the purposes of API access, rather than an Owner. In particular,
-    the fact that Editors have full_control access in the default object and
-    bucket ACLs, but the canned ACL options remove full_control access from
+    the fact that Editors have OWNER access in the default object and
+    bucket ACLs, but the canned ACL options remove OWNER access from
     Editors, can lead to unexpected results. The solution to this problem is to
     add the email address for your service account as a project Owner. To find
-    the email address, visit the `Google Cloud Console
-    <https://cloud.google.com/console#/project>`_, click on the project you
-    are using, then click "APIs & auth", then click "Registered apps", then
-    click on the name of the registered app. (Note: for service accounts created
-    via the older API Developer's Console, the name will be something like
-    "Service Account-<service account id>".) This page lists the email address
-    of your service account.
+    the email address, visit the
+    `Google Developers Console <https://cloud.google.com/console#/project>`_,
+    click on the project you're using, click "APIs & auth", and click
+    "Credentials".
 
     To create a service account, visit the Google Cloud Console and then:
 
        - Click the APIs tab on the left
 
-       - Click "All Registered Apps"
+       - Click "APIs & auth"
 
-       - Click the red "Register App" button
+       - Click the red "Create New Client ID" button
 
-       - Create a "Web Application" type
+       - Create a "Service Account" type
 
-       - Once that's created, click on the "Certificate" area
-
-       - Click the "Generate Certificate" button.
+       - Save the private key and password provided.
 
     For further information about account roles, see:
       https://developers.google.com/console/help/#DifferentRoles
@@ -108,19 +105,15 @@ _detailed_help_text = ("""
 """)
 
 
-
 class CommandOptions(HelpProvider):
   """Additional help about types of credentials and authentication."""
 
-  help_spec = {
-    # Name of command or auxiliary help info for which this help applies.
-    HELP_NAME : 'creds',
-    # List of help name aliases.
-    HELP_NAME_ALIASES : ['credentials', 'authentication', 'auth'],
-    # Type of help:
-    HELP_TYPE : HelpType.ADDITIONAL_HELP,
-    # One line summary of this help.
-    HELP_ONE_LINE_SUMMARY : 'Credential Types Supporting Various Use Cases',
-    # The full help text.
-    HELP_TEXT : _detailed_help_text,
-  }
+  # Help specification. See help_provider.py for documentation.
+  help_spec = HelpProvider.HelpSpec(
+      help_name='creds',
+      help_name_aliases=['credentials', 'authentication', 'auth'],
+      help_type='additional_help',
+      help_one_line_summary='Credential Types Supporting Various Use Cases',
+      help_text=_detailed_help_text,
+      subcommand_help_text={},
+  )

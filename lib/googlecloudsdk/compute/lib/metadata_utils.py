@@ -53,13 +53,13 @@ def ConstructMetadataMessage(metadata=None, metadata_from_file=None,
   for key, file_path in metadata_from_file.iteritems():
     if key in new_metadata_dict:
       raise exceptions.ToolException(
-          'encountered duplicate metadata key: {0}'.format(key))
+          'Encountered duplicate metadata key [{0}].'.format(key))
 
     try:
       new_metadata_dict[key] = open(file_path).read()
     except IOError as e:
       raise exceptions.ToolException(
-          'could not populate metadata key "{0}" from file "{1}": {2}'.format(
+          'Could not populate metadata key [{0}] from file [{1}]: {2}'.format(
               key, file_path, e.strerror))
 
   existing_metadata_dict = _MetadataMessageToDict(existing_metadata)
@@ -150,4 +150,3 @@ def AddMetadataArgs(parser):
       be read from a local file. This is useful for values that are
       too large such as ``startup-script'' contents.
       """
-

@@ -3,7 +3,7 @@
 from googlecloudsdk.compute.lib import base_classes
 
 
-class ListHttpHealthChecks(base_classes.GlobalLister):
+class List(base_classes.GlobalLister):
   """List HTTP health checks."""
 
   @property
@@ -11,11 +11,11 @@ class ListHttpHealthChecks(base_classes.GlobalLister):
     return self.context['compute'].httpHealthChecks
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'httpHealthChecks'
 
 
-ListHttpHealthChecks.detailed_help = {
+List.detailed_help = {
     'brief': 'List HTTP health checks',
     'DESCRIPTION': """\
         *{command}* lists summary information for the HTTP health

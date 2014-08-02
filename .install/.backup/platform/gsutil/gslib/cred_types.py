@@ -11,6 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Defines gsutil-supported credential types."""
 
-class CredTypes:
-  HMAC, OAUTH2_SERVICE_ACCOUNT, OAUTH2_USER_ACCOUNT = range(3)
+
+class CredTypes(object):
+  HMAC = "HMAC"
+  OAUTH2_SERVICE_ACCOUNT = "OAuth 2.0 Service Account"
+  OAUTH2_USER_ACCOUNT = "Oauth 2.0 User Account"
+  GCE = "GCE"

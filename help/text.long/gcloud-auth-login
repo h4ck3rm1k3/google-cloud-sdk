@@ -9,8 +9,9 @@ SYNOPSIS
          [ACCOUNT]
          [--do-not-activate]
          [--force]
+         [--help]
          [--no-launch-browser]
-         [-h, --help]
+         [-h]
 
 POSITIONAL ARGUMENTS
        [ACCOUNT]
@@ -24,9 +25,12 @@ FLAGS
            Re-run the web flow even if the given account has valid
            credentials.
 
+       --help
+           Display detailed help.
+
        --no-launch-browser
            Print a URL to be copied instead of launching a web browser.
 
-       --help
+       -h
            Print a summary help and exit.
 

@@ -11,6 +11,7 @@ IF "%CLOUDSDK_PYTHON_ARGS%"=="" (
     SET CLOUDSDK_PYTHON_ARGS=-S
   )
 )
+SET PATH=%~dp0..\bin\sdk;%PATH%
 
 cmd /c "%CLOUDSDK_PYTHON% %CLOUDSDK_PYTHON_ARGS% "%~dp0bootstrapping\gcutil.py" %*"
 

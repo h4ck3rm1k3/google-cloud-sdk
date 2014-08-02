@@ -2,7 +2,8 @@
 """Command for attaching a disk to an instance."""
 from googlecloudapis.compute.v1 import compute_v1_messages as messages
 from googlecloudsdk.compute.lib import base_classes
-
+from googlecloudsdk.compute.lib import utils
+from googlecloudsdk.core import resources
 
 MODE_OPTIONS = ['ro', 'rw']
 
@@ -39,10 +40,10 @@ class AttachDisk(base_classes.BaseAsyncMutator):
         more than one instance.
         """
 
-    parser.add_argument(
-        '--zone',
-        help='The zone in which the instance and disk reside.',
-        required=True)
+    utils.AddZoneFlag(
+        parser,
+        resource_type='instance',
+        operation_type='attach a disk to')
 
   @property
   def service(self):
@@ -53,26 +54,29 @@ class AttachDisk(base_classes.BaseAsyncMutator):
     return 'AttachDisk'
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'instances'
 
   def CreateRequests(self, args):
     """Returns a request for attaching a disk to an instance."""
+    instance_ref = self.CreateZonalReference(args.name, args.zone)
+    disk_ref = resources.Parse(args.disk, collection='compute.disks',
+                               params={'zone': instance_ref.zone})
+
     if args.mode == 'rw':
       mode = messages.AttachedDisk.ModeValueValuesEnum.READ_WRITE
     else:
       mode = messages.AttachedDisk.ModeValueValuesEnum.READ_ONLY
 
     request = messages.ComputeInstancesAttachDiskRequest(
-        instance=args.name,
+        instance=instance_ref.Name(),
         project=self.context['project'],
         attachedDisk=messages.AttachedDisk(
             deviceName=args.device_name,
             mode=mode,
-            source=self.context['uri-builder'].Build(
-                'zones', args.zone, 'disks', args.disk),
+            source=disk_ref.SelfLink(),
             type=messages.AttachedDisk.TypeValueValuesEnum.PERSISTENT),
-        zone=args.zone)
+        zone=instance_ref.zone)
 
     return [request]
 

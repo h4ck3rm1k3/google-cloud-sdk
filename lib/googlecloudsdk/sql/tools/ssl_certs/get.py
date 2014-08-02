@@ -5,6 +5,7 @@ from apiclient import errors
 
 from googlecloudsdk.calliope import base
 from googlecloudsdk.calliope import exceptions
+from googlecloudsdk.core import resources
 from googlecloudsdk.sql import util
 
 
@@ -20,6 +21,11 @@ class Get(base.Command):
           on the command line after this command. Positional arguments are
           allowed.
     """
+    parser.add_argument(
+        '--instance',
+        '-i',
+        required=True,
+        help='Cloud SQL instance ID.')
     parser.add_argument(
         'common_name',
         help='User supplied name. Constrained to [a-zA-Z.-_ ]+.')
@@ -41,9 +47,18 @@ class Get(base.Command):
           command.
     """
     common_name = args.common_name
+    instance_id = util.GetInstanceIdWithoutProject(args.instance)
+    project_id = util.GetProjectId(args.instance)
+    # TODO(user): as we deprecate P:I args, simplify the call to .Parse().
+    instance_ref = resources.Parse(
+        instance_id, collection='sql.instances',
+        params={'project': project_id})
     try:
-      ssl_certs = (self.command.ParentGroup().list())
+      ssl_certs = self.command.ParentGroup().list(
+          instance=instance_ref.instance)
       for cert in ssl_certs['items']:
+        # TODO(user): figure out how to rectify the common_name and the
+        # sha1fingerprint, so that things can work with the resource parser.
         if cert.get('commonName') == common_name:
           return cert
       raise exceptions.ToolException('Cert with the provided common name '

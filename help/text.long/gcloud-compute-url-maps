@@ -4,14 +4,24 @@ NAME
 SYNOPSIS
        gcloud compute url-maps
          COMMAND
-         [-h, --help]
+         [--help]
+         [-h]
 
 FLAGS
        --help
+           Display detailed help.
+
+       -h
            Print a summary help and exit.
 
 COMMANDS
        COMMAND is one of the following.
+
+       add-host-rule
+           Add a rule to a URL map to map hosts to a path matcher.
+
+       add-path-matcher
+           Add a path matcher to a URL map.
 
        create
            Create a URL map.
@@ -27,4 +37,7 @@ COMMANDS
 
        list
            List URL maps.
+
+       remove-path-matcher
+           Remove a path matcher from a URL map.
 

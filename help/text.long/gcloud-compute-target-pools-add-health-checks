@@ -5,9 +5,10 @@ NAME
 SYNOPSIS
        gcloud compute target-pools add-health-checks
          NAME
+         [--help]
          --http-health-check HEALTH_CHECK
-         --region REGION
-         [-h, --help]
+         [--region REGION]
+         [-h]
 
 DESCRIPTION
        gcloud compute target-pools add-health-checks is used to add an HTTP
@@ -23,12 +24,17 @@ POSITIONAL ARGUMENTS
            The name of the target pool to which to add the health check.
 
 FLAGS
+       --help
+           Display detailed help.
+
        --http-health-check HEALTH_CHECK
            Specifies an HTTP health check object to add to the target pool.
 
        --region REGION
-           The region of the target pool.
+           The region of the target pool to add health checks to. If omitted
+           and the arguments are not all URIs, you will be prompted to select
+           a region.
 
-       --help
+       -h
            Print a summary help and exit.
 

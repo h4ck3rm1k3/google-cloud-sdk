@@ -3,7 +3,7 @@
 from googlecloudsdk.compute.lib import base_classes
 
 
-class GetZones(base_classes.GlobalGetter):
+class Get(base_classes.GlobalGetter):
   """Get Google Compute Engine zones."""
 
   @staticmethod
@@ -16,11 +16,11 @@ class GetZones(base_classes.GlobalGetter):
     return self.context['compute'].zones
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'zones'
 
 
-GetZones.detailed_help = {
+Get.detailed_help = {
     'brief': 'Get Google Compute Engine zones',
     'DESCRIPTION': """\
         *{command}* displays all data associated with Google Compute

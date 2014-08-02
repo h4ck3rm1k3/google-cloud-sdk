@@ -5,6 +5,7 @@ from apiclient import errors
 
 from googlecloudsdk.calliope import base
 from googlecloudsdk.calliope import exceptions
+from googlecloudsdk.core import resources
 from googlecloudsdk.sql import util
 
 
@@ -54,6 +55,10 @@ class SetRootPassword(base.Command):
     sql = self.context['sql']
     instance_id = util.GetInstanceIdWithoutProject(args.instance)
     project_id = util.GetProjectId(args.instance)
+    # TODO(user): as we deprecate P:I args, simplify the call to .Parse().
+    instance_ref = resources.Parse(
+        instance_id, collection='sql.instances',
+        params={'project': project_id})
     if args.password and args.password_file:
       raise exceptions.ToolException('Argument --password/-p not allowed with'
                                      ' --password-file')
@@ -67,13 +72,13 @@ class SetRootPassword(base.Command):
         with open(password_file, 'r') as f:
           password = f.readline()
       body = {'setRootPasswordContext': {'password': password}}
-      request = sql.instances().setRootPassword(project=project_id,
-                                                instance=instance_id,
+      request = sql.instances().setRootPassword(project=instance_ref.project,
+                                                instance=instance_ref.instance,
                                                 body=body)
       result = request.execute()
-      operations = self.command.ParentGroup().ParentGroup().operations(
-          instance=instance_id)
-      operation = operations.get(operation=result['operation'])
+      operations = self.command.ParentGroup().ParentGroup().operations()
+      operation = operations.get(instance=str(instance_ref),
+                                 operation=result['operation'])
       return operation
     except errors.HttpError as error:
       raise exceptions.HttpException(util.GetError(error))

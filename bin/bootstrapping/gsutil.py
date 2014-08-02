@@ -43,10 +43,13 @@ def main():
       del os.environ['BOTO_CONFIG']
     os.environ['BOTO_PATH'] = boto_path
 
+  args = []
+
   if project:
-    args = ['-o', 'GSUtil:default_project_id=%s' % project]
-  else:
-    args = []
+    args.extend(['-o', 'GSUtil:default_project_id=%s' % project])
+  if account in c_gce.Metadata().Accounts():
+    # Tell gsutil to look for GCE service accounts.
+    args.extend(['-o', 'GoogleCompute:service_account=default'])
 
   bootstrapping.ExecutePythonTool(
       'platform/gsutil', 'gsutil', *args)

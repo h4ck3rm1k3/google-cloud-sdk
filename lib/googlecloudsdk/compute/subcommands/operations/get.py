@@ -4,8 +4,8 @@ from googlecloudsdk.compute.lib import base_classes
 from googlecloudsdk.compute.lib import operations_utils
 
 
-class GetOperations(operations_utils.OperationsResourceFetcherMixin,
-                    base_classes.BaseGetter):
+class Get(operations_utils.OperationsResourceFetcherMixin,
+          base_classes.BaseGetter):
   """Get Google Compute Engine operations."""
 
   @staticmethod
@@ -15,11 +15,11 @@ class GetOperations(operations_utils.OperationsResourceFetcherMixin,
     operations_utils.AddOperationFetchingArgs(parser)
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'operations'
 
 
-GetOperations.detailed_help = {
+Get.detailed_help = {
     'brief': 'Get Google Compute Engine operations',
     'DESCRIPTION': """\
         *{command}* displays all data associated with Google Compute

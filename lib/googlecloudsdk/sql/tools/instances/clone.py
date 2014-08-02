@@ -7,6 +7,7 @@ from apiclient import errors
 
 from googlecloudsdk.calliope import base
 from googlecloudsdk.calliope import exceptions
+from googlecloudsdk.core import resources
 from googlecloudsdk.sql import util
 
 
@@ -60,19 +61,28 @@ class Clone(base.Command):
     sql = self.context['sql']
     source_instance_name = util.GetInstanceIdWithoutProject(args.source)
     source_project_id = util.GetProjectId(args.source)
+    # TODO(user): as we deprecate P:I args, simplify the call to .Parse().
+    source_instance_ref = resources.Parse(
+        source_instance_name, collection='sql.instances',
+        params={'project': source_project_id})
     destination_instance_name = util.GetInstanceIdWithoutProject(
         args.destination)
     destination_project_id = util.GetProjectId(args.destination)
-    if source_project_id != destination_project_id:
+    # TODO(user): as we deprecate P:I args, simplify the call to .Parse().
+    destination_instance_ref = resources.Parse(
+        destination_instance_name, collection='sql.instances',
+        params={'project': destination_project_id})
+    if source_instance_ref.project != destination_instance_ref.project:
       raise exceptions.ToolException(
           'The source and the clone instance must belong to the same project:'
           ' "{src}" != "{dest}".' . format(
-              src=source_project_id, dest=destination_project_id))
+              src=source_instance_ref.project,
+              dest=destination_instance_ref.project))
 
     clone_context = (
         '"kind": "sql#cloneContext", "sourceInstanceName": "%s"'
         ', "destinationInstanceName": "%s"' %
-        (source_instance_name, destination_instance_name))
+        (source_instance_ref.instance, destination_instance_ref.instance))
 
     bin_log_file_name = args.bin_log_file_name
     bin_log_position = args.bin_log_position
@@ -89,12 +99,13 @@ class Clone(base.Command):
           ' cloned.')
 
     body = json.loads('{ "cloneContext" : { %s }}' % clone_context)
-    request = sql.instances().clone(project=destination_project_id, body=body)
+    request = sql.instances().clone(project=destination_instance_ref.project,
+                                    body=body)
     try:
       result = request.execute()
-      operations = self.command.ParentGroup().ParentGroup().operations(
-          instance=destination_instance_name)
-      operation = operations.get(operation=result['operation'])
+      operations = self.command.ParentGroup().ParentGroup().operations()
+      operation = operations.get(instance=str(destination_instance_ref),
+                                 operation=result['operation'])
       return operation
     except errors.HttpError as error:
       raise exceptions.HttpException(util.GetError(error))

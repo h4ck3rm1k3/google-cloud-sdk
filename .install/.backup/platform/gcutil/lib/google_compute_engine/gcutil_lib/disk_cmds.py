@@ -27,8 +27,8 @@ from gcutil_lib import version
 
 FLAGS = flags.FLAGS
 LOGGER = gcutil_logging.LOGGER
-DEFAULT_DISK_SIZE_GB = 500
-PERFORMANCE_WARNING_SIZE_GB = 200
+DEFAULT_DISK_SIZE_GB = {'pd-standard': 500, 'pd-ssd': 100}
+PERFORMANCE_WARNING_SIZE_GB = {'pd-standard': 200, 'pd-ssd': 10}
 
 
 class DiskCommand(command_base.GoogleComputeCommand):
@@ -127,13 +127,21 @@ class AddDisk(DiskCommand):
                         '',
                         'An optional description for this disk.',
                         flag_values=flag_values)
+    flags.DEFINE_string('disk_type',
+                        'pd-standard',
+                        'Specifies the disk type used to create the disk. '
+                        'For example, \'--disk_type=pd-standard\'. '
+                        'To get a list of avaiable disk types, run '
+                        '\'gcutil listdisktypes\'.',
+                        flag_values=flag_values)
     flags.DEFINE_integer('size_gb',
                          None,
                          'Sets the size of this disk, in GB. The default '
                          'size is %s GB. If source_snapshot is also specified, '
                          'This value must be greater than or equal to the size '
                          'of the disk from which the source_snapshot was '
-                         'created.' % DEFAULT_DISK_SIZE_GB,
+                         'created.'
+                         % DEFAULT_DISK_SIZE_GB[flag_values['disk_type'].value],
                          flag_values=flag_values)
     flags.DEFINE_string('source_snapshot',
                         None,
@@ -172,14 +180,15 @@ class AddDisk(DiskCommand):
       raise app.UsageError('You must specify either a source_image or a'
                            'source_snapshot but not both.')
 
+    perf_min = PERFORMANCE_WARNING_SIZE_GB[self._flags.disk_type]
     if (not self._flags.source_image and self._flags.size_gb and
-        self._flags.size_gb < PERFORMANCE_WARNING_SIZE_GB):
+        self._flags.size_gb < perf_min):
       LOGGER.warn(('You have selected a volume size of under %s GB. '
                    'This may result in reduced performance. '
                    'For sizing and performance guidelines, see '
                    'https://developers.google.com/compute/docs/disks'
                    '#pdperformance.')
-                  % PERFORMANCE_WARNING_SIZE_GB)
+                  % PERFORMANCE_WARNING_SIZE_GB[self._flags.disk_type])
 
     self._PromptForZoneOnlyOnce()
 
@@ -220,8 +229,12 @@ class AddDisk(DiskCommand):
         if self._flags.size_gb:
           disk['sizeGb'] = self._flags.size_gb
       else:
-        disk['sizeGb'] = self._flags.size_gb or str(DEFAULT_DISK_SIZE_GB)
+        disk_type_default = str(DEFAULT_DISK_SIZE_GB[self._flags.disk_type])
+        disk['sizeGb'] = (self._flags.size_gb or disk_type_default)
 
+      if self.api.version >= version.get('v1') and self._flags.disk_type:
+        disk['type'] = self._context_parser.NormalizeOrPrompt(
+            'diskTypes', self._flags.disk_type)
       requests.append(self.api.disks.insert(project=disk_context['project'],
                                             body=disk, **kwargs))
 

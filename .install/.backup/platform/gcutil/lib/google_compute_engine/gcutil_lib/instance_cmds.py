@@ -19,6 +19,7 @@
 import logging
 import subprocess
 import sys
+import time
 
 from apiclient import errors
 
@@ -36,6 +37,7 @@ from gcutil_lib import scopes
 from gcutil_lib import ssh_keys
 from gcutil_lib import version
 from gcutil_lib import windows_password
+from gcutil_lib import windows_user_name
 
 
 FLAGS = flags.FLAGS
@@ -389,7 +391,7 @@ class InstanceCommand(command_base.GoogleComputeCommand):
         if option == 'boot':
           boot = True
           continue
-        if not '=' in option:
+        if '=' not in option:
           raise ValueError('Invalid disk option: %s' % option)
         key, value = option.split('=', 2)
         if key == 'deviceName':
@@ -483,6 +485,13 @@ class AddInstance(InstanceCommand):
                          'scratch disk space for your root files, pass in '
                          '\'--nopersistent_boot_disk\'.',
                          flag_values=flag_values)
+    flags.DEFINE_string('boot_disk_type',
+                        'pd-standard',
+                        'Specifies the disk type used to create the boot disk. '
+                        'For example, \'--boot_disk_type=pd-standard\'. '
+                        'To get a list of avaiable disk types, run '
+                        '\'gcutil listdisktypes\'.',
+                        flag_values=flag_values)
     flags.DEFINE_integer('boot_disk_size_gb',
                          None,
                          'Size of the persistent boot disk in GiB.',
@@ -689,13 +698,24 @@ class AddInstance(InstanceCommand):
     instance_metadata = self._metadata_flags_processor.GatherMetadata()
     is_image_from_windows_project = self._IsImageFromWindowsProject(
         self._flags.image)
-    has_windows_password = AddInstance._GetWindowsPasswordFromMetadata(
-        instance_metadata) is not None
+    has_windows_password = (
+        metadata.GetMetadataValue(
+            instance_metadata,
+            metadata.INITIAL_WINDOWS_PASSWORD_METADATA_NAME)
+        is not None)
+    has_windows_user = (
+        metadata.GetMetadataValue(
+            instance_metadata,
+            metadata.INITIAL_WINDOWS_USER_METADATA_NAME)
+        is not None)
 
     # We deem the instance to be Windows instance if the image is from
     # Google provided Windows project, or if the user gives the
-    # initial Windows password in metadata.
-    is_windows_instance = is_image_from_windows_project or has_windows_password
+    # initial Windows user or password in metadata.
+    is_windows_instance = (
+        is_image_from_windows_project
+        or has_windows_password
+        or has_windows_user)
 
     if is_windows_instance:
       if (self._flags.authorized_ssh_keys or
@@ -713,10 +733,11 @@ class AddInstance(InstanceCommand):
               ('%s metadata is given. This is assumed to be a Windows '
                'instance. ' % metadata.INITIAL_WINDOWS_PASSWORD_METADATA_NAME)
               + ssh_ignored_warning)
-      # We need to set initial windows password in metadata.
-      # It is used on the server side to set the initial
-      # password for gceadmin user account.
-      self._EnsureWindowsPasswordInMetadata(instance_metadata)
+      # For Windows image, we need to set the user name and password
+      # in metadata so the daemon on the machine can set up the initial
+      # user account.
+      windows_user = self._EnsureWindowsUserNameInMetadata(instance_metadata)
+      self._EnsureWindowsPasswordInMetadata(instance_metadata, windows_user)
     else:
       # Do ssh related processing only for non-Windows image.
       if self._flags.authorized_ssh_keys or self._flags.use_compute_key:
@@ -806,7 +827,7 @@ class AddInstance(InstanceCommand):
     if not is_windows_instance and (
         self._flags.add_compute_key_to_project or (
             self._flags.add_compute_key_to_project is None and
-            not 'sshKeys' in [entry.get('key', '') for entry
+            'sshKeys' not in [entry.get('key', '') for entry
                               in instance_metadata])):
       try:
         self._AddComputeKeyToProject()
@@ -831,6 +852,10 @@ class AddInstance(InstanceCommand):
               instance_name=instance_context['instance'],
               disk_size_gb=self._flags.boot_disk_size_gb,
               auto_delete=self._flags.auto_delete_boot_disk)
+        if self.api.version >= version.get('v1'):
+          boot_disk['initializeParams']['diskType'] = (
+              self._context_parser.NormalizeOrPrompt(
+                  'diskTypes', self._flags.boot_disk_type))
 
         instance_disks = [boot_disk] + disks
       requests.append(self._BuildRequestWithMetadata(
@@ -1083,44 +1108,61 @@ class AddInstance(InstanceCommand):
         'images', image_path)
     return image_context['project'] in command_base.WINDOWS_IMAGE_PROJECTS
 
-  def _EnsureWindowsPasswordInMetadata(self, instance_metadata):
-    """Ensures that the initial Windows password is set in the metadata.
-
-    If the metadata does not contain password, the user will be prompted to
-    type in the password, and metadata will be updated to include the password.
-    The password must meet strong password requirement, otherwise
-    CommandError will be raised.
+  def _EnsureWindowsUserNameInMetadata(self, instance_metadata):
+    """Ensures that the initial windows user account name is set in metadata.
 
     Args:
       instance_metadata: The instance metadata.
 
+    Returns:
+      The user account name.
+    """
+    windows_user = metadata.GetMetadataValue(
+        instance_metadata,
+        metadata.INITIAL_WINDOWS_USER_METADATA_NAME)
+    if windows_user is None:
+      windows_user = windows_user_name.GenerateLocalUserNameBasedOnProject(
+          self._project, self.api)
+      instance_metadata.append({
+          'key': metadata.INITIAL_WINDOWS_USER_METADATA_NAME,
+          'value': windows_user})
+      LOGGER.info(
+          'The initial Windows login user name is %s.', windows_user)
+    else:
+      windows_user_name.ValidateUserName(windows_user)
+    return windows_user
+
+  def _EnsureWindowsPasswordInMetadata(
+      self, instance_metadata, user_account_name):
+    """Ensures that the initial Windows password is set in the metadata.
+
+    If the metadata does not contain password, a random password will be
+    generated.
+
+    Args:
+      instance_metadata: The instance metadata.
+      user_account_name: The user account name.
+
     Raises:
       CommandError: The password does not meet strong password requirement.
     """
-    password = AddInstance._GetWindowsPasswordFromMetadata(instance_metadata)
+    password = metadata.GetMetadataValue(
+        instance_metadata,
+        metadata.INITIAL_WINDOWS_PASSWORD_METADATA_NAME)
     if password is None:
-      password = windows_password.GetPassword(
-          'Provide a password for the gceadmin account of your Windows '
-          'instance(s):')
+      password = windows_password.GeneratePassword(user_account_name)
       instance_metadata.append({
           'key': metadata.INITIAL_WINDOWS_PASSWORD_METADATA_NAME,
           'value': password})
+      LOGGER.info(
+          'Generated password for user account %s. The password can be '
+          'retrieved from %s key in instance metadata.' %
+          (user_account_name, metadata.INITIAL_WINDOWS_PASSWORD_METADATA_NAME))
+      # Print the password on screen.
+      print 'Generated password is %s' % password
     else:
-      windows_password.ValidateStrongPasswordRequirement(password)
-
-  @staticmethod
-  def _GetWindowsPasswordFromMetadata(instance_metadata):
-    passwords = [entry['value'] for entry in instance_metadata
-                 if entry['key'] ==
-                 metadata.INITIAL_WINDOWS_PASSWORD_METADATA_NAME]
-    if not passwords:
-      return None
-    else:
-      # The metadata parser makes sure that the key is unique.
-      assert len(passwords) == 1, ('Unexpected duplicate %s in metadata' %
-                                   metadata
-                                   .INITIAL_WINDOWS_PASSWORD_METADATA_NAME)
-      return passwords[0]
+      windows_password.ValidateStrongPasswordRequirement(
+          password, user_account_name)
 
 
 class GetInstance(InstanceCommand):
@@ -1150,7 +1192,7 @@ class GetInstance(InstanceCommand):
 class DeleteInstance(InstanceCommand):
   """Delete one or more VM instances.
 
-  Specify multiple disks as multiple arguments. Instances will be deleted
+  Specify multiple instances as multiple arguments. Instances will be deleted
   in parallel.
   """
   positional_args = '<instance-name-1> ... <instance-name-n>'
@@ -1501,8 +1543,16 @@ class SshInstanceBase(InstanceCommand):
     flags.DEFINE_integer(
         'ssh_key_push_wait_time',
         10,  # 10 seconds
-        'Number of seconds to wait for updates to project-wide ssh keys '
-        'to cascade to the instances within the project',
+        '[Deprecated] Number of seconds to wait for updates to project-wide '
+        'ssh keys to cascade to the instances within the project. This value '
+        'is no longer used. Instead, the instance is polled periodically '
+        'until it accepts SSH connections using the new key.',
+        flag_values=flag_values)
+    flags.DEFINE_integer(
+        'ssh_key_push_timeout',
+        60,  # 60 seconds
+        'Number of seconds to wait for a newly added SSH key to cascade '
+        'to the instance before timing out.',
         flag_values=flag_values)
 
   def PrintResult(self, _):
@@ -1554,44 +1604,80 @@ class SshInstanceBase(InstanceCommand):
 
     return (external_addresses[0], self._flags.ssh_port)
 
+  def _WaitForSshKeyPropagation(self, instance_resource):
+    command = self._BuildSshCmd(
+        instance_resource, 'ssh',
+        ['-A', '-p', '%(port)d', '%(user)s@%(host)s', 'true'])
+    deadline_sec = time.time() + self._flags.ssh_key_push_timeout
+    finished = False
+    while (not finished) and (time.time() < deadline_sec):
+      retval = subprocess.call(
+          command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+      finished = retval == 0
+      if not finished:
+        time.sleep(5)
+    if not finished:
+      raise gcutil_errors.CommandError('SSH key failed to propagate to the VM')
+
   def _EnsureSshable(self, instance_resource):
     """Ensure that the user can ssh into the specified instance.
 
-    This method checks if the instance has SSH keys defined for it, and if
-    it does not this makes sure the enclosing project contains a metadata
-    entry for the user's public ssh key.
+    This method returns a context manager which checks if the instance has SSH
+    keys defined for it, and if it does not this makes sure the enclosing
+    project contains a metadata entry for the user's public ssh key.
 
-    If the project is updated to add the user's ssh key, then this method
-    waits for the amount of time specified by the wait_time_for_ssh_key_push
-    flag for the change to cascade down to the instance.
+    If the project is updated to add the user's ssh key, then the entry point
+    will attempt to connect to the instance repeatedly until the ssh keys
+    have been propagated.
 
     Args:
       instance_resource: The resource data for the instance to which to connect.
 
+    Returns:
+      A context manager which takes care of adding ephemeral SSH keys to the
+      project and removing them later on.
+
     Raises:
       gcutil_errors.CommandError: If the instance is not in the RUNNING state.
     """
-    instance_status = instance_resource.get('status')
-    if instance_status != 'RUNNING':
-      raise gcutil_errors.CommandError(
-          'Cannot connect to the instance since its current status is %s.'
-          % instance_status)
 
-    instance_metadata = instance_resource.get('metadata', {})
+    class SshableContextManager(object):
+      """Context manager for an instance being sshable.
 
-    instance_ssh_key_entries = (
-        [entry for entry in instance_metadata.get(
-            'items', [])
-         if entry.get('key') == 'sshKeys'])
+      This ensures that an instance can be ssh'ed to on entry (including
+      adding an SSH key pair to the project if necessary).
+      """
 
-    if not instance_ssh_key_entries:
-      if self._AddComputeKeyToProject():
-        wait_time = self._flags.ssh_key_push_wait_time
-        LOGGER.info('Updated project with new ssh key. It can take some '
-                    'time for the instance to pick up the key.')
-        LOGGER.info('Waiting %s seconds before attempting to connect.',
-                    wait_time)
-        self._timer.sleep(wait_time)
+      def __init__(self, add_method, wait_method):
+        self.add_method = add_method
+        self.wait_method = wait_method
+
+      def __enter__(self):
+        instance_status = instance_resource.get('status')
+        if instance_status != 'RUNNING':
+          raise gcutil_errors.CommandError(
+              'Cannot connect to the instance since its current status is %s.'
+              % instance_status)
+
+        instance_metadata = instance_resource.get('metadata', {})
+
+        instance_ssh_key_entries = (
+            [entry for entry in instance_metadata.get('items', [])
+             if entry.get('key') == 'sshKeys'])
+
+        self.added_ssh_key = None
+        if not instance_ssh_key_entries:
+          self.added_ssh_key = self.add_method()
+        if self.added_ssh_key:
+          self.wait_method(instance_resource)
+        return self.added_ssh_key
+
+      def __exit__(self, *args, **kwargs):
+        pass
+
+    return SshableContextManager(
+        self._AddComputeKeyToProject,
+        self._WaitForSshKeyPropagation)
 
   def _BuildSshCmd(self, instance_resource, command, args):
     """Builds the given SSH-based command line with the given arguments.
@@ -1678,14 +1764,14 @@ class SshInstanceBase(InstanceCommand):
     self._PrintEphemeralDiskWarning(instance_resource)
 
     try:
-      self._EnsureSshable(instance_resource)
+      proc = None
+      with self._EnsureSshable(instance_resource):
+        LOGGER.info('Running command line: %s', ' '.join(command_line))
+        proc = subprocess.Popen(command_line)
+      sys.exit(proc.wait())
     except ssh_keys.UserSetupError as e:
       LOGGER.warn('Could not generate compute ssh key: %s', e)
       return
-
-    LOGGER.info('Running command line: %s', ' '.join(command_line))
-    try:
-      sys.exit(subprocess.call(command_line))
     except OSError as e:
       LOGGER.error('There was a problem executing the command: %s', e)
 

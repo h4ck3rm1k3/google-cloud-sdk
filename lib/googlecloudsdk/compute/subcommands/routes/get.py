@@ -16,7 +16,7 @@ class Get(base_classes.GlobalGetter):
     return self.context['compute'].routes
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'routes'
 
 

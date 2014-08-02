@@ -50,7 +50,7 @@ class DeleteAccessConfig(base_classes.BaseAsyncMutator):
     return 'DeleteAccessConfig'
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'instances'
 
   def CreateRequests(self, args):

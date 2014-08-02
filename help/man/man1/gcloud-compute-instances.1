@@ -11,11 +11,17 @@ gcloud-compute-instances \- Read and manipulate Google Compute Engine virtual ma
 .nf
 \fBgcloud compute instances\fR
   COMMAND
-  [\-h, \-\-help]
+  [\-\-help]
+  [\-h]
 .fi
 .SH "FLAGS"
 .PP
 \fB\-\-help\fR
+.RS 4
+Display detailed help\&.
+.RE
+.PP
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE
@@ -56,6 +62,11 @@ Delete Google Compute Engine virtual machine instances\&.
 \fBdelete\-access\-config\fR
 .RS 4
 Delete access configs from Google Compute Engine virtual machines\&.
+.RE
+.PP
+\fBdescribe\fR
+.RS 4
+Describe a virtual machine instance\&.
 .RE
 .PP
 \fBdetach\-disk\fR

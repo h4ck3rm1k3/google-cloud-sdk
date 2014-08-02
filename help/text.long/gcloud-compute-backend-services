@@ -5,14 +5,21 @@ NAME
 SYNOPSIS
        gcloud compute backend-services
          COMMAND
-         [-h, --help]
+         [--help]
+         [-h]
 
 FLAGS
        --help
+           Display detailed help.
+
+       -h
            Print a summary help and exit.
 
 COMMANDS
        COMMAND is one of the following.
+
+       add-backend
+           Add a backend to a backend service.
 
        create
            Create a backend service.
@@ -31,4 +38,7 @@ COMMANDS
 
        list
            List backend services.
+
+       remove-backend
+           Remove a backend frome a backend service.
 

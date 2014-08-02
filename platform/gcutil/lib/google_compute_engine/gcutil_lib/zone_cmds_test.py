@@ -124,7 +124,7 @@ class ZoneCmdsTest(gcutil_unittest.GcutilTestCase):
     data = command.GetDetailRow(results['items'][2])
 
     expected_data = {
-        'v1beta16': [
+        'v1': [
             ('maintenance-window',
              [('name', 'name-1'),
               ('description', 'description-1'),

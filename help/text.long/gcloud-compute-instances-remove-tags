@@ -5,9 +5,10 @@ NAME
 SYNOPSIS
        gcloud compute instances remove-tags
          NAME
+         [--help]
          [--all | --tags TAG [TAG ...]]
-         --zone ZONE
-         [-h, --help]
+         [--zone ZONE]
+         [-h]
 
 DESCRIPTION
        gcloud compute instances remove-tags is used to remove tags to Google
@@ -31,13 +32,17 @@ FLAGS
        --all
            Remove all tags from the instance.
 
+       --help
+           Display detailed help.
+
        --tags TAG [TAG ...]
            Specifies strings to be removed from the instance tags. Multiple
            tags can be removed by repeating this flag.
 
        --zone ZONE
-           The zone of the instance.
+           The zone of the instance to set tags on. If omitted and the
+           arguments are not all URIs, you will be prompted to select a zone.
 
-       --help
+       -h
            Print a summary help and exit.
 

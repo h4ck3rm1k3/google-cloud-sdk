@@ -8,10 +8,10 @@ import sys
 import textwrap
 
 from googlecloudsdk.core import config
+from googlecloudsdk.core import exceptions
 from googlecloudsdk.core import log
 from googlecloudsdk.core import metrics
 from googlecloudsdk.core import properties
-from googlecloudsdk.core.updater import installers
 from googlecloudsdk.core.updater import local_state
 from googlecloudsdk.core.updater import schemas
 from googlecloudsdk.core.updater import snapshots
@@ -20,13 +20,8 @@ from googlecloudsdk.core.util import files as file_utils
 from googlecloudsdk.core.util import platforms
 
 
-class Error(Exception):
+class Error(exceptions.Error):
   """Base exception for the update_manager module."""
-  pass
-
-
-class InvalidSDKRootError(Error):
-  """Error for when the root of the Cloud SDK is invalid or cannot be found."""
   pass
 
 
@@ -35,18 +30,13 @@ class InvalidCWDError(Error):
   pass
 
 
-class InvalidComponentSnapshotURLError(Error):
-  """Error for when the components URL is invalid or cannot be found."""
+class InsufficientPrivilegeError(Error):
+  """Error for when you don't have the permissions to update the SDK."""
   pass
 
 
-class InvalidComponentSourceURLError(Error):
-  """Error for when a single component's URL is invalid or cannot be found."""
-  pass
-
-
-class BadSDKPermissionsError(Error):
-  """Error for problems with permissions when accessing SDK files."""
+class UpdaterDisableError(Error):
+  """Error for when an update is attempted but it is disallowed."""
   pass
 
 
@@ -65,37 +55,11 @@ class ReinstallationFailedError(Error):
   pass
 
 
-class UpdaterDisableError(Error):
-  """Error for when an update is attempted but it is disallowed."""
-  pass
-
-
-def _RaisesBadSDKPermissionsError(func):
-  """Use this decorator for functions that deal with files.
-
-  If an exception indicating file permissions is raised, this decorator will
-  raise a PermissionsError instead, so that the caller only has to watch for
-  one type of exception.
-
-  Args:
-    func: The function to decorate.
-
-  Returns:
-    A decorator.
-  """
-
-  def _TryFunc(*args, **kwargs):
-    try:
-      return func(*args, **kwargs)
-    except local_state.PermissionsError as e:
-      raise BadSDKPermissionsError(e)
-  return _TryFunc
-
-
 class UpdateManager(object):
   """Main class for performing updates for the Cloud SDK."""
 
-  UPDATE_CHECK_FREQUENCY_IN_SECONDS = 86400  # once a day
+  UPDATE_CHECK_FREQUENCY_IN_SECONDS = 86400  # once a day.
+  UPDATE_CHECK_NAG_FREQUENCY_IN_SECONDS = 86400  # once a day.
   BIN_DIR_NAME = 'bin'
 
   def __init__(self, sdk_root=None, url=None, platform_filter=None,
@@ -115,7 +79,7 @@ class UpdateManager(object):
         interactive user output.  If not provided, sys.stdout will be used.
 
     Raises:
-      InvalidSDKRootError: If the Cloud SDK root cannot be found.
+      local_state.InvalidSDKRootError: If the Cloud SDK root cannot be found.
     """
 
     if not url:
@@ -130,8 +94,7 @@ class UpdateManager(object):
       self.__sdk_root = local_state.InstallationState.FindSDKInstallRoot(
           os.path.dirname(__file__))
     if not self.__sdk_root:
-      raise InvalidSDKRootError(
-          'Could not locate the install root of the Cloud SDK.')
+      raise local_state.InvalidSDKRootError()
     self.__sdk_root = os.path.realpath(self.__sdk_root)
     self.__url = url
     self.__platform_filter = platform_filter
@@ -151,10 +114,10 @@ class UpdateManager(object):
     if word_wrap:
       msg = self.__text_wrapper.fill(msg)
     if stderr:
-      sys.stderr.write(msg + '\n')
+      log.err.write(msg + '\n')
     else:
       self.__out_stream.write(msg + '\n')
-    self.__out_stream.flush()
+      self.__out_stream.flush()
 
   def _CheckCWD(self, allow_no_backup=False):
     """Ensure that the command is not being run from within the SDK root.
@@ -199,7 +162,7 @@ class UpdateManager(object):
 
     Raises:
       UpdaterDisableError: If the updater is disabled.
-      BadSDKPermissionsError: If the caller has insufficient privilege.
+      InsufficientPrivilegeError: If the caller has insufficient privilege.
     """
     if config.INSTALLATION_CONFIG.disable_updater:
       message = (
@@ -217,19 +180,17 @@ class UpdateManager(object):
       message = (
           'You cannot perform this action because you do not have permission '
           'to modify the Google Cloud SDK installation directory [' +
-          self.__sdk_root + '].')
+          self.__sdk_root + '].\n\n')
       if (platforms.OperatingSystem.Current() ==
           platforms.OperatingSystem.WINDOWS):
         message += (
-            ' Click the Google Cloud SDK Shell icon and re-run the command in '
+            'Click the Google Cloud SDK Shell icon and re-run the command in '
             'that window, or re-run the command with elevated privileges by '
             'right-clicking cmd.exe and selecting "Run as Administrator".')
       else:
         message += (
-            ' Re-run the command with sudo: sudo gcloud components ...')
-      self.__Write(message, word_wrap=True, stderr=True)
-      raise BadSDKPermissionsError(
-          'Insufficient privilege to run component manager')
+            'Re-run the command with sudo: sudo gcloud components ...')
+      raise InsufficientPrivilegeError(message)
 
   def _GetInstallState(self):
     return local_state.InstallationState(self.__sdk_root)
@@ -239,10 +200,7 @@ class UpdateManager(object):
 
   def _GetStateAndDiff(self):
     install_state = self._GetInstallState()
-    try:
-      latest_snapshot = self._GetLatestSnapshot()
-    except snapshots.URLFetchError as e:
-      raise InvalidComponentSnapshotURLError(e)
+    latest_snapshot = self._GetLatestSnapshot()
     diff = install_state.DiffCurrentState(
         latest_snapshot, platform_filter=self.__platform_filter)
     return install_state, diff
@@ -262,7 +220,6 @@ class UpdateManager(object):
       versions[component_id] = component.VersionString()
     return versions
 
-  @_RaisesBadSDKPermissionsError
   def PerformUpdateCheck(self, force=False):
     """Checks to see if a new snapshot has been released periodically.
 
@@ -278,36 +235,49 @@ class UpdateManager(object):
     Returns:
       bool, True if updates are available, False otherwise.
     """
+    def PrintUpdates(last_update_check):
+      """Print the update message but only if it's time to nag again."""
+      log.debug('Updates are available.')
+      if (self.__out_stream.isatty() and
+          last_update_check.SecondsSinceLastNag()
+          >= UpdateManager.UPDATE_CHECK_NAG_FREQUENCY_IN_SECONDS):
+        self.__Write(
+            '\nThere are available updates for some Cloud SDK components.  To '
+            'install them, please run:', word_wrap=True, stderr=True)
+        self.__Write(
+            ' $ gcloud components update\n', word_wrap=False, stderr=True)
+        last_update_check.SetNagged()
+      return True
+
     if (config.INSTALLATION_CONFIG.disable_updater or
         properties.VALUES.component_manager.disable_update_check.GetBool()):
       return False
 
     install_state = self._GetInstallState()
-    last_update_check = install_state.LastUpdateCheck()
 
-    if not last_update_check.UpdatesAvailable():
+    with install_state.LastUpdateCheck() as last_update_check:
+      # We already know there are updates, no need to check again.
+      if last_update_check.UpdatesAvailable():
+        return PrintUpdates(last_update_check)
+
       # Not time to check again
       if not force and (last_update_check.SecondsSinceLastUpdateCheck()
                         < UpdateManager.UPDATE_CHECK_FREQUENCY_IN_SECONDS):
         return False
 
+      # Check for updates.
       try:
         latest_snapshot = self._GetLatestSnapshot()
       except snapshots.IncompatibleSchemaVersionError:
         # The schema version of the snapshot is newer than what we know about,
         # it is definitely a newer version.
         last_update_check.SetFromIncompatibleSchema()
-        return True
+        return PrintUpdates(last_update_check)
       updates_available = last_update_check.SetFromSnapshot(latest_snapshot)
       if not updates_available:
         return False
+      return PrintUpdates(last_update_check)
 
-    self.__Write('\nThere are available updates for some Cloud SDK components.'
-                 '  To install them, please run:', word_wrap=True, stderr=True)
-    self.__Write(' $ gcloud components update\n', word_wrap=False, stderr=True)
-    return True
-
-  @_RaisesBadSDKPermissionsError
   def List(self, show_versions=False):
     """Lists all of the components and their current state.
 
@@ -405,13 +375,9 @@ class UpdateManager(object):
 
   def _InstallFunction(self, install_state, diff):
     def Inner(component_id):
-      try:
-        return install_state.Install(diff.latest, component_id)
-      except installers.Error as e:
-        raise InvalidComponentSourceURLError(e)
+      return install_state.Install(diff.latest, component_id)
     return Inner
 
-  @_RaisesBadSDKPermissionsError
   def Update(self, update_seed=None, allow_no_backup=False):
     """Performs an update of the given components.
 
@@ -454,7 +420,8 @@ class UpdateManager(object):
     self.__Write()
     if not to_remove and not to_install:
       self.__Write('All components are up to date.')
-      install_state.LastUpdateCheck().SetFromSnapshot(diff.latest, force=True)
+      with install_state.LastUpdateCheck() as update_check:
+        update_check.SetFromSnapshot(diff.latest, force=True)
       return
 
     disable_backup = self._CheckCWD(allow_no_backup=allow_no_backup)
@@ -491,7 +458,8 @@ class UpdateManager(object):
       self.__Write('Creating backup and activating new installation...')
       install_state.ReplaceWith(staging_state)
 
-    install_state.LastUpdateCheck().SetFromSnapshot(diff.latest, force=True)
+    with install_state.LastUpdateCheck() as update_check:
+      update_check.SetFromSnapshot(diff.latest, force=True)
     self.__Write('\nDone!\n')
 
     bad_commands = self.FindAllOldToolsOnPath()
@@ -531,7 +499,6 @@ Please remove the following to avoid accidentally invoking these old tools:
             - set([this_tool]))
     return bad_commands
 
-  @_RaisesBadSDKPermissionsError
   def Remove(self, ids, allow_no_backup=False):
     """Uninstalls the given components.
 
@@ -596,7 +563,6 @@ Please remove the following to avoid accidentally invoking these old tools:
 
     self.__Write('\nDone!\n')
 
-  @_RaisesBadSDKPermissionsError
   def Restore(self):
     """Restores the latest backup installation of the Cloud SDK.
 
@@ -620,7 +586,6 @@ Please remove the following to avoid accidentally invoking these old tools:
 
     self.__Write('\nDone!\n')
 
-  @_RaisesBadSDKPermissionsError
   def _DoFreshInstall(self, e):
     """Do a reinstall of what we have based on a fresh download of the SDK.
 
@@ -660,6 +625,7 @@ Please remove the following to avoid accidentally invoking these old tools:
       staging_state = install_state.CreateStagingFromDownload(download_url)
     except local_state.Error:
       log.error('An updated Cloud SDK failed to download')
+      log.debug('Handling re-installation error', exc_info=True)
       self._RaiseReinstallationFailedError()
 
     # shell out to install script

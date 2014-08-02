@@ -126,8 +126,10 @@ def _HandleRemoveError(func, failed_path, exc_info):
   logging.debug('Handling file system error: %s, %s, %s',
                 func, failed_path, exc_info)
   if not _RetryOperation(exc_info, func, (failed_path), _ShouldRetryOperation):
-    # Always raise the original error
-    raise exc_info
+    # Always raise the original error.
+    # raises is weird in that you can raise exc_info directly even though it's
+    # a tuple.
+    raise exc_info[0], exc_info[1], exc_info[2]
 
 
 def RmTree(path):

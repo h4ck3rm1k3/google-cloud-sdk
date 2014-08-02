@@ -19,10 +19,6 @@ class List(base.Command):
   def Args(parser):
     """Adds args for this command."""
     parser.add_argument(
-        '--section', '-s',
-        help='The section whose properties shall be listed.',
-        choices=properties.VALUES.AllSections())
-    parser.add_argument(
         '--all', action='store_true',
         help='List all set and unset properties that match the arguments.')
     property_arg = parser.add_argument(
@@ -34,14 +30,13 @@ class List(base.Command):
   @c_exc.RaiseToolExceptionInsteadOf(properties.Error)
   def Run(self, args):
     """List available properties."""
-    section = args.section or properties.VALUES.default_section.name
+    section, prop = self.group.ParsePropertyString(args.property)
 
-    if args.property:
+    if prop:
       return {section: {
-          args.property:
-              properties.VALUES.Section(section).Property(args.property).Get()}}
-    if args.section:
-      return {section: properties.VALUES.Section(args.section).AllValues(
+          prop: properties.VALUES.Section(section).Property(prop).Get()}}
+    if section:
+      return {section: properties.VALUES.Section(section).AllValues(
           list_unset=args.all)}
     return properties.VALUES.AllValues(list_unset=args.all)
 

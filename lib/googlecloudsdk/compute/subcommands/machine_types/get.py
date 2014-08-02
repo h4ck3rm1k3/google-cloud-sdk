@@ -3,7 +3,7 @@
 from googlecloudsdk.compute.lib import base_classes
 
 
-class GetMachineTypes(base_classes.ZonalGetter):
+class Get(base_classes.ZonalGetter):
   """Get Google Compute Engine machine types."""
 
   @staticmethod
@@ -16,11 +16,11 @@ class GetMachineTypes(base_classes.ZonalGetter):
     return self.context['compute'].machineTypes
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'machineTypes'
 
 
-GetMachineTypes.detailed_help = {
+Get.detailed_help = {
     'brief': 'Get Google Compute Engine machine types',
     'DESCRIPTION': """\
         *{command}* displays all data associated with Google Compute

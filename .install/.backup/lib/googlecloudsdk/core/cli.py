@@ -15,7 +15,7 @@ from googlecloudsdk.core import config
 from googlecloudsdk.core.credentials import store as c_store
 
 
-__all__ = ['CLI', 'GoogleCloudSDKPackageRoot', 'Credentials', 'Http']
+__all__ = ['CLILoader', 'GoogleCloudSDKPackageRoot', 'Credentials', 'Http']
 
 
 class Error(Exception):
@@ -106,18 +106,14 @@ def GetHelp(help_dir):
     return None
 
 
-def CLI(name, command_root_directory, module_directories=None,
-        top_level_command=None, allow_non_existing_modules=False,
-        version_func=None, help_dir=None):
+def CLILoader(name, command_root_directory, allow_non_existing_modules=False,
+              version_func=None, help_dir=None):
   """Get a ready-to-go CLI for Cloud SDK tools.
 
   Args:
     name: str, The name of your CLI. Should probably be the same as the
         executable name.
     command_root_directory: str, The absolute path to the tools root.
-    module_directories: {str: str}, A Map of subgroup name to alternate roots.
-    top_level_command: str, The name of the top level command to use, instead
-        of a command group.
     allow_non_existing_modules: bool, If true, module directories that don't
         exist will be ignored rather than cause errors.
     version_func: func, Function to call with -v, --version.
@@ -125,16 +121,14 @@ def CLI(name, command_root_directory, module_directories=None,
       if the CLI does not support man pages.
 
   Returns:
-    calliope.CommandLoader, An object that will run the tools from the command
+    calliope.CLILoader, An object that will run the tools from the command
         line.
   """
   paths = config.Paths()
 
-  return calliope.CommandLoader(
+  return calliope.CLILoader(
       name=name,
       command_root_directory=command_root_directory,
-      module_directories=module_directories,
-      top_level_command=top_level_command,
       load_context=None,
       config_file=paths.config_json_path,
       logs_dir=paths.logs_dir,

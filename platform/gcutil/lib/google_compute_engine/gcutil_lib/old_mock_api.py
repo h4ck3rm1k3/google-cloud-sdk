@@ -281,16 +281,6 @@ class MockInstancesApi(MockApiBase):
                                  'deviceName': deviceName, 'zone': zone})
 
 
-class MockKernelsApi(MockApiBase):
-  """Mock return result of the MockApi.kernels() method."""
-
-  def get(self, project='wrong_project', kernel='wrong_kernel'):
-    return self.RegisterRequest({'project': project, 'kernel': kernel})
-
-  def list(self, project='wrong_project'):
-    return self.RegisterRequest({'project': project})
-
-
 class MockMachineSpecsApi(MockApiBase):
   """Mock return result of the MockApi.machineSpecs() method."""
 
@@ -406,9 +396,6 @@ class MockApi(object):
   def instances(self):
     return MockInstancesApi()
 
-  def kernels(self):
-    return MockKernelsApi()
-
   def machineSpecs(self):
     return MockMachineSpecsApi()
 
@@ -453,5 +440,5 @@ class MockCredential(object):
     return http
 
 
-def CreateMockApi(service_version='v1beta16'):
+def CreateMockApi(service_version='v1'):
   return gce_api.ComputeApi(MockApi(), version.get(service_version), None)

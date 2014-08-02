@@ -1,9 +1,55 @@
-Release 1.16.1 (release date: 2014-06-18):
+Release 1.16.4 (release date: 2014-07-24):
+==========================================
+
+Bug Fixes:
+----------
+
+  - Updated deleteinstance to not delete boot disk when
+    --nodelete_boot_pd is set, regardless of whether boot
+    disk is set to be auto-deleted.
+
+  - Updated moveinstances to preserve disk type (SSD or
+    standard).
+
+
+Release 1.16.3 (release date: 2014-07-18):
+==========================================
 
 New Features:
 -------------
 
-  - Change the default volume size to 100GB for SSD Persistent Disk.
+  - Added support for creating images from Persistent Disk.
+
+  - Added support for CoreOS and OpenSUSE.
+
+
+Release 1.16.2 (release date: 2014-06-30):
+==========================================
+
+Bug Fixes:
+----------
+
+  - Updated "gcutil ssh", "gcutil push", and "gcutil pull" to create an SSH
+    directory before running ssh-keygen if the directory does not exist.
+
+  - Updated "gcutil ssh", "gcutil push", and "gcutil pull" to respect arbitrary
+    public SSH key comments.
+
+  - Improved the way gcutil detects Windows instances during instance creation.
+
+Other Changes:
+--------------
+
+  - Removed dependencies on sunsetted v1beta16 API.
+
+
+Release 1.16.1 (release date: 2014-06-18):
+==========================================
+
+New Features:
+-------------
+
+  - Changed the default volume size to 100GB for SSD Persistent Disk.
 
   - Added auto-generation for initial Windows user account and password.
 

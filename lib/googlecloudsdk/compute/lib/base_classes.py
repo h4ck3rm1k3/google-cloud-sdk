@@ -17,54 +17,23 @@ from googlecloudapis.apitools.base.py import encoding
 from googlecloudapis.compute.v1 import compute_v1_messages as messages
 from googlecloudsdk.calliope import base
 from googlecloudsdk.calliope import exceptions as calliope_exceptions
-from googlecloudsdk.compute.lib import constants
 from googlecloudsdk.compute.lib import lister
 from googlecloudsdk.compute.lib import metadata_utils
 from googlecloudsdk.compute.lib import property_selector
 from googlecloudsdk.compute.lib import request_helper
 from googlecloudsdk.compute.lib import resource_specs
+from googlecloudsdk.compute.lib import scope_prompter
+from googlecloudsdk.compute.lib import utils
 from googlecloudsdk.core import log
 from googlecloudsdk.core import properties
 from googlecloudsdk.core.util import console_io
 from googlecloudsdk.core.util import edit
+from googlecloudsdk.core.util import list_printer
 from googlecloudsdk.core.util import resource_printer
-
-
-def ConstructList(title, items):
-  """Returns a string displaying the items and a title."""
-  buf = cStringIO.StringIO()
-  printer = console_io.ListPrinter(title)
-  printer.Print(sorted(set(items)), output_stream=buf)
-  return buf.getvalue()
-
-
-def RaiseToolException(problems, error_message=None):
-  """Raises a ToolException with the given list of messages."""
-  tips = []
-  errors = []
-  for code, message in problems:
-    errors.append(message)
-
-    new_tips = constants.HTTP_ERROR_TIPS.get(code)
-    if new_tips:
-      tips.extend(new_tips)
-
-  if tips:
-    advice = ConstructList(
-        '\nhere are some tips that may help fix these problems:', tips)
-  else:
-    advice = ''
-
-  raise calliope_exceptions.ToolException(
-      ConstructList(
-          error_message or 'some requests did not succeed:',
-          errors) + advice)
 
 
 def PrintTable(resources, table_cols):
   """Prints a table of the given resources."""
-  # TODO(user): Switch over to console_io.TablePrinter once the
-  # class is refactored to support tables without ASCII borders.
   printer = resource_printer.TablePrinter(out=log.out)
 
   header = []
@@ -84,18 +53,21 @@ def PrintTable(resources, table_cols):
   printer.Print()
 
 
-class BaseCommand(base.Command):
+class BaseCommand(base.Command, scope_prompter.ScopePrompter):
   """Base class for all compute subcommands."""
 
   __metaclass__ = abc.ABCMeta
 
   def __init__(self, *args, **kwargs):
     super(BaseCommand, self).__init__(*args, **kwargs)
-    if self.print_resource_type:
+
+    # Set the default project for resource resolution
+
+    if self.resource_type:
       # Constructing the spec can be potentially expensive (e.g.,
       # generating the set of valid fields from the protobuf message),
       # so we fetch it once in the constructor.
-      self._resource_spec = resource_specs.GetSpec(self.print_resource_type)
+      self._resource_spec = resource_specs.GetSpec(self.resource_type)
     else:
       self._resource_spec = None
 
@@ -106,14 +78,18 @@ class BaseCommand(base.Command):
     else:
       return None
 
-  # TODO(user): Change this to "resource_type". "print_resource_type"
-  # is now a misnomer because the resource_specs module contains
-  # non-presentation data as well (e.g., which fields can be edited
-  # for a give resource).
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     """Specifies the name of the collection that should be printed."""
     return None
+
+  @property
+  def prompting_resource_type(self):
+    """Specifies the name of the collection that should be prompted for.
+
+    For most commands this is equal to self.resource_type.
+    """
+    return self.resource_type
 
 
 class BaseResourceFetcher(BaseCommand):
@@ -123,20 +99,6 @@ class BaseResourceFetcher(BaseCommand):
 
   @staticmethod
   def Args(parser, add_name_regex_arg=True):
-    raw_links = parser.add_argument(
-        '--raw-links',
-        action='store_true',
-        help=('If provided, resource references in output from the server will '
-              'not be condensed for readability.'))
-    raw_links.detailed_help = """\
-        If provided, resource references in output from the server
-        will not be condensed for readability. For example, when
-        listing operations, if a targetLink is
-        ``https://www.googleapis.com/compute/v1/projects/my-project/zones/us-central2-a/instances/my-instance'',
-        ``us-central2-a/instances/my-instance'' is shown for
-        brevity. This behavior can be turned off using this flag.
-        """
-
     parser.add_argument(
         '--limit',
         type=int,
@@ -178,7 +140,7 @@ class BaseResourceFetcher(BaseCommand):
     if args.limit is not None:
       if args.limit <= 0:
         raise calliope_exceptions.ToolException(
-            '--limit must be a positive integer; received: {0}'
+            '[--limit] must be a positive integer; received [{0}].'
             .format(args.limit))
 
       # A really large value should be treated as if the user does not
@@ -222,7 +184,7 @@ class BaseLister(BaseResourceFetcher):
       # fields, we can fail fast.
       field_selector = property_selector.PropertySelector(
           properties=None,
-          transformations=None if args.raw_links else self.transformations)
+          transformations=self.transformations)
 
     errors = []
     resources = lister.ProcessResults(
@@ -238,7 +200,7 @@ class BaseLister(BaseResourceFetcher):
         yield resource
 
     if errors:
-      RaiseToolException(errors)
+      utils.RaiseToolException(errors)
 
   def Display(self, args, resources):
     """Prints the given resources."""
@@ -280,6 +242,55 @@ def AddFieldsFlag(parser, resource_type):
   fields.detailed_help = GenerateDetailedHelp
 
 
+class BaseDescriber(BaseCommand):
+  """Base class for the describe subcommands."""
+
+  __metaclass__ = abc.ABCMeta
+
+  @staticmethod
+  def Args(parser):
+    parser.add_argument(
+        'name',
+        metavar='NAME',
+        help='The name of the resource to fetch.')
+
+  @property
+  def method(self):
+    return 'Get'
+
+  def ScopeRequest(self, args, request):
+    """Adds a zone or region to the request object if necessary."""
+
+  def Run(self, args):
+    """Yields JSON-serializable dicts of resources."""
+    # The field selector should be constructed before any resources
+    # are fetched, so if there are any syntactic errors with the
+    # fields, we can fail fast.
+    field_selector = property_selector.PropertySelector(properties=args.fields)
+    get_request_class = self.service.GetRequestType(self.method)
+    name_field = self.service.GetMethodConfig(self.method).ordered_params[-1]
+
+    request = get_request_class(project=self.context['project'])
+    setattr(request, name_field, args.name)
+    self.ScopeRequest(args, request)
+
+    get_request = (self.service, self.method, request)
+    objects = request_helper.MakeRequests(
+        requests=[get_request],
+        http=self.context['http'],
+        batch_url=self.context['batch-url'])
+
+    resources = list(lister.ProcessResults(objects, field_selector))
+    return resources[0]
+
+  def Display(self, args, resources):
+    """Prints the given resources."""
+    resource_printer.Print(
+        resources=resources,
+        print_format='yaml',
+        out=log.out)
+
+
 class BaseGetter(BaseResourceFetcher):
   """Base class for the get subcommands."""
 
@@ -288,19 +299,6 @@ class BaseGetter(BaseResourceFetcher):
   @staticmethod
   def Args(parser, add_name_regex_arg=True):
     BaseResourceFetcher.Args(parser, add_name_regex_arg=add_name_regex_arg)
-    format_arg = parser.add_argument(
-        '--format',
-        choices=resource_printer.SUPPORTED_FORMATS,
-        default='yaml',
-        help='Specifies the display format.')
-    format_arg.detailed_help = """\
-        Specifies the display format. By default, resources are
-        printed in YAML format.  The "text" and "yaml" formats print
-        data as they are fetched from the server, so these formats
-        feel more responsive. The "json" format delays printing
-        until all data is collected into a single list,
-        so it may feel less responsive.
-        """
 
   def ActuallyRun(self, args):
     """Yields JSON-serializable dicts of resources."""
@@ -309,7 +307,7 @@ class BaseGetter(BaseResourceFetcher):
     # fields, we can fail fast.
     field_selector = property_selector.PropertySelector(
         properties=args.fields,
-        transformations=None if args.raw_links else self.transformations)
+        transformations=None)
 
     errors = []
     resources = lister.ProcessResults(
@@ -322,13 +320,13 @@ class BaseGetter(BaseResourceFetcher):
       yield resource
 
     if errors:
-      RaiseToolException(errors)
+      utils.RaiseToolException(errors)
 
   def Display(self, args, resources):
     """Prints the given resources."""
     resource_printer.Print(
         resources=resources,
-        print_format=args.format,
+        print_format='yaml',
         out=log.out)
 
 
@@ -351,6 +349,10 @@ class GlobalLister(GlobalResourceFetcherMixin, BaseLister):
 
 class GlobalGetter(GlobalResourceFetcherMixin, BaseGetter):
   """Base class for getting global resources."""
+
+
+class GlobalDescriber(BaseDescriber):
+  """Base class for describing global resources."""
 
 
 class RegionalResourceFetcherMixin(object):
@@ -397,6 +399,21 @@ class RegionalGetter(RegionalResourceFetcherMixin, BaseGetter):
         default=[])
 
 
+class RegionalDescriber(BaseDescriber):
+  """Base class for describing regional resources."""
+
+  @staticmethod
+  def Args(parser):
+    BaseDescriber.Args(parser)
+    parser.add_argument(
+        '--region',
+        help='The region of the resource.',
+        required=True)
+
+  def ScopeRequest(self, args, request):
+    request.region = args.region
+
+
 class ZonalResourceFetcherMixin(object):
   """Mixin class for zonal resources."""
 
@@ -439,6 +456,21 @@ class ZonalGetter(ZonalResourceFetcherMixin, BaseGetter):
         help='If provided, only resources from the given zones are queried.',
         nargs='+',
         default=[])
+
+
+class ZonalDescriber(BaseDescriber):
+  """Base class for describing zonal resources."""
+
+  @staticmethod
+  def Args(parser):
+    BaseDescriber.Args(parser)
+    parser.add_argument(
+        '--zone',
+        help='The zone of the resource.',
+        required=True)
+
+  def ScopeRequest(self, args, request):
+    request.zone = args.zone
 
 
 class BaseAsyncMutator(BaseCommand):
@@ -517,6 +549,15 @@ class BaseAsyncMutator(BaseCommand):
       pass
 
 
+class BaseAsyncCreator(BaseAsyncMutator):
+  """Base class for subcommands that create resources."""
+
+  def Display(self, _, resources):
+    list_printer.PrintResourceList(
+        'compute.' + self.resource_type,
+        resources)
+
+
 class BaseDeleter(BaseAsyncMutator):
   """Base class for deleting resources."""
 
@@ -530,8 +571,12 @@ class BaseDeleter(BaseAsyncMutator):
         help='The resources to delete.')
 
   @abc.abstractproperty
-  def collection(self):
+  def resource_type(self):
     """The name of the collection that we will delete from."""
+
+  @abc.abstractproperty
+  def reference_creator(self):
+    """A function that can construct resource reference objects."""
 
   @property
   def method(self):
@@ -540,20 +585,29 @@ class BaseDeleter(BaseAsyncMutator):
   def ScopeRequest(self, args, request):
     """Adds a zone or region to the request object if necessary."""
 
+  @abc.abstractmethod
+  def CreatePromptListItem(self, ref):
+    pass
+
   def CreateRequests(self, args):
     """Returns a list of delete request protobufs."""
     delete_request_class = self.service.GetRequestType(self.method)
     name_field = self.service.GetMethodConfig(self.method).ordered_params[-1]
 
-    prompt_message = ConstructList(self.prompt_title, args.names)
+    refs = self.reference_creator(args.names, args)
+    prompt_list = []
+    for ref in refs:
+      prompt_list.append(self.CreatePromptListItem(ref))
+
+    prompt_message = utils.ConstructList(self.prompt_title, prompt_list)
     if not console_io.PromptContinue(message=prompt_message):
-      raise calliope_exceptions.ToolException('deletion aborted by user')
+      raise calliope_exceptions.ToolException('Deletion aborted by user.')
 
     requests = []
-    for name in args.names:
+    for ref in refs:
       request = delete_request_class(project=self.context['project'])
-      setattr(request, name_field, name)
-      self.ScopeRequest(args, request)
+      setattr(request, name_field, ref.Name())
+      self.ScopeRequest(ref, request)
       requests.append(request)
     return requests
 
@@ -564,18 +618,22 @@ class ZonalDeleter(BaseDeleter):
   @staticmethod
   def Args(parser):
     BaseDeleter.Args(parser)
-    parser.add_argument(
-        '--zone',
-        help='The zone of the resources to delete.',
-        required=True)
+    utils.AddZoneFlag(
+        parser, resource_type='resources', operation_type='delete')
 
-  def ScopeRequest(self, args, request):
-    request.zone = args.zone
+  @property
+  def reference_creator(self):
+    return (lambda names, args: self.CreateZonalReferences(names, args.zone))
+
+  def ScopeRequest(self, ref, request):
+    request.zone = ref.zone
+
+  def CreatePromptListItem(self, ref):
+    return '[{0}] in [{1}]'.format(ref.Name(), ref.zone)
 
   def Run(self, args):
-    self.prompt_title = (
-        'The following {0} in zone {1} will be deleted:'.format(
-            self.collection, args.zone))
+    self.prompt_title = 'The following {0} will be deleted:'.format(
+        self.resource_type)
     return super(ZonalDeleter, self).Run(args)
 
 
@@ -585,27 +643,39 @@ class RegionalDeleter(BaseDeleter):
   @staticmethod
   def Args(parser):
     BaseDeleter.Args(parser)
-    parser.add_argument(
-        '--region',
-        help='The region of the resources to delete.',
-        required=True)
+    utils.AddRegionFlag(
+        parser, resource_type='resources', operation_type='delete')
 
-  def ScopeRequest(self, args, request):
-    request.region = args.region
+  @property
+  def reference_creator(self):
+    return (
+        lambda names, args: self.CreateRegionalReferences(names, args.region))
+
+  def ScopeRequest(self, ref, request):
+    request.region = ref.region
+
+  def CreatePromptListItem(self, ref):
+    return '[{0}] in [{1}]'.format(ref.Name(), ref.region)
 
   def Run(self, args):
-    self.prompt_title = (
-        'The following {0} in region {1} will be deleted:'.format(
-            self.collection, args.region))
+    self.prompt_title = 'The following {0} will be deleted:'.format(
+        self.resource_type)
     return super(RegionalDeleter, self).Run(args)
 
 
 class GlobalDeleter(BaseDeleter):
   """Base class for deleting global resources."""
 
+  @property
+  def reference_creator(self):
+    return (lambda names, _: self.CreateGlobalReferences(names))
+
+  def CreatePromptListItem(self, ref):
+    return '[{0}]'.format(ref.Name())
+
   def Run(self, args):
     self.prompt_title = 'The following {0} will be deleted:'.format(
-        self.collection)
+        self.resource_type)
     return super(GlobalDeleter, self).Run(args)
 
 
@@ -617,6 +687,9 @@ class ReadWriteCommand(BaseCommand):
   @abc.abstractproperty
   def service(self):
     pass
+
+  def CreateReference(self, args):
+    """Returns a resources.Resource object for the object being mutated."""
 
   @abc.abstractmethod
   def GetGetRequest(self, args):
@@ -630,11 +703,8 @@ class ReadWriteCommand(BaseCommand):
   def Modify(self, args, existing):
     """Returns a modified resource."""
 
-  @property
-  def messages(self):
-    return messages
-
   def Run(self, args):
+    self.ref = self.CreateReference(args)
     get_request = self.GetGetRequest(args)
     objects = list(request_helper.MakeRequests(
         requests=[get_request],
@@ -657,51 +727,6 @@ class ReadWriteCommand(BaseCommand):
 
     resources = request_helper.MakeRequests(
         requests=[self.GetSetRequest(args, new_object, objects[0])],
-        http=self.context['http'],
-        batch_url=self.context['batch-url'])
-
-    resources = lister.ProcessResults(
-        resources=resources,
-        field_selector=property_selector.PropertySelector(
-            properties=None,
-            transformations=self.transformations))
-    for resource in resources:
-      yield resource
-
-  def Display(self, _, resources):
-    resource_printer.Print(
-        resources=resources,
-        print_format='yaml',
-        out=log.out)
-
-
-class ReadSetCommand(BaseCommand):
-  """Base class for read->set subcommands."""
-
-  __metaclass__ = abc.ABCMeta
-
-  @abc.abstractproperty
-  def service(self):
-    pass
-
-  @abc.abstractmethod
-  def GetGetRequest(self, args):
-    """Returns a request for fetching a resource."""
-
-  @abc.abstractmethod
-  def GetSetRequest(self, args, existing):
-    """Returns a request for setting a resource."""
-
-  def Run(self, args):
-    get_request = self.GetGetRequest(args)
-    objects = list(request_helper.MakeRequests(
-        requests=[get_request],
-        http=self.context['http'],
-        batch_url=self.context['batch-url']))
-
-    set_request = self.GetSetRequest(args, objects[0])
-    resources = request_helper.MakeRequests(
-        requests=[set_request],
         http=self.context['http'],
         batch_url=self.context['batch-url'])
 
@@ -748,7 +773,8 @@ class BaseMetadataAdder(ReadWriteCommand):
   def Run(self, args):
     if not args.metadata and not args.metadata_from_file:
       raise calliope_exceptions.ToolException(
-          'at least one of --metadata or --metadata-from-file must be provided')
+          'At least one of [--metadata] or [--metadata-from-file] must be '
+          'provided.')
 
     return super(BaseMetadataAdder, self).Run(args)
 
@@ -790,7 +816,7 @@ class BaseMetadataRemover(ReadWriteCommand):
   def Run(self, args):
     if not args.all and not args.keys:
       raise calliope_exceptions.ToolException(
-          'one of --all or --keys must be provided')
+          'One of [--all] or [--keys] must be provided.')
 
     return super(BaseMetadataRemover, self).Run(args)
 
@@ -800,14 +826,18 @@ class InstanceMetadataMutatorMixin(ReadWriteCommand):
 
   @staticmethod
   def Args(parser):
-    parser.add_argument(
-        '--zone',
-        help='The zone of the instance.',
-        required=True)
+    utils.AddZoneFlag(
+        parser,
+        resource_type='instance',
+        operation_type='set metadata on')
     parser.add_argument(
         'name',
         metavar='NAME',
         help='The name of the instance whose metadata should be modified.')
+
+  @property
+  def resource_type(self):
+    return 'instances'
 
   @property
   def service(self):
@@ -817,22 +847,25 @@ class InstanceMetadataMutatorMixin(ReadWriteCommand):
   def metadata_field(self):
     return 'metadata'
 
+  def CreateReference(self, args):
+    return self.CreateZonalReference(args.name, args.zone)
+
   def GetGetRequest(self, args):
     return (self.service,
             'Get',
             messages.ComputeInstancesGetRequest(
-                instance=args.name,
+                instance=self.ref.Name(),
                 project=self.context['project'],
-                zone=args.zone))
+                zone=self.ref.zone))
 
   def GetSetRequest(self, args, replacement, existing):
     return (self.service,
             'SetMetadata',
             messages.ComputeInstancesSetMetadataRequest(
-                instance=args.name,
+                instance=self.ref.Name(),
                 metadata=replacement.metadata,
                 project=self.context['project'],
-                zone=args.zone))
+                zone=self.ref.zone))
 
 
 class InstanceTagsMutatorMixin(ReadWriteCommand):
@@ -840,35 +873,42 @@ class InstanceTagsMutatorMixin(ReadWriteCommand):
 
   @staticmethod
   def Args(parser):
-    parser.add_argument(
-        '--zone',
-        help='The zone of the instance.',
-        required=True)
+    utils.AddZoneFlag(
+        parser,
+        resource_type='instance',
+        operation_type='set tags on')
     parser.add_argument(
         'name',
         metavar='NAME',
         help='The name of the instance whose tags should be modified.')
 
   @property
+  def resource_type(self):
+    return 'instances'
+
+  @property
   def service(self):
     return self.context['compute'].instances
+
+  def CreateReference(self, args):
+    return self.CreateZonalReference(args.name, args.zone)
 
   def GetGetRequest(self, args):
     return (self.service,
             'Get',
             messages.ComputeInstancesGetRequest(
-                instance=args.name,
+                instance=self.ref.Name(),
                 project=self.context['project'],
-                zone=args.zone))
+                zone=self.ref.zone))
 
   def GetSetRequest(self, args, replacement, existing):
     return (self.service,
             'SetTags',
             messages.ComputeInstancesSetTagsRequest(
-                instance=args.name,
+                instance=self.ref.Name(),
                 tags=replacement.tags,
                 project=self.context['project'],
-                zone=args.zone))
+                zone=self.ref.zone))
 
 
 class ProjectMetadataMutatorMixin(ReadWriteCommand):
@@ -960,6 +1000,8 @@ class BaseEdit(BaseCommand):
 
   __metaclass__ = abc.ABCMeta
 
+  DEFAULT_FORMAT = 'yaml'
+
   @abc.abstractproperty
   def service(self):
     pass
@@ -976,17 +1018,6 @@ class BaseEdit(BaseCommand):
   def example_resource(self):
     pass
 
-  @staticmethod
-  def Args(parser):
-    format_arg = parser.add_argument(
-        '--format',
-        choices=['json', 'yaml'],
-        default='yaml',
-        help='The format to edit the resource in.')
-    format_arg.detailed_help = """\
-        The format to edit the resource in. Choices are ``json'' and ``yaml''.
-        """
-
   def ProcessEditedResource(self, file_contents, args):
     """Returns an updated resource that was edited by the user."""
 
@@ -1002,7 +1033,8 @@ class BaseEdit(BaseCommand):
         ' ' * len(line) if line.startswith('#') else line
         for line in file_contents.splitlines())
 
-    modified_record = _DeserializeValue(non_comment_lines, args.format)
+    modified_record = _DeserializeValue(non_comment_lines,
+                                        args.format or BaseEdit.DEFAULT_FORMAT)
 
     if self.modifiable_record == modified_record:
       new_object = None
@@ -1053,17 +1085,19 @@ class BaseEdit(BaseCommand):
       buf.write('\n')
 
     buf.write('\n')
-    buf.write(_SerializeDict(self.modifiable_record, args.format))
+    buf.write(_SerializeDict(self.modifiable_record,
+                             args.format or BaseEdit.DEFAULT_FORMAT))
     buf.write('\n')
 
     example = _SerializeDict(
         encoding.MessageToDict(self.example_resource),
-        args.format)
+        args.format or BaseEdit.DEFAULT_FORMAT)
     _WriteResourceInCommentBlock(example, 'Example resource:', buf)
 
     buf.write('#\n')
 
-    original = _SerializeDict(self.original_record, args.format)
+    original = _SerializeDict(self.original_record,
+                              args.format or BaseEdit.DEFAULT_FORMAT)
     _WriteResourceInCommentBlock(original, 'Original resource:', buf)
 
     file_contents = buf.getvalue()
@@ -1090,7 +1124,7 @@ class BaseEdit(BaseCommand):
         if not console_io.PromptContinue(
             message=message,
             prompt_string='Would you like to edit the resource again?'):
-          raise calliope_exceptions.ToolException('edit aborted by user')
+          raise calliope_exceptions.ToolException('Edit aborted by user.')
 
     resources = lister.ProcessResults(
         resources=resources,
@@ -1105,4 +1139,3 @@ class BaseEdit(BaseCommand):
         resources=resources,
         print_format='yaml',
         out=log.out)
-

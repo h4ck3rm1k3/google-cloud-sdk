@@ -14,7 +14,7 @@
 
 import re
 
-__version__ = '1.15.0'
+__version__ = '1.16.1'
 
 # Supported_api_versions must be maintained in chronological order
 SUPPORTED_API_VERSIONS = ['v1beta16', 'v1']

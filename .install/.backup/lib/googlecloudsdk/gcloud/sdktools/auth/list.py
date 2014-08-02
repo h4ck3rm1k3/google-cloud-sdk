@@ -42,9 +42,14 @@ class List(base.Command):
       lp.Print([account +
                 (' (active)' if account == result.active_account else '')
                 for account in result.accounts])
-      log.Print(textwrap.dedent("""\
-          To set the active account, run
-           $ gcloud config set account <account>
+      log.err.Print(textwrap.dedent("""
+          To set the active account, run:
+            $ gcloud config set account <account>
           """))
     else:
-      log.Print('No credentialed accounts.')
+      log.err.Print(textwrap.dedent("""\
+          No credentialed accounts.
+          
+          To login, run:
+            $ gcloud auth login <account>
+          """))

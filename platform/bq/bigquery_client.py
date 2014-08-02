@@ -1221,7 +1221,16 @@ class BigqueryClient(object):
     if list_all is not None:
       request['all'] = list_all
     result = self.apiclient.datasets().list(**request).execute()
-    return result.get('datasets', [])
+    results = result.get('datasets', [])
+    if max_results is not None:
+      while 'nextPageToken' in result and len(results) < max_results:
+        request = self._PrepareListRequest(
+            reference, max_results, result['nextPageToken'])
+        if list_all is not None:
+          request['all'] = list_all
+        result = self.apiclient.datasets().list(**request).execute()
+        results.extend(result.get('datasets', []))
+    return results
 
   def ListTableRefs(self, **kwds):
     return map(  # pylint: disable=g-long-lambda
@@ -1247,13 +1256,13 @@ class BigqueryClient(object):
   ## Table and dataset management
   #################################
 
-  def CopyTable(self, source_reference, dest_reference,
+  def CopyTable(self, source_references, dest_reference,
                 create_disposition=None, write_disposition=None,
                 ignore_already_exists=False, **kwds):
     """Copies a table.
 
     Args:
-      source_reference: TableReference of source table.
+      source_references: TableReferences of source tables.
       dest_reference: TableReference of destination table.
       create_disposition: Optional. Specifies the create_disposition for
           the dest_reference.
@@ -1269,13 +1278,14 @@ class BigqueryClient(object):
       BigqueryDuplicateError: when write_disposition 'WRITE_EMPTY' is
         specified and the dest_reference table already exists.
     """
-    _Typecheck(source_reference, ApiClientHelper.TableReference,
-               method='CopyTable')
+    for src_ref in source_references:
+      _Typecheck(src_ref, ApiClientHelper.TableReference,
+                 method='CopyTable')
     _Typecheck(dest_reference, ApiClientHelper.TableReference,
                method='CopyTable')
     copy_config = {
         'destinationTable': dict(dest_reference),
-        'sourceTable': dict(source_reference),
+        'sourceTables': [dict(src_ref) for src_ref in source_references],
         }
     _ApplyParameters(copy_config, create_disposition=create_disposition,
                      write_disposition=write_disposition)
@@ -1981,6 +1991,7 @@ class BigqueryClient(object):
         priority=priority,
         write_disposition=write_disposition,
         use_query_cache=use_cache,
+        flatten_results=flatten_results,
         min_completion_ratio=min_completion_ratio)
     request = {'query': query_config}
     _ApplyParameters(request, dry_run=dry_run)

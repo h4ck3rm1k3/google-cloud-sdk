@@ -17,6 +17,7 @@ from googlecloudsdk.core.updater import schemas
 from googlecloudsdk.core.updater import snapshots
 from googlecloudsdk.core.util import console_io
 from googlecloudsdk.core.util import files as file_utils
+from googlecloudsdk.core.util import platforms
 
 
 class Error(Exception):
@@ -193,10 +194,12 @@ class UpdateManager(object):
     """Prints an error and raises an Exception if the updater is disabled.
 
     The updater is disabled for installations that come from other package
-    managers like apt-get.
+    managers like apt-get or if the current user does not have permission
+    to create or delete files in the SDK root directory.
 
     Raises:
       UpdaterDisableError: If the updater is disabled.
+      BadSDKPermissionsError: If the caller has insufficient privilege.
     """
     if config.INSTALLATION_CONFIG.disable_updater:
       message = (
@@ -208,6 +211,25 @@ class UpdateManager(object):
       self.__Write(message, word_wrap=True, stderr=True)
       raise UpdaterDisableError(
           'The component manager is disabled for this installation')
+    if (os.path.isdir(self.__sdk_root) and
+        (not os.access(self.__sdk_root, os.X_OK) or
+         not os.access(self.__sdk_root, os.W_OK))):
+      message = (
+          'You cannot perform this action because you do not have permission '
+          'to modify the Google Cloud SDK installation directory [' +
+          self.__sdk_root + '].')
+      if (platforms.OperatingSystem.Current() ==
+          platforms.OperatingSystem.WINDOWS):
+        message += (
+            ' Click the Google Cloud SDK Shell icon and re-run the command in '
+            'that window, or re-run the command with elevated privileges by '
+            'right-clicking cmd.exe and selecting "Run as Administrator".')
+      else:
+        message += (
+            ' Re-run the command with sudo: sudo gcloud components ...')
+      self.__Write(message, word_wrap=True, stderr=True)
+      raise BadSDKPermissionsError(
+          'Insufficient privilege to run component manager')
 
   def _GetInstallState(self):
     return local_state.InstallationState(self.__sdk_root)

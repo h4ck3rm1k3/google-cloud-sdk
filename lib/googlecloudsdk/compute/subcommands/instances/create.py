@@ -9,6 +9,8 @@ from googlecloudsdk.compute.lib import base_classes
 from googlecloudsdk.compute.lib import constants
 from googlecloudsdk.compute.lib import image_utils
 from googlecloudsdk.compute.lib import metadata_utils
+from googlecloudsdk.compute.lib import utils
+from googlecloudsdk.core import resources
 
 
 DISK_METAVAR = (
@@ -19,7 +21,7 @@ MIGRATION_OPTIONS = sorted(
     messages.Scheduling.OnHostMaintenanceValueValuesEnum.to_dict().keys())
 
 
-class CreateInstances(base_classes.BaseAsyncMutator):
+class Create(base_classes.BaseAsyncMutator, image_utils.ImageExpander):
   """Create Google Compute Engine virtual machine instances."""
 
   @staticmethod
@@ -30,11 +32,11 @@ class CreateInstances(base_classes.BaseAsyncMutator):
         '--boot-disk-device-name',
         help='The name the guest operating system will see the boot disk as.')
     boot_disk_device_name.detailed_help = """\
-        The name the guest operating system will see for the boot disk
-        as. This option can only be specified when using
-        ``--image''. When creating more than one instance, the value
-        of the device name will apply to all of the instances' boot
-        disks.
+        The name the guest operating system will see for the boot disk as.  This
+        option can only be specified if a new boot disk is being created (as
+        opposed to mounting an existing persistent disk). When creating more
+        than one instance, the value of the device name will apply to all of the
+        instances' boot disks.
         """
 
     boot_disk_size = parser.add_argument(
@@ -42,14 +44,25 @@ class CreateInstances(base_classes.BaseAsyncMutator):
         type=arg_parsers.BinarySize(lower_bound='10GB'),
         help='The size of the boot disk.')
     boot_disk_size.detailed_help = """\
-        The size of the boot disk. This option can only be specified when using
-        ``--image''. The value must be a whole number followed
-        by a size unit of ``KB'' for kilobyte, ``MB'' for megabyte, ``GB'' for
-        gigabyte, or ``TB'' for terabyte. For example, ``10GB'' will produce a
-        10 gigabyte disk. If omitted, a default size of 200 GB is used. The
-        minimum size a disk can have is 1 GB. Disk size must be a multiple
-        of 1 GB. When creating more than one instance, the size will apply
-        to all of the instances' boot disks.
+        The size of the boot disk. This option can only be specified if a new
+        boot disk is being created (as opposed to mounting an existing
+        persistent disk). The value must be a whole number followed by a size
+        unit of ``KB'' for kilobyte, ``MB'' for megabyte, ``GB'' for gigabyte,
+        or ``TB'' for terabyte. For example, ``10GB'' will produce a 10 gigabyte
+        disk. If omitted, a default size of 200 GB is used. The minimum size a
+        boot disk can have is 10 GB. Disk size must be a multiple of 1 GB. When
+        creating more than one instance, the size will apply to all of the
+        instances' boot disks.
+        """
+
+    boot_disk_type = parser.add_argument(
+        '--boot-disk-type',
+        help='The type of the boot disk.')
+    boot_disk_type.detailed_help = """\
+        The type of the boot disk. This option can only be specified if a new boot
+        disk is being created (as opposed to mounting an existing persistent
+        disk). To get a list of available disk types, run 'gcloud compute
+        disk-types list'.
         """
 
     parser.add_argument(
@@ -80,6 +93,8 @@ class CreateInstances(base_classes.BaseAsyncMutator):
         '--image',
         help='The image that the boot disk will be initialized with.')
     image.detailed_help = AddImageHelp
+
+    image_utils.AddImageProjectFlag(parser)
 
     parser.add_argument(
         '--can-ip-forward',
@@ -255,9 +270,10 @@ class CreateInstances(base_classes.BaseAsyncMutator):
         nargs='+',
         help='The names of the instances to create.')
 
-    parser.add_argument(
-        '--zone', required=True,
-        help='The zone to create the instances in.')
+    utils.AddZoneFlag(
+        parser,
+        resource_type='instances',
+        operation_type='create')
 
   @property
   def service(self):
@@ -268,7 +284,7 @@ class CreateInstances(base_classes.BaseAsyncMutator):
     return 'Insert'
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'instances'
 
   def ValidateDiskFlags(self, args):
@@ -279,76 +295,79 @@ class CreateInstances(base_classes.BaseAsyncMutator):
       disk_name = disk.get('name')
       if not disk_name:
         raise exceptions.ToolException(
-            'missing name in --disk; --disk value must be of the form "{0}"'
-            .format(DISK_METAVAR))
+            '[name] is missing in [--disk]. [--disk] value must be of the form '
+            '[{0}].'.format(DISK_METAVAR))
 
       mode_value = disk.get('mode')
       if mode_value and mode_value not in ('rw', 'ro'):
         raise exceptions.ToolException(
-            'value for mode in --disk must be "rw" or "ro"; received: {0}'
+            'Value for [mode] in [--disk] must be [rw] or [ro], not [{0}].'
             .format(mode_value))
 
       # Ensures that the user is not trying to attach a read-write
       # disk to more than one instance.
       if len(args.names) > 1 and mode_value == 'rw':
         raise exceptions.ToolException(
-            'cannot attach disk "{0}" in read-write mode to more than one '
-            'instance'.format(disk_name))
+            'Cannot attach disk [{0}] in read-write mode to more than one '
+            'instance.'.format(disk_name))
 
       boot_value = disk.get('boot')
       if boot_value and boot_value not in ('yes', 'no'):
         raise exceptions.ToolException(
-            'value for boot in --disk must be "yes" or "no"; received: {0}'
+            'Value for [boot] in [--disk] must be [yes] or [no], not [{0}].'
             .format(boot_value))
 
       auto_delete_value = disk.get('auto-delete')
       if auto_delete_value and auto_delete_value not in ['yes', 'no']:
         raise exceptions.ToolException(
-            'value for auto-delete in --disk must be "yes" or "no"; '
-            'received: {0}'
-            .format(auto_delete_value))
+            'Value for [auto-delete] in [--disk] must be [yes] or [no], not '
+            '[{0}].'.format(auto_delete_value))
 
       # If this is a boot disk and we have already seen a boot disk,
       # we need to fail because only one boot disk can be attached.
       if boot_value == 'yes':
         if boot_disk_specified:
           raise exceptions.ToolException(
-              'each instance can have exactly one boot disk; at least two '
-              'boot disks were specified through --disk')
+              'Each instance can have exactly one boot disk. At least two '
+              'boot disks were specified through [--disk].')
         else:
           boot_disk_specified = True
 
     if args.image and boot_disk_specified:
       raise exceptions.ToolException(
-          'each instance can have exactly one boot disk; one boot disk '
-          'was specified through --disk and another through --image')
+          'Each instance can have exactly one boot disk. One boot disk '
+          'was specified through [--disk] and another through [--image].')
 
     if not args.image and args.boot_disk_device_name:
       raise exceptions.ToolException(
-          '--boot-disk-device-name can only be used in conjunction with the '
-          '--image flag')
+          '[--boot-disk-device-name] can only be used when creating a new boot '
+          'disk.')
 
-    if not args.image and args.boot_disk_size:
+    if not args.image and args.boot_disk_type:
       raise exceptions.ToolException(
-          '--boot-disk-size can only be used in conjunction with the '
-          '--image flag')
+          '[--boot-disk-type] can only be used when creating a new boot '
+          'disk.')
 
     if args.boot_disk_size:
+      if not args.image:
+        raise exceptions.ToolException(
+            '[--boot-disk-size] can only be used when creating a new boot '
+            'disk.')
       if args.boot_disk_size % constants.BYTES_IN_ONE_GB != 0:
         raise exceptions.ToolException(
-            'boot disk size must be a multiple of 1 GB; did you mean "{0}GB"?'
+            'Boot disk size must be a multiple of 1 GB. Did you mean [{0}GB]?'
             .format(args.boot_disk_size / constants.BYTES_IN_ONE_GB + 1))
 
     if not args.image and args.no_boot_disk_auto_delete:
       raise exceptions.ToolException(
-          '--no-boot-disk-auto-delete can only be used in conjunction with the '
-          '--image flag')
+          '[--no-boot-disk-auto-delete] can only be used when creating a new '
+          'boot disk.')
 
   def UseExistingBootDisk(self, args):
     """Returns True if the user has specified an existing boot disk."""
     return any(disk.get('boot') == 'yes' for disk in args.disk or [])
 
-  def CreateAttachedDiskMessages(self, args):
+  def CreateAttachedDiskMessages(self, args, instance_ref):
     """Returns a list of AttachedDisk messages based on command-line args."""
     disks = []
 
@@ -356,7 +375,7 @@ class CreateInstances(base_classes.BaseAsyncMutator):
       name = disk['name']
 
       # Resolves the mode.
-      mode_value = disk.get('mode', 'ro')
+      mode_value = disk.get('mode', 'rw')
       if mode_value == 'rw':
         mode = messages.AttachedDisk.ModeValueValuesEnum.READ_WRITE
       else:
@@ -365,15 +384,16 @@ class CreateInstances(base_classes.BaseAsyncMutator):
       boot = disk.get('boot') == 'yes'
       auto_delete = disk.get('auto-delete') == 'yes'
 
-      disk_uri = self.context['uri-builder'].Build(
-          'zones', args.zone, 'disks', name)
+      disk_ref = resources.Parse(
+          name, collection='compute.disks',
+          params={'zone': instance_ref.zone})
 
       attached_disk = messages.AttachedDisk(
           autoDelete=auto_delete,
           boot=boot,
           deviceName=disk.get('device-name'),
           mode=mode,
-          source=disk_uri,
+          source=disk_ref.SelfLink(),
           type=messages.AttachedDisk.TypeValueValuesEnum.PERSISTENT)
 
       # The boot disk must end up at index 0.
@@ -384,14 +404,20 @@ class CreateInstances(base_classes.BaseAsyncMutator):
 
     return disks
 
-  def CreateDefaultBootAttachedDiskMessage(self, args):
+  def CreateDefaultBootAttachedDiskMessage(self, args, image_uri, instance_ref):
     """Returns an AttachedDisk message for creating a new boot disk."""
-    image_uri = image_utils.ExpandImage(args.image, self.context['uri-builder'])
-
     if args.boot_disk_size:
       size_gb = args.boot_disk_size / constants.BYTES_IN_ONE_GB
     else:
       size_gb = None
+
+    if args.boot_disk_type:
+      disk_type_ref = resources.Parse(
+          args.boot_disk_type, collection='compute.diskTypes',
+          params={'zone': instance_ref.zone})
+      disk_type_uri = disk_type_ref.SelfLink()
+    else:
+      disk_type_uri = None
 
     return messages.AttachedDisk(
         autoDelete=not args.no_boot_disk_auto_delete,
@@ -399,7 +425,8 @@ class CreateInstances(base_classes.BaseAsyncMutator):
         deviceName=args.boot_disk_device_name,
         initializeParams=messages.AttachedDiskInitializeParams(
             sourceImage=image_uri,
-            diskSizeGb=size_gb),
+            diskSizeGb=size_gb,
+            diskType=disk_type_uri),
         mode=messages.AttachedDisk.ModeValueValuesEnum.READ_WRITE,
         type=messages.AttachedDisk.TypeValueValuesEnum.PERSISTENT)
 
@@ -420,8 +447,8 @@ class CreateInstances(base_classes.BaseAsyncMutator):
         account, scope_uri = parts
       else:
         raise exceptions.ToolException(
-            '--scopes values must be of the form [ACCOUNT=]SCOPE; received: {0}'
-            .format(scope))
+            '[{0}] is an illegal value for [--scopes]. Values must be of the '
+            'form [SCOPE] or [ACCOUNT=SCOPE].'.format(scope))
 
       # Expands the scope if the user provided an alias like
       # "compute-rw".
@@ -438,10 +465,9 @@ class CreateInstances(base_classes.BaseAsyncMutator):
 
   def CreateNetworkInterfaceMessage(self, args):
     """Returns a new NetworkInterface message."""
-    network_uri = self.context['uri-builder'].Build(
-        'global', 'networks', args.network)
+    network_ref = resources.Parse(args.network, collection='compute.networks')
     network_interface = messages.NetworkInterface(
-        network=network_uri)
+        network=network_ref.SelfLink())
 
     if not args.no_address:
       access_config = messages.AccessConfig(
@@ -460,55 +486,64 @@ class CreateInstances(base_classes.BaseAsyncMutator):
   def CreateRequests(self, args):
     self.ValidateDiskFlags(args)
 
-    machine_type_uri = self.context['uri-builder'].Build(
-        'zones', args.zone, 'machineTypes', args.machine_type)
-
-    metadata = metadata_utils.ConstructMetadataMessage(
-        metadata=args.metadata, metadata_from_file=args.metadata_from_file)
-
-    network_interface = self.CreateNetworkInterfaceMessage(args)
-
-    scheduling = messages.Scheduling(
-        automaticRestart=not args.no_restart_on_failure,
-        onHostMaintenance=(
-            messages.Scheduling.OnHostMaintenanceValueValuesEnum(
-                args.maintenance_policy)))
-
-    service_accounts = self.CreateServiceAccountMessages(args)
-
-    if args.tags:
-      tags = messages.Tags(items=args.tags)
-    else:
-      tags = None
-
-
-    disks = self.CreateAttachedDiskMessages(args)
-
-    if not self.UseExistingBootDisk(args):
-      disks = [self.CreateDefaultBootAttachedDiskMessage(args)] + disks
-
     requests = []
-    for name in args.names:
+    instance_refs = self.CreateZonalReferences(args.names, args.zone)
+
+    create_boot_disk = not self.UseExistingBootDisk(args)
+    if create_boot_disk:
+      image_uri = self.ExpandImageFlag(args)
+    else:
+      image_uri = None
+
+    for instance_ref in instance_refs:
+      machine_type_ref = resources.Parse(
+          args.machine_type, collection='compute.machineTypes',
+          params={'zone': instance_ref.zone})
+
+      metadata = metadata_utils.ConstructMetadataMessage(
+          metadata=args.metadata, metadata_from_file=args.metadata_from_file)
+
+      network_interface = self.CreateNetworkInterfaceMessage(args)
+
+      scheduling = messages.Scheduling(
+          automaticRestart=not args.no_restart_on_failure,
+          onHostMaintenance=(
+              messages.Scheduling.OnHostMaintenanceValueValuesEnum(
+                  args.maintenance_policy)))
+
+      service_accounts = self.CreateServiceAccountMessages(args)
+
+      if args.tags:
+        tags = messages.Tags(items=args.tags)
+      else:
+        tags = None
+
+      disks = self.CreateAttachedDiskMessages(args, instance_ref)
+      if create_boot_disk:
+        boot_disk = self.CreateDefaultBootAttachedDiskMessage(
+            args, image_uri, instance_ref)
+        disks = [boot_disk] + disks
+
       requests.append(messages.ComputeInstancesInsertRequest(
           instance=messages.Instance(
               canIpForward=args.can_ip_forward,
               disks=disks,
               description=args.description,
-              machineType=machine_type_uri,
+              machineType=machine_type_ref.SelfLink(),
               metadata=metadata,
-              name=name,
+              name=instance_ref.Name(),
               networkInterfaces=[network_interface],
               serviceAccounts=service_accounts,
               scheduling=scheduling,
               tags=tags,
           ),
           project=self.context['project'],
-          zone=args.zone))
+          zone=instance_ref.zone))
 
     return requests
 
 
-CreateInstances.detailed_help = {
+Create.detailed_help = {
     'brief': 'Create Compute Engine virtual machine instances',
     'DESCRIPTION': """\
         *{command}* facilitates the creation of Google Compute Engine

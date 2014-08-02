@@ -2,7 +2,9 @@ NAME
        gcloud-auth-list - List the accounts for known credentials.
 
 SYNOPSIS
-       gcloud auth list [--account ACCOUNT] [-h, --help]
+       gcloud auth list
+         [--account ACCOUNT]
+         [-h, --help]
 
 FLAGS
        --account ACCOUNT

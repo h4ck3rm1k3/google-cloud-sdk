@@ -64,6 +64,14 @@ class SshKeyTest(unittest.TestCase):
         [{'key': 'sshKeys', 'value': ''}])
     self.assertEqual(authorized_user_keys, [])
 
+  def testGetAuthorizedUserKeysFromMetadataWithSpecialCharsInComment(self):
+    comment = 'X' + ''.join([chr(i) for i in range(32, 128)]) + 'X'
+    key = 'type content ' + comment
+    authorized_user_keys = ssh_keys.SshKeys.GetAuthorizedUserKeysFromMetadata(
+        [{'key': 'sshKeys', 'value': 'foo:' + key}])
+    self.assertEqual(authorized_user_keys,
+                     [{'user': 'foo', 'key': key}])
+
   def testSetAuthorizedUserKeysInMetadata(self):
     metadata = [{'key': 'key1', 'value': 'value1'},
                 {'key': 'sshKeys', 'value': 'foo:bar\nbaz:bat'},
@@ -83,8 +91,20 @@ class SshKeyTest(unittest.TestCase):
            '0l/pGnsCPzCZhV5++U9+AZpnM+669fQiA9pRq9JlL4JJtmz0dZHbBSlOwe2ty6lSS5G'
            'xAcZ+g553dj5NLfTTAH+HRzA9AnySOEExUIJ1Vpix+NEyyRkMQbBHcJnWAnqd+yBe5d'
            'E0ojpO6ZZzciF4waBhmMK4T8kuuXII/bTqlZKGzl3qdzBIhFaMmXDXq+3bw9hRvPb+g'
-           'ChIDYiPmx0HJyqtZ7OkRbh5MyR5W/Zu8cn4sjoiBWIfxJ comment@comment.com')
+           'ChIDYiPmx0HJyqtZ7OkRbh5MyR5W/Zu8cn4sjoiBWIfxJ')
     self.assertEqual(key, ssh_keys.SshKeys._ValidateSshKey(key, 'filename'))
+    key_with_empty_comment = key + ' '
+    self.assertEqual(key_with_empty_comment,
+                     ssh_keys.SshKeys._ValidateSshKey(
+                         key_with_empty_comment, 'filename'))
+    key_with_comment = key + ' comment@comment.com'
+    self.assertEqual(key_with_comment,
+                     ssh_keys.SshKeys._ValidateSshKey(
+                         key_with_comment, 'filename'))
+    key_with_spaces_in_comment = key + ' comment comment com'
+    self.assertEqual(key_with_spaces_in_comment,
+                     ssh_keys.SshKeys._ValidateSshKey(
+                         key_with_spaces_in_comment, 'filename'))
 
     # No key - exception
     self.assertRaises(ssh_keys.UserSetupError, ssh_keys.SshKeys._ValidateSshKey,
@@ -95,20 +115,18 @@ class SshKeyTest(unittest.TestCase):
       try:
         ssh_keys.SshKeys._ValidateSshKey(key, filename)
       except ssh_keys.UserSetupError, e:
-        self.assert_(key in e.msg)
-        self.assert_(filename in e.msg)
-        self.assert_(message in e.msg)
+        self.assertIn(key, e.msg)
+        self.assertIn(filename, e.msg)
+        self.assertIn(message, e.msg)
       else:
         self.fail('Expected an UserSetupError exception')
 
     # Newline in the key
     AssertUserSetupError('\n'.join(key.split()), 'single line')
-    # More than 3 parts
-    AssertUserSetupError(key + ' another_part', 'exactly three space separated')
-    # Or fewer than 3
+    # Fewer than 2 parts
     AssertUserSetupError(
-        ' '.join(key.split()[:-1]),
-        'exactly three space separated')
+        ' '.join(key.split()[0:1]),
+        'must consist of at least two')
     # Base-64 cannot contain '_'
     AssertUserSetupError(key.replace('Q', '_'), 'is not a valid base64 encoded')
     # Malformed key - not enought data

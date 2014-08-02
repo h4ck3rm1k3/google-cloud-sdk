@@ -133,7 +133,7 @@ class DeprecateImages(base_classes.BaseAsyncMutator):
     return 'Deprecate'
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'images'
 
   def CreateRequests(self, args):
@@ -142,13 +142,13 @@ class DeprecateImages(base_classes.BaseAsyncMutator):
     if (any([args.delete_on, args.delete_in, args.obsolete_on, args.obsolete_in,
              args.replacement]) and args.state == 'ACTIVE'):
       raise calliope_exceptions.ToolException(
-          'if the state is set to ACTIVE then none of --delete-on, '
-          '--delete-in, --obsolete-on, --obsolete-in, or --replacement may be '
-          'provided')
+          'If the state is set to [ACTIVE] then none of [--delete-on], '
+          '[--delete-in], [--obsolete-on], [--obsolete-in], or [--replacement] '
+          'may be provided.')
     elif not args.replacement and args.state != 'ACTIVE':
       raise calliope_exceptions.ToolException(
-          '--replacement is required when deprecation, obsoletion or '
-          'deletion status is set or scheduled')
+          '[--replacement] is required when deprecation, obsoletion or '
+          'deletion status is set or scheduled.')
 
     # Determine the date and time to deprecate for each flag set.
     current_time = datetime.datetime.now()

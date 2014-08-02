@@ -13,9 +13,10 @@ gcloud-compute-instances-attach-disk \- Attach a disk to an instance
   INSTANCE
   [\-\-device\-name DEVICE_NAME]
   \-\-disk DISK
+  [\-\-help]
   [\-\-mode MODE; default="rw"]
-  \-\-zone ZONE
-  [\-h, \-\-help]
+  [\-\-zone ZONE]
+  [\-h]
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -51,6 +52,11 @@ An optional name that indicates the disk name the guest operating system will se
 The name of the disk to attach to the instance\&.
 .RE
 .PP
+\fB\-\-help\fR
+.RS 4
+Display detailed help\&.
+.RE
+.PP
 \fB\-\-mode\fR \fIMODE\fR
 .RS 4
 Specifies the mode of the disk\&. Supported options are \(lqro\(rq for read\-only and \(lqrw\(rq for read\-write\&. If omitted, \(lqrw\(rq is used as a default\&. It is an error to attach a disk in read\-write mode to more than one instance\&.
@@ -58,10 +64,10 @@ Specifies the mode of the disk\&. Supported options are \(lqro\(rq for read\-onl
 .PP
 \fB\-\-zone\fR \fIZONE\fR
 .RS 4
-The zone in which the instance and disk reside\&.
+The zone of the instance to attach a disk to\&. If omitted and the arguments are not all URIs, you will be prompted to select a zone\&.
 .RE
 .PP
-\fB\-\-help\fR
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE

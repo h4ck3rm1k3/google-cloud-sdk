@@ -3,7 +3,9 @@ NAME
        Cloud SDK.
 
 SYNOPSIS
-       gcloud components COMMAND [-h, --help]
+       gcloud components
+         COMMAND
+         [-h, --help]
 
 FLAGS
        --help

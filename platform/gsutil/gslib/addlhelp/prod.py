@@ -15,7 +15,7 @@
 
 from gslib.help_provider import HelpProvider
 
-_detailed_help_text = ("""
+_DETAILED_HELP_TEXT = ("""
 <B>OVERVIEW</B>
   If you use gsutil in large production tasks (such as uploading or
   downloading many GBs of data each night), there are a number of things
@@ -30,22 +30,17 @@ _detailed_help_text = ("""
   reliably. gsutil uses resumable transfer support when you attempt to upload
   or download a file larger than a configurable threshold (by default, this
   threshold is 2 MB). When a transfer fails partway through (e.g., because of
-  an intermittent network problem), gsutil uses a randomized binary exponential
-  backoff-and-retry strategy:
-  wait a random period between [0..1] seconds and retry; if that fails,
-  wait a random period between [0..2] seconds and retry; and if that
-  fails, wait a random period between [0..4] seconds, and so on, up to a
-  configurable number of times (the default is 6 times). Thus, the retry
-  actually spans a randomized period up to 1+2+4+8+16+32=63 seconds.
-
-  If the transfer fails each of these attempts with no intervening
-  progress, gsutil gives up on the transfer, but keeps a "tracker" file
-  for it in a configurable location (the default location is ~/.gsutil/,
-  in a file named by a combination of the SHA1 hash of the name of the
-  bucket and object being transferred and the last 16 characters of the
-  file name). When transfers fail in this fashion, you can rerun gsutil
-  at some later time (e.g., after the networking problem has been
-  resolved), and the resumable transfer picks up where it left off.
+  an intermittent network problem), gsutil uses a truncated randomized binary
+  exponential backoff-and-retry strategy that by default will retry transfers up
+  to 6 times over a 63 second period of time (see "gsutil help retries" for
+  details). If the transfer fails each of these attempts with no intervening
+  progress, gsutil gives up on the transfer, but keeps a "tracker" file for
+  it in a configurable location (the default location is ~/.gsutil/, in a file
+  named by a combination of the SHA1 hash of the name of the bucket and object
+  being transferred and the last 16 characters of the file name). When transfers
+  fail in this fashion, you can rerun gsutil at some later time (e.g., after
+  the networking problem has been resolved), and the resumable transfer picks
+  up where it left off.
 
 
 <B>SCRIPTING DATA TRANSFER TASKS</B>
@@ -142,8 +137,8 @@ _detailed_help_text = ("""
   same OAuth2 refresh token, it is possible to encounter rate limiting errors
   for the refresh requests (especially if all of these machines are likely to
   start running gsutil at the same time). To account for this, gsutil will
-  automatically retry OAuth2 refresh requests with a randomized exponential
-  backoff strategy like that which is described in the
+  automatically retry OAuth2 refresh requests with a truncated randomized
+  exponential backoff strategy like that which is described in the
   "BACKGROUND ON RESUMABLE TRANSFERS" section above. The number of retries
   attempted for OAuth2 refresh requests can be controlled via the
   "oauth2_refresh_retries" variable in the .boto config file.
@@ -155,12 +150,12 @@ class CommandOptions(HelpProvider):
 
   # Help specification. See help_provider.py for documentation.
   help_spec = HelpProvider.HelpSpec(
-      help_name = 'prod',
-      help_name_aliases = [
+      help_name='prod',
+      help_name_aliases=[
           'production', 'resumable', 'resumable upload', 'resumable transfer',
           'resumable download', 'scripts', 'scripting'],
-      help_type = 'additional_help',
-      help_one_line_summary = 'Scripting Production Transfers',
-      help_text = _detailed_help_text,
-      subcommand_help_text = {},
+      help_type='additional_help',
+      help_one_line_summary='Scripting Production Transfers',
+      help_text=_DETAILED_HELP_TEXT,
+      subcommand_help_text={},
   )

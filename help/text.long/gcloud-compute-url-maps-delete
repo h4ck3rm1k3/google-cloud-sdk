@@ -4,7 +4,8 @@ NAME
 SYNOPSIS
        gcloud compute url-maps delete
          NAME [NAME ...]
-         [-h, --help]
+         [--help]
+         [-h]
 
 DESCRIPTION
        gcloud compute url-maps delete deletes one or more URL maps.
@@ -15,5 +16,8 @@ POSITIONAL ARGUMENTS
 
 FLAGS
        --help
+           Display detailed help.
+
+       -h
            Print a summary help and exit.
 

@@ -19,6 +19,7 @@ from __future__ import with_statement
 
 
 import base64
+import errno
 import getpass
 import os
 import struct
@@ -27,7 +28,6 @@ import subprocess
 
 import gflags as flags
 
-from gcutil_lib import command_base
 from gcutil_lib import gcutil_errors
 from gcutil_lib import gcutil_logging
 
@@ -121,7 +121,7 @@ class SshKeys(object):
     """
 
     def GetAuthorizedUserKeyFromLine(line):
-      line_parts = line.split(':')
+      line_parts = line.split(':', 1)
       return {'user': line_parts[0], 'key': line_parts[1]}
 
     for metadata_entry in metadata:
@@ -194,6 +194,15 @@ class SshKeys(object):
 
     LOGGER.warn('You don\'t have an ssh key for Google Compute Engine. '
                 'Creating one now...')
+    ssh_directory = os.path.dirname(FLAGS.private_key_file)
+    try:
+      os.mkdir(ssh_directory, 0700)
+    except OSError as e:
+      if e.errno != errno.EEXIST:
+        raise UserSetupError(
+            'Error creating ssh key directory %s: %s.' % (ssh_directory, e))
+      elif not os.path.isdir(ssh_directory):
+        raise UserSetupError('%s must be a directory %s.' % ssh_directory)
     command_line = [
         'ssh-keygen',
         '-t', 'rsa',
@@ -246,14 +255,14 @@ class SshKeys(object):
           'Public key file (%s) has invalid format. '
           'It must only contain single line.\n%s' % (key_file, key))
     # Validate the OpenSSH key format
-    parts = key.split()
-    if len(parts) != 3:
+    parts = key.split(None, 2)
+    if len(parts) < 2:
       raise UserSetupError(
           'Public key file (%s) doesn\'t contain an OpenSSH public key. '
-          'The key must consist of exactly three space separated parts.\n%s' %
+          'The key must consist of at least two space separated parts.\n%s' %
           (key_file, key))
 
-    key_type, key_value, _ = parts
+    key_type, key_value = parts[0:2]
 
     try:
       key_value = base64.b64decode(key_value)

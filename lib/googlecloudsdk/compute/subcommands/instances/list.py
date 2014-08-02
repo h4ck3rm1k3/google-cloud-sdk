@@ -3,7 +3,7 @@
 from googlecloudsdk.compute.lib import base_classes
 
 
-class ListInstances(base_classes.ZonalLister):
+class List(base_classes.ZonalLister):
   """List Google Compute Engine virtual machine instances."""
 
   @property
@@ -11,11 +11,11 @@ class ListInstances(base_classes.ZonalLister):
     return self.context['compute'].instances
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'instances'
 
 
-ListInstances.detailed_help = {
+List.detailed_help = {
     'brief': 'List Google Compute Engine virtual machine instances',
     'DESCRIPTION': """\
         *{command}* lists summary information for the virtual

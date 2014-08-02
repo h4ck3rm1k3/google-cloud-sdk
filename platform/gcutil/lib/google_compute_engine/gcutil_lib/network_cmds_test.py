@@ -161,7 +161,7 @@ class NetworkCmdsTest(gcutil_unittest.GcutilTestCase):
             'name': 'my-network',
             'operationType': 'delete',
             'targetLink':
-            'https://www.googleapis.com/compute/v1beta16/projects/'
+            'https://www.googleapis.com/compute/v1/projects/'
             'my-project/global/networks/my-network',
             'status': 'DONE'
         })
@@ -200,7 +200,7 @@ class NetworkCmdsTest(gcutil_unittest.GcutilTestCase):
               'name': parameters['network'],
               'operationType': 'delete',
               'targetLink':
-              'https://www.googleapis.com/compute/v1beta16/projects/'
+              'https://www.googleapis.com/compute/v1/projects/'
               'my-project/global/networks/my-network',
               'status': 'DONE'
           },

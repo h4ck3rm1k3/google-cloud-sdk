@@ -4,6 +4,8 @@ import copy
 
 from googlecloudapis.compute.v1 import compute_v1_messages as messages
 from googlecloudsdk.compute.lib import base_classes
+from googlecloudsdk.compute.lib import utils
+from googlecloudsdk.core import resources
 
 
 class DetachDisk(base_classes.ReadWriteCommand):
@@ -11,11 +13,6 @@ class DetachDisk(base_classes.ReadWriteCommand):
 
   @staticmethod
   def Args(parser):
-    parser.add_argument(
-        '--zone',
-        help='The zone of the instance.',
-        required=True)
-
     disk_group = parser.add_mutually_exclusive_group(required=True)
 
     disk_name = disk_group.add_argument(
@@ -45,38 +42,50 @@ class DetachDisk(base_classes.ReadWriteCommand):
         metavar='NAME',
         help='The name of the instance to detach the disk from.')
 
+    utils.AddZoneFlag(
+        parser,
+        resource_type='instance',
+        operation_type='detach a disk from')
+
   @property
   def service(self):
     return self.context['compute'].instances
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'instances'
+
+  def CreateReference(self, args):
+    return self.CreateZonalReference(args.name, args.zone)
 
   def GetGetRequest(self, args):
     return (self.service,
             'Get',
             messages.ComputeInstancesGetRequest(
-                instance=args.name,
+                instance=self.ref.Name(),
                 project=self.context['project'],
-                zone=args.zone))
+                zone=self.ref.zone))
 
   def GetSetRequest(self, args, replacement, existing):
-    removed_disk = list(set(existing.disks) - set(replacement.disks))[0]
+    removed_disk = list(
+        set(disk.deviceName for disk in existing.disks) -
+        set(disk.deviceName for disk in replacement.disks))[0]
+
     return (self.service,
             'DetachDisk',
             messages.ComputeInstancesDetachDiskRequest(
-                deviceName=removed_disk.deviceName,
-                instance=args.name,
+                deviceName=removed_disk,
+                instance=self.ref.Name(),
                 project=self.context['project'],
-                zone=args.zone))
+                zone=self.ref.zone))
 
   def Modify(self, args, existing):
     replacement = copy.deepcopy(existing)
 
     if args.disk:
-      disk_uri = self.context['uri-builder'].Build(
-          'zones', args.zone, 'disks', args.disk)
+      disk_uri = resources.Parse(
+          args.disk, collection='compute.disks',
+          params={'zone': self.ref.zone}).SelfLink()
       replacement.disks = [disk for disk in existing.disks
                            if disk.source != disk_uri]
     else:

@@ -43,11 +43,11 @@ from gcutil_lib import gcutil_unittest
 from gcutil_lib import instance_cmds
 from gcutil_lib import metadata as metadata_module
 from gcutil_lib import mock_api
-from gcutil_lib import mock_get_pass
 from gcutil_lib import mock_lists
 from gcutil_lib import mock_timer
 from gcutil_lib import old_mock_api
 from gcutil_lib import version
+from gcutil_lib import windows_password
 
 
 FLAGS = flags.FLAGS
@@ -60,6 +60,7 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
 
   def setUp(self):
     self.mock, self.api = mock_api.CreateApi(self.version)
+    gcutil_logging.SetupLogging()
 
   def testUnicodeInSerialOutput(self):
     set_flags = {
@@ -621,61 +622,71 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
     # Parameter validation occurs elsewhere.  If this code path does not crash,
     # then the test was successful.
 
-  def testAddInstanceWithWindowsImageNoInitialPassword(self):
-    """Test AddInstance with a Windows image used and no password provided.
+  def testAddInstanceWithWindowsImageNoInitialUserAndPassword(self):
+    """Test AddInstance with a Windows image, and user or password not provided.
     """
-    expected_password = 'Pa$$w0rd'
     expected_instance = 'my-instance'
+    expected_user_name = 'cool-project'  # same as project id.
     command, instancecall = self._SetUpAddInstanceUsingWindowsImage()
 
-    # Handle the command
-    with mock_get_pass.MockGetPass(lambda _: expected_password):
-      (unused_results, exceptions) = command.Handle(expected_instance)
+    (unused_results, exceptions) = command.Handle(expected_instance)
     self.assertEquals(exceptions, [])
 
-    # Validate that the meta data contains the password
-    self._ValidateMetadataContainsInitialPassword(instancecall,
-                                                  expected_password)
+    # Validate that the metadata contains the user name based on project name.
+    self._ValidateMetadataContains(
+        instancecall,
+        metadata_module.INITIAL_WINDOWS_USER_METADATA_NAME,
+        expected_user_name)
 
-  def testAddInstanceWithWindowsImageWithInitialPassword(self):
-    """Test AddInstance with a Windows image used and password provided.
+    # Validate that the metadata contains some randomly generated password.
+    password = self._GetMetadataInRequest(
+        instancecall,
+        metadata_module.INITIAL_WINDOWS_PASSWORD_METADATA_NAME)
+    LOGGER.info('Generated password: ' + password)
+    windows_password.ValidateStrongPasswordRequirement(
+        password,
+        expected_user_name)
+
+  def testAddInstanceWithWindowsImageWithInitialUserAndPassword(self):
+    """Test AddInstance with a Windows image, and user and password provided.
     """
-    # Because initial password is given in the metadata, getpass should not
-    # be called.  Fail the test if it is called.
-    def _GetPass(_):
-      self.fail('When initial password is given, '
-                'we should not prompt for password.')
-
     expected_password = 'Pa$$w0rd'
+    expected_user_name = 'adminuser'
     expected_instance = 'my-instance'
     handle, path = tempfile.mkstemp()
     try:
       with os.fdopen(handle, 'w') as metadata_file:
         metadata_file.write(expected_password)
-      command, instancecall = self._SetUpAddInstanceUsingWindowsImage(path)
+        command, instancecall = self._SetUpAddInstanceUsingWindowsImage(
+            expected_user_name, path)
 
-    # Handle the command.
-      with mock_get_pass.MockGetPass(_GetPass):
-        (unused_results, exceptions) = command.Handle(expected_instance)
+      # Handle the command.
+      (unused_results, exceptions) = command.Handle(expected_instance)
       self.assertEquals(exceptions, [])
     finally:
       os.remove(path)
 
-    # Validate that the meta data contains the password
-    self._ValidateMetadataContainsInitialPassword(instancecall,
-                                                  expected_password)
+    # Validate that the meta data contains the user name and password
+    self._ValidateMetadataContains(
+        instancecall,
+        metadata_module.INITIAL_WINDOWS_USER_METADATA_NAME,
+        expected_user_name)
+    self._ValidateMetadataContains(
+        instancecall,
+        metadata_module.INITIAL_WINDOWS_PASSWORD_METADATA_NAME,
+        expected_password)
 
-  def _ValidateMetadataContainsInitialPassword(
-      self, instancecall, expected_password):
+  def _GetMetadataInRequest(self, instancecall, key):
     instance_requests = instancecall.GetAllRequests()
     request = instance_requests[0]
     body = json.loads(request.body)
     metadata = body['metadata']['items']
-    password_in_metadata = [
-        entry['value'] for entry in metadata
-        if entry['key'] ==
-        metadata_module.INITIAL_WINDOWS_PASSWORD_METADATA_NAME]
-    self.assertEqual([expected_password], password_in_metadata)
+    return metadata_module.GetMetadataValue(metadata, key)
+
+  def _ValidateMetadataContains(
+      self, instancecall, key, expected_value):
+    self.assertEqual(expected_value,
+                     self._GetMetadataInRequest(instancecall, key))
 
   def _MockListImagesWithWindowsImage(self, command, windows_image_name):
     # The call to list images from customer project.
@@ -693,7 +704,8 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
       else:
         mock_lists.GetSampleImageListCall(command, self.mock)
 
-  def _SetUpAddInstanceUsingWindowsImage(self, password_file=None):
+  def _SetUpAddInstanceUsingWindowsImage(
+      self, user_name=None, password_file=None):
     expected_project = 'cool-project'
     expected_zone = 'the-danger-zone'
     expected_machine = 'party-machine'
@@ -708,6 +720,10 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
         'synchronous_mode': False,
     }
 
+    if user_name:
+      set_flags['metadata'] = [
+          metadata_module.INITIAL_WINDOWS_USER_METADATA_NAME + ':' +
+          user_name]
     if password_file:
       set_flags['metadata_from_file'] = [
           metadata_module.INITIAL_WINDOWS_PASSWORD_METADATA_NAME + ':' +
@@ -853,6 +869,8 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
         'add_compute_key_to_project': False
         }
 
+    expected_disk_type = 'pd-ssd'
+    set_flags['boot_disk_type'] = expected_disk_type
 
     # Capture I/O.
     oldin = sys.stdin
@@ -989,6 +1007,14 @@ class InstanceCmdsTest(gcutil_unittest.GcutilTestCase):
                                                             'images',
                                                             'my_image'),
                         str(disks[0]['initializeParams']['sourceImage']))
+      if self.version >= version.get('v1'):
+        expected_normalized_disk_type = command.NormalizePerZoneResourceName(
+            expected_project,
+            expected_zone,
+            'diskTypes',
+            expected_disk_type)
+        self.assertEquals(expected_normalized_disk_type,
+                          str(disks[0]['initializeParams']['diskType']))
 
     self.assertEquals(expected_zone, instance_request_parameters['zone'])
     self.assertEquals(expected_project, instance_request_parameters['project'])
@@ -1760,8 +1786,8 @@ class OldInstanceCmdsTest(unittest.TestCase):
       self.assertEqual(instance_tags, [])
 
   def testAddMultipleInstances(self):
-    for version in command_base.SUPPORTED_VERSIONS:
-      self._DoTestAddMultipleInstances(version)
+    for ver in command_base.SUPPORTED_VERSIONS:
+      self._DoTestAddMultipleInstances(ver)
 
   def testAddInstanceWithCanIpForwardGeneratesCorrectRequest(self):
     flag_values = copy.deepcopy(FLAGS)
@@ -2618,6 +2644,7 @@ class OldInstanceCmdsTest(unittest.TestCase):
     self._DoNotPauseForCommand(command)
 
     class SetCommonInstanceMetadata(object):
+
       def __init__(self, record):
         self.record = record
 
@@ -2665,6 +2692,7 @@ class OldInstanceCmdsTest(unittest.TestCase):
     self._DoNotPauseForCommand(command)
 
     class SetCommonInstanceMetadata(object):
+
       def __init__(self, record):
         self.record = record
 
@@ -2936,8 +2964,8 @@ class OldInstanceCmdsTest(unittest.TestCase):
     self.assertEqual(submitted_zone, result['zone'])
 
   def testAddAccessConfigGeneratesCorrectRequest(self):
-    for version in command_base.SUPPORTED_VERSIONS:
-      self._DoTestAddAccessConfigGeneratesCorrectRequest(version)
+    for ver in command_base.SUPPORTED_VERSIONS:
+      self._DoTestAddAccessConfigGeneratesCorrectRequest(ver)
 
   def _DoTestDeleteAccessConfigGeneratesCorrectRequest(self, service_version):
     flag_values = copy.deepcopy(FLAGS)
@@ -2975,8 +3003,8 @@ class OldInstanceCmdsTest(unittest.TestCase):
     self.assertEqual(submitted_zone, result['zone'])
 
   def testDeleteAccessConfigGeneratesCorrectRequest(self):
-    for version in command_base.SUPPORTED_VERSIONS:
-      self._DoTestDeleteAccessConfigGeneratesCorrectRequest(version)
+    for ver in command_base.SUPPORTED_VERSIONS:
+      self._DoTestDeleteAccessConfigGeneratesCorrectRequest(ver)
 
   def testSetInstanceMetadataGeneratesCorrectRequest(self):
     flag_values = copy.deepcopy(FLAGS)
@@ -3293,7 +3321,8 @@ class OldInstanceCmdsTest(unittest.TestCase):
       self.fail('Unexpected call to _AddComputeKeyToProject')
 
     command._AddComputeKeyToProject = MockAddComputeKeyToProject
-    command._EnsureSshable(mock_instance)
+    with command._EnsureSshable(mock_instance):
+      pass
 
   def testEnsureSshableChecksForNonRunningInstance(self):
     flag_values = copy.deepcopy(FLAGS)
@@ -3304,10 +3333,10 @@ class OldInstanceCmdsTest(unittest.TestCase):
     command._InitializeContextParser()
     mock_instance = {'networkInterfaces': [{'accessConfigs': [{}]}],
                      'status': 'STAGING'}
+    sshable_context_manager = command._EnsureSshable(mock_instance)
 
     self.assertRaises(gcutil_errors.CommandError,
-                      command._EnsureSshable,
-                      mock_instance)
+                      sshable_context_manager.__enter__)
 
   def testSshGeneratesCorrectArguments(self):
     flag_values = copy.deepcopy(FLAGS)
@@ -3463,6 +3492,7 @@ class OldInstanceCmdsTest(unittest.TestCase):
 
   def testScpPullGeneratesCorrectArguments(self):
     class MockGetApi(object):
+
       def __init__(self, nat_ip='0.0.0.0'):
         self._nat_ip = nat_ip
 
@@ -3567,9 +3597,9 @@ class OldInstanceCmdsTest(unittest.TestCase):
     self.assertTrue(command.ListZoneFunc() is not None)
 
   def testInstancesCollectionScope(self):
-    for version in command_base.SUPPORTED_VERSIONS:
+    for ver in command_base.SUPPORTED_VERSIONS:
       flag_values = copy.deepcopy(FLAGS)
-      flag_values.service_version = version
+      flag_values.service_version = ver
       self._DoTestInstancesCollectionScope(flag_values)
 
   def testIsInstanceRootDiskPersistentForPersistentDiskCase(self):

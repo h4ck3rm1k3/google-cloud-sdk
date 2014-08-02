@@ -4,7 +4,8 @@ NAME
 SYNOPSIS
        gcloud auth print-access-token
          [ACCOUNT]
-         [-h, --help]
+         [--help]
+         [-h]
 
 POSITIONAL ARGUMENTS
        [ACCOUNT]
@@ -13,5 +14,8 @@ POSITIONAL ARGUMENTS
 
 FLAGS
        --help
+           Display detailed help.
+
+       -h
            Print a summary help and exit.
 

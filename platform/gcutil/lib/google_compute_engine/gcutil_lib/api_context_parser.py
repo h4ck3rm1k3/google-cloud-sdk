@@ -65,32 +65,6 @@ class ApiContextParser(object):
     """
 
     api_context_by_service_version = {
-        'v1beta16': {
-            'addresses': '{project}/regions/{region}/addresses/{address}',
-            'disks': '{project}/zones/{zone}/disks/{disk}',
-            'firewalls': '{project}/global/firewalls/{firewall}',
-            'forwardingRules': (
-                '{project}/regions/{region}/forwardingRules/{forwardingRule}'),
-            'gateways': '{project}/global/gateways/default-internet-gateway',
-            'globalOperations': '{project}/global/operations/{operation}',
-            'httpHealthChecks': (
-                '{project}/global/httpHealthChecks/{httpHealthCheck}'),
-            'images': '{project}/global/images/{image}',
-            'instances': '{project}/zones/{zone}/instances/{instance}',
-            'kernels': '{project}/global/kernels/{kernel}',
-            'machineTypes': '{project}/zones/{zone}/machineTypes/{machineType}',
-            'networks': '{project}/global/networks/{network}',
-            'projects': '{project}',
-            'regionOperations': (
-                '{project}/regions/{region}/operations/{operation}'),
-            'regions': '{project}/regions/{region}',
-            'routes': '{project}/global/routes/{route}',
-            'snapshots': '{project}/global/snapshots/{snapshot}',
-            'targetPools': (
-                '{project}/regions/{region}/targetPools/{targetPool}'),
-            'zoneOperations': '{project}/zones/{zone}/operations/{operation}',
-            'zones': '{project}/zones/{zone}'
-        },
         'v1': {
             'addresses': '{project}/regions/{region}/addresses/{address}',
             'disks': '{project}/zones/{zone}/disks/{disk}',
@@ -104,6 +78,7 @@ class ApiContextParser(object):
                 '{project}/global/httpHealthChecks/{httpHealthCheck}'),
             'images': '{project}/global/images/{image}',
             'instances': '{project}/zones/{zone}/instances/{instance}',
+            'licenses': '{project}/global/licenses/{license}',
             'machineTypes': '{project}/zones/{zone}/machineTypes/{machineType}',
             'networks': '{project}/global/networks/{network}',
             'projects': '{project}',
@@ -132,6 +107,7 @@ class ApiContextParser(object):
                 '{project}/global/httpHealthChecks/{httpHealthCheck}'),
             'images': '{project}/global/images/{image}',
             'instances': '{project}/zones/{zone}/instances/{instance}',
+            'licenses': '{project}/global/licenses/{license}',
             'machineTypes': '{project}/zones/{zone}/machineTypes/{machineType}',
             'networks': '{project}/global/networks/{network}',
             'projects': '{project}',

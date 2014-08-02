@@ -9,6 +9,7 @@ from apiclient import errors
 
 from googlecloudsdk.calliope import base
 from googlecloudsdk.calliope import exceptions
+from googlecloudsdk.core import resources
 from googlecloudsdk.sql import util
 
 
@@ -28,6 +29,11 @@ class List(base.Command):
           on the command line after this command. Positional arguments are
           allowed.
     """
+    parser.add_argument(
+        '--instance',
+        '-i',
+        required=True,
+        help='Cloud SQL instance ID.')
     parser.add_argument(
         '--max-results',
         '-m',
@@ -60,14 +66,18 @@ class List(base.Command):
     sql = self.context['sql']
     instance_id = util.GetInstanceIdWithoutProject(args.instance)
     project_id = util.GetProjectId(args.instance)
+    # TODO(user): as we deprecate P:I args, simplify the call to .Parse().
+    instance_ref = resources.Parse(
+        instance_id, collection='sql.instances',
+        params={'project': project_id})
     max_results = args.max_results
     page_token = args.page_token
     instance = self.command.ParentGroup().ParentGroup().instances.get(
-        instance=instance_id)
+        instance=instance_ref.instance)
     # At this point we support only one backup-config. So, we just use that id.
     backup_config = instance['settings']['backupConfiguration'][0]['id']
     request = sql.backupRuns().list(
-        project=project_id, instance=instance_id,
+        project=instance_ref.project, instance=instance_ref.instance,
         backupConfiguration=backup_config, maxResults=max_results,
         pageToken=page_token)
     try:

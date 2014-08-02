@@ -6,10 +6,11 @@ SYNOPSIS
        gcloud compute images deprecate
          NAME
          [--delete-in DELETE_IN | --delete-on DELETE_ON]
+         [--help]
          [--obsolete-in OBSOLETE_IN | --obsolete-on OBSOLETE_ON]
          [--replacement REPLACEMENT]
          --state STATE
-         [-h, --help]
+         [-h]
 
 DESCRIPTION
        gcloud compute images deprecate is used to deprecate images.
@@ -37,6 +38,9 @@ FLAGS
            looks like "YYYY-MM-DDTHH:MM:SSZ". For example:
            2020-01-02T00:00:00Z for midnight on January 2, 2020 in UTC. This
            flag is mutually exclusive with --delete-in.
+
+       --help
+           Display detailed help.
 
        --obsolete-in OBSOLETE_IN
            Specifies time (in the same format as --delete-in) until this
@@ -69,7 +73,7 @@ FLAGS
            delete the image. You must still make a request to delete the image
            to remove it from the image list.
 
-       --help
+       -h
            Print a summary help and exit.
 
 EXAMPLES

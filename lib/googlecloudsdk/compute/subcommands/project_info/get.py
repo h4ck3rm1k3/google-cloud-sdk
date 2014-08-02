@@ -19,7 +19,7 @@ class Get(base_classes.BaseGetter):
     return self.context['compute'].projects
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'projects'
 
   def GetResources(self, args, errors):

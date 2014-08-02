@@ -3,7 +3,9 @@ NAME
        components that depend on them.
 
 SYNOPSIS
-       gcloud components remove COMPONENT-IDS [COMPONENT-IDS ...] [-h, --help]
+       gcloud components remove
+         COMPONENT-IDS [COMPONENT-IDS ...]
+         [-h, --help]
 
 POSITIONAL ARGUMENTS
        COMPONENT-IDS [COMPONENT-IDS ...]

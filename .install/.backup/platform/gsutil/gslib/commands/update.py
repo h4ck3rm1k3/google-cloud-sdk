@@ -11,38 +11,28 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Implementation of update command for updating gsutil."""
+from __future__ import absolute_import
 
 import os
 import shutil
 import signal
+import stat
 import tarfile
 import tempfile
 import textwrap
 
 import gslib
 from gslib.command import Command
-from gslib.command import COMMAND_NAME
-from gslib.command import COMMAND_NAME_ALIASES
-from gslib.command import FILE_URIS_OK
-from gslib.command import MAX_ARGS
-from gslib.command import MIN_ARGS
-from gslib.command import PROVIDER_URIS_OK
-from gslib.command import SUPPORTED_SUB_ARGS
-from gslib.command import URIS_START_ARG
+from gslib.cs_api_map import ApiSelector
 from gslib.exception import CommandException
-from gslib.help_provider import HELP_NAME
-from gslib.help_provider import HELP_NAME_ALIASES
-from gslib.help_provider import HELP_ONE_LINE_SUMMARY
-from gslib.help_provider import HELP_TEXT
-from gslib.help_provider import HELP_TYPE
-from gslib.help_provider import HelpType
-from gslib.storage_uri_builder import StorageUriBuilder
-from gslib.util import BOTO_IS_SECURE
+from gslib.storage_url import StorageUrlFromString
+from gslib.util import CERTIFICATE_VALIDATION_ENABLED
 from gslib.util import CompareVersions
+from gslib.util import GetBotoConfigFileList
 from gslib.util import GSUTIL_PUB_TARBALL
 from gslib.util import IS_CYGWIN
 from gslib.util import IS_WINDOWS
-from gslib.util import LookUpGsutilVersion
 from gslib.util import LookUpGsutilVersion
 from gslib.util import RELEASE_NOTES_URL
 
@@ -97,44 +87,34 @@ _detailed_help_text = ("""
 class UpdateCommand(Command):
   """Implementation of gsutil update command."""
 
-  # Command specification (processed by parent class).
-  command_spec = {
-      # Name of command.
-      COMMAND_NAME: 'update',
-      # List of command name aliases.
-      COMMAND_NAME_ALIASES: ['refresh'],
-      # Min number of args required by this command.
-      MIN_ARGS: 0,
-      # Max number of args required by this command, or NO_MAX.
-      MAX_ARGS: 1,
-      # Getopt-style string specifying acceptable sub args.
-      SUPPORTED_SUB_ARGS: 'fn',
-      # True if file URIs acceptable for this command.
-      FILE_URIS_OK: True,
-      # True if provider-only URIs acceptable for this command.
-      PROVIDER_URIS_OK: False,
-      # Index in args of first URI arg.
-      URIS_START_ARG: 0,
-  }
-  help_spec = {
-      # Name of command or auxiliary help info for which this help applies.
-      HELP_NAME: 'update',
-      # List of help name aliases.
-      HELP_NAME_ALIASES: ['refresh'],
-      # Type of help:
-      HELP_TYPE: HelpType.COMMAND_HELP,
-      # One line summary of this help.
-      HELP_ONE_LINE_SUMMARY: 'Update to the latest gsutil release',
-      # The full help text.
-      HELP_TEXT: _detailed_help_text,
-  }
+  # Command specification. See base class for documentation.
+  command_spec = Command.CreateCommandSpec(
+      'update',
+      command_name_aliases=['refresh'],
+      min_args=0,
+      max_args=1,
+      supported_sub_args='fn',
+      file_url_ok=True,
+      provider_url_ok=False,
+      urls_start_arg=0,
+      gs_api_support=[ApiSelector.XML, ApiSelector.JSON],
+      gs_default_api=ApiSelector.JSON,
+  )
+  # Help specification. See help_provider.py for documentation.
+  help_spec = Command.HelpSpec(
+      help_name='update',
+      help_name_aliases=['refresh'],
+      help_type='command_help',
+      help_one_line_summary='Update to the latest gsutil release',
+      help_text=_detailed_help_text,
+      subcommand_help_text={},
+  )
 
   def _DisallowUpdataIfDataInGsutilDir(self):
-    """
-    Disallows the update command from running if files other than those
-    distributed with gsutil are found. This prevents users from losing data if
-    they are in the habit of running gsutil from the gsutil directory, and
-    leaving data in that directory.
+    """Disallows the update command if files not in the gsutil distro are found.
+
+    This prevents users from losing data if they are in the habit of running
+    gsutil from the gsutil directory and leaving data in that directory.
 
     This will also detect someone attempting to run gsutil update from a git
     repo, since the top-level directory will contain git files and dirs (like
@@ -143,18 +123,17 @@ class UpdateCommand(Command):
     Raises:
       CommandException: if files other than those distributed with gsutil found.
     """
-    # Manifest includes recursive-includes of gslib and scripts. Directly add
+    # Manifest includes recursive-includes of gslib. Directly add
     # those to the list here so we will skip them in os.listdir() loop without
     # having to build deeper handling of the MANIFEST file here. Also include
     # 'third_party', which isn't present in manifest but gets added to the
     # gsutil distro by the gsutil submodule configuration; and the MANIFEST.in
     # and CHANGES.md files.
-    manifest_lines = ['gslib', 'scripts', 'third_party', 'MANIFEST.in',
-                      'CHANGES.md']
-    
+    manifest_lines = ['gslib', 'third_party', 'MANIFEST.in', 'CHANGES.md']
+
     try:
       with open(os.path.join(gslib.GSUTIL_DIR, 'MANIFEST.in'), 'r') as fp:
-        for line in fp.readlines():
+        for line in fp:
           if line.startswith('include '):
             manifest_lines.append(line.split()[-1])
     except IOError:
@@ -166,16 +145,16 @@ class UpdateCommand(Command):
     # subdirs (like gslib) because that would require deeper parsing of
     # MANFFEST.in, and most users who drop data into gsutil dir do so at the top
     # level directory.
-    for file in os.listdir(gslib.GSUTIL_DIR):
-      if file[-4:] == '.pyc':
+    for filename in os.listdir(gslib.GSUTIL_DIR):
+      if filename.endswith('.pyc'):
         # Ignore compiled code.
         continue
-      if file not in manifest_lines:
+      if filename not in manifest_lines:
         raise CommandException('\n'.join(textwrap.wrap(
             'A file (%s) that is not distributed with gsutil was found in '
             'the gsutil directory. The update command cannot run with user '
             'data in the gsutil directory.' %
-            os.path.join(gslib.GSUTIL_DIR, file))))
+            os.path.join(gslib.GSUTIL_DIR, filename))))
 
   def _ExplainIfSudoNeeded(self, tf, dirs_to_remove):
     """Explains what to do if sudo needed to update gsutil software.
@@ -200,16 +179,17 @@ class UpdateCommand(Command):
 
     # Won't fail - this command runs after main startup code that insists on
     # having a config file.
-    config_files = ' '.join(self.config_file_list)
+    config_files = ' '.join(GetBotoConfigFileList())
     self._CleanUpUpdateCommand(tf, dirs_to_remove)
     raise CommandException('\n'.join(textwrap.wrap(
         'Since it was installed by a different user previously, you will need '
         'to update using the following commands. You will be prompted for your '
         'password, and the install will run as "root". If you\'re unsure what '
-        'this means please ask your system administrator for help:'))
-         + ('\n\tchmod 644 %s\n\tsudo env BOTO_CONFIG=%s gsutil update'
-            '\n\tchmod 600 %s') % (config_files, config_files, config_files),
-        informational=True)
+        'this means please ask your system administrator for help:')) + (
+            '\n\tsudo chmod 644 %s\n\tsudo env BOTO_CONFIG="%s" gsutil update'
+            '\n\tsudo chmod 600 %s') %
+                           (config_files, config_files, config_files),
+                           informational=True)
 
   # This list is checked during gsutil update by doing a lowercased
   # slash-left-stripped check. For example "/Dev" would match the "dev" entry.
@@ -223,7 +203,7 @@ class UpdateCommand(Command):
   ]
 
   def _EnsureDirsSafeForUpdate(self, dirs):
-    """Throws Exception if any of dirs is known to be unsafe for gsutil update.
+    """Raises Exception if any of dirs is known to be unsafe for gsutil update.
 
     This provides a fail-safe check to ensure we don't try to overwrite
     or delete any important directories. (That shouldn't happen given the
@@ -265,8 +245,8 @@ class UpdateCommand(Command):
         if not IS_WINDOWS:
           raise
 
-  # Command entry point.
   def RunCommand(self):
+    """Command entry point for the update command."""
 
     if gslib.IS_PACKAGE_INSTALL:
       raise CommandException(
@@ -274,11 +254,11 @@ class UpdateCommand(Command):
           'tarball. If you installed gsutil via another method, use the same '
           'method to update it.')
 
-    is_secure = BOTO_IS_SECURE
-    if not is_secure[0]:
+    https_validate_certificates = CERTIFICATE_VALIDATION_ENABLED
+    if not https_validate_certificates:
       raise CommandException(
-          'Your boto configuration has %s = False. The update command\n'
-          'cannot be run this way, for security reasons.' % is_secure[1])
+          'Your boto configuration has https_validate_certificates = False.\n'
+          'The update command cannot be run this way, for security reasons.')
 
     self._DisallowUpdataIfDataInGsutilDir()
 
@@ -307,12 +287,13 @@ class UpdateCommand(Command):
         if i > 0:
           raise CommandException(
               'Invalid update URI. Must name a single .tar.gz file.')
-        if result.uri.names_file():
+        storage_url = StorageUrlFromString(result.GetUrlString())
+        if storage_url.IsFileUrl() and not storage_url.IsDirectory():
           if not force_update:
             raise CommandException(
                 ('"update" command does not support "file://" URIs without the '
                  '-f option.'))
-        elif not result.uri.names_object():
+        elif not (storage_url.IsCloudUrl() and storage_url.IsObject()):
           raise CommandException(
               'Invalid update object URI. Must name a single .tar.gz file.')
     else:
@@ -322,9 +303,7 @@ class UpdateCommand(Command):
     # the tarball and extract the VERSION file. The version lookup will fail
     # when running the update system test, because it retrieves the tarball from
     # a temp file rather than a cloud URI (files lack the version metadata).
-    suri_builder = StorageUriBuilder(self.debug, self.bucket_storage_uri_class)
-    tarball_version = LookUpGsutilVersion(
-        self.suri_builder.StorageUri(update_from_uri_str))
+    tarball_version = LookUpGsutilVersion(self.gsutil_api, update_from_uri_str)
     if tarball_version:
       tf = None
     else:
@@ -343,8 +322,8 @@ class UpdateCommand(Command):
                                'installed.', informational=True)
 
     if not no_prompt:
-      (g, m) = CompareVersions(tarball_version, gslib.VERSION)
-      if m:
+      (_, major) = CompareVersions(tarball_version, gslib.VERSION)
+      if major:
         print('\n'.join(textwrap.wrap(
             'This command will update to the "%s" version of gsutil at %s. '
             'NOTE: This a major new version, so it is strongly recommended '
@@ -397,13 +376,25 @@ class UpdateCommand(Command):
     # users, we can skip this step when running on Windows, which
     # avoids the problem that Windows has no find or xargs command.
     if not IS_WINDOWS:
-      # Make all files and dirs in updated area readable by other
-      # and make all directories executable by other.
-      os.system('chmod -R o+r ' + new_dir)
-      os.system('find ' + new_dir + ' -type d | xargs chmod o+x')
+      # Make all files and dirs in updated area owner-RW and world-R, and make
+      # all directories owner-RWX and world-RX.
+      for dirname, subdirs, filenames in os.walk(new_dir):
+        for filename in filenames:
+          fd = os.open(os.path.join(dirname, filename), os.O_RDONLY)
+          os.fchmod(fd, stat.S_IWRITE | stat.S_IRUSR |
+                    stat.S_IRGRP | stat.S_IROTH)
+          os.close(fd)
+        for subdir in subdirs:
+          fd = os.open(os.path.join(dirname, subdir), os.O_RDONLY)
+          os.fchmod(fd, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH |
+                    stat.S_IRGRP | stat.S_IROTH)
+          os.close(fd)
 
-      # Make main gsutil script readable and executable by other.
-      os.system('chmod o+rx ' + os.path.join(new_dir, 'gsutil'))
+      # Make main gsutil script owner-RWX and world-RX.
+      fd = os.open(os.path.join(new_dir, 'gsutil', 'gsutil'), os.O_RDONLY)
+      os.fchmod(fd, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP |
+                stat.S_IROTH | stat.S_IXOTH)
+      os.close(fd)
 
     # Move old installation aside and new into place.
     os.rename(gslib.GSUTIL_DIR, os.path.join(old_dir, 'old'))

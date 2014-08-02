@@ -11,17 +11,33 @@ gcloud-compute-url-maps \- List, create, and delete URL maps
 .nf
 \fBgcloud compute url\-maps\fR
   COMMAND
-  [\-h, \-\-help]
+  [\-\-help]
+  [\-h]
 .fi
 .SH "FLAGS"
 .PP
 \fB\-\-help\fR
+.RS 4
+Display detailed help\&.
+.RE
+.PP
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE
 .SH "COMMANDS"
 .sp
 \fICOMMAND\fR is one of the following\&.
+.PP
+\fBadd\-host\-rule\fR
+.RS 4
+Add a rule to a URL map to map hosts to a path matcher\&.
+.RE
+.PP
+\fBadd\-path\-matcher\fR
+.RS 4
+Add a path matcher to a URL map\&.
+.RE
 .PP
 \fBcreate\fR
 .RS 4
@@ -46,4 +62,9 @@ Get URL maps\&.
 \fBlist\fR
 .RS 4
 List URL maps\&.
+.RE
+.PP
+\fBremove\-path\-matcher\fR
+.RS 4
+Remove a path matcher from a URL map\&.
 .RE

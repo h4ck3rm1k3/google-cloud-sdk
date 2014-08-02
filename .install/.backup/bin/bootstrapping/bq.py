@@ -10,6 +10,7 @@ import sys
 import bootstrapping
 
 from googlecloudsdk.core import config
+from googlecloudsdk.core.credentials import gce
 
 
 def main():
@@ -18,7 +19,11 @@ def main():
   project, account = bootstrapping.GetActiveProjectAndAccount()
   json_path = config.Paths().LegacyCredentialsJSONPath(account)
 
-  args = ['--credential_file', json_path]
+  gce_metadata = gce.Metadata()
+  if gce_metadata and account in gce_metadata.Accounts():
+    args = ['--use_gce_service_account']
+  else:
+    args = ['--credential_file', json_path]
   if project:
     args += ['--project', project]
 
@@ -33,5 +38,5 @@ if __name__ == '__main__':
   }
   bootstrapping.CheckForBlacklistedCommand(sys.argv, blacklist,
                                            warn=True, die=True)
-  bootstrapping.PrerunChecks()
+  bootstrapping.PrerunChecks(can_be_gce=True)
   main()

@@ -4,12 +4,16 @@ NAME
 SYNOPSIS
        gcloud auth list
          [--account ACCOUNT]
-         [-h, --help]
+         [--help]
+         [-h]
 
 FLAGS
        --account ACCOUNT
            List only credentials for one account.
 
        --help
+           Display detailed help.
+
+       -h
            Print a summary help and exit.
 

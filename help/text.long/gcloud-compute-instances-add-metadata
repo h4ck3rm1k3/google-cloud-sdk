@@ -4,10 +4,11 @@ NAME
 SYNOPSIS
        gcloud compute instances add-metadata
          NAME
+         [--help]
          [--metadata KEY=VALUE [KEY=VALUE ...]]
          [--metadata-from-file KEY=LOCAL_FILE_PATH [KEY=LOCAL_FILE_PATH ...]]
-         --zone ZONE
-         [-h, --help]
+         [--zone ZONE]
+         [-h]
 
 DESCRIPTION
        gcloud compute instances add-metadata can be used to add or update the
@@ -24,6 +25,9 @@ POSITIONAL ARGUMENTS
            The name of the instance whose metadata should be modified.
 
 FLAGS
+       --help
+           Display detailed help.
+
        --metadata KEY=VALUE [KEY=VALUE ...]
            Metadata to be made available to the guest operating system running
            on the instances. Each metadata entry is a key/value pair separated
@@ -49,8 +53,9 @@ FLAGS
            large such as "startup-script" contents.
 
        --zone ZONE
-           The zone of the instance.
+           The zone of the instance to set metadata on. If omitted and the
+           arguments are not all URIs, you will be prompted to select a zone.
 
-       --help
+       -h
            Print a summary help and exit.
 

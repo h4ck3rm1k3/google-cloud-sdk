@@ -53,6 +53,7 @@ setup(name='bigquery',
       # Contained modules and scripts.
       py_modules=[
           'bq',
+          'bq_flags',
           'bigquery_client',
           'table_formatter',
           ],

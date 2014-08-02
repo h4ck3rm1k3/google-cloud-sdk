@@ -4,6 +4,7 @@
 
 """
 
+import copy
 import re
 import urllib
 
@@ -240,6 +241,7 @@ class Resource(object):
                collectionpath, parser):
     self.__collection = collection
     self.__request = request
+    self.__name = None
     self.__self_link = None
     self.__ordered_params = ordered_params
     self.__resolvers = resolvers
@@ -250,6 +252,10 @@ class Resource(object):
 
   def Collection(self):
     return self.__collection
+
+  def Name(self):
+    self.Resolve()
+    return self.__name
 
   def SelfLink(self):
     self.Resolve()
@@ -312,10 +318,15 @@ class Resource(object):
       # TODO(user): Unquote URLs for compute, pending b/15425944.
       self.__self_link = urllib.unquote(self.__self_link)
 
+    if self.__ordered_params:
+      self.__name = getattr(self, self.__ordered_params[-1])
+
   def __str__(self):
-    path = '/'.join([getattr(self, param) for param in self.__ordered_params])
-    return '{collection}::{path}'.format(
-        collection=self.__collection, path=path)
+    return self.SelfLink()
+    # TODO(user): Possibly change what is returned, here.
+    # path = '/'.join([getattr(self, param) for param in self.__ordered_params])
+    # return '{collection}::{path}'.format(
+    #     collection=self.__collection, path=path)
 
 
 class Registry(object):
@@ -341,7 +352,10 @@ class Registry(object):
     self.parsers_by_url = {}
     self.default_param_funcs = {}
 
-  def RegisterAPI(self, api, urls_only):
+  def _Clone(self):
+    return copy.deepcopy(self)
+
+  def RegisterAPI(self, api, urls_only=False):
     """Register a generated API with this registry.
 
     Args:
@@ -356,30 +370,79 @@ class Registry(object):
       if not isinstance(potential_service, base_api.BaseApiService):
         continue
       try:
-        parser = _ResourceParser(potential_service, self)
-
-        if not urls_only:
-          if parser.collection in self.parsers_by_collection:
-            urls = [api.url,
-                    self.parsers_by_collection[parser.collection].client.url]
-            raise AmbiguousAPIException(parser.collection, urls)
-          self.parsers_by_collection[parser.collection] = parser
-        method_config = potential_service.GetMethodConfig('Get')
-        tokens = method_config.relative_path.split('/')
-        # Build up a search tree to match URLs against URL templates.
-        # The tree will branch at each URL segment, where the first segment
-        # is the API's base url, and each subsequent segment is a token in
-        # the instance's get method's relative path. At the leaf, a key of
-        # None indicates that the URL can finish here, and provides the parser
-        # for this resource.
-        cur_level = self.parsers_by_url[api.url]
-        while tokens:
-          token = tokens.pop(0)
-          if token not in cur_level:
-            cur_level[token] = {} if tokens else {None: parser}
-          cur_level = cur_level[token]
+        self._RegisterService(api, potential_service, urls_only)
       except _ResourceWithoutGetException:
         pass
+
+  def _RegisterService(self, api, service, urls_only):
+    """Register one service for an API with this registry.
+
+    Args:
+      api: base_api.BaseApiClient, The client for a Google Cloud API.
+      service: base_api.BaseApiService, the service to be registered.
+      urls_only: bool, True if this API should only be used to interpret URLs,
+          and not to interpret collectionpaths.
+
+    Raises:
+      AmbiguousAPIException: If the API defines a collection that has already
+          been added.
+    """
+    if api.url not in self.parsers_by_url:
+      self.parsers_by_url[api.url] = {}
+
+    parser = _ResourceParser(service, self)
+
+    if not urls_only:
+      if parser.collection in self.parsers_by_collection:
+        urls = [api.url,
+                self.parsers_by_collection[parser.collection].client.url]
+        raise AmbiguousAPIException(parser.collection, urls)
+      self.parsers_by_collection[parser.collection] = parser
+    method_config = service.GetMethodConfig('Get')
+    tokens = method_config.relative_path.split('/')
+    # Build up a search tree to match URLs against URL templates.
+    # The tree will branch at each URL segment, where the first segment
+    # is the API's base url, and each subsequent segment is a token in
+    # the instance's get method's relative path. At the leaf, a key of
+    # None indicates that the URL can finish here, and provides the parser
+    # for this resource.
+    cur_level = self.parsers_by_url[api.url]
+    while tokens:
+      token = tokens.pop(0)
+      if token not in cur_level:
+        cur_level[token] = {}
+      if not tokens:
+        cur_level[token][None] = parser
+      cur_level = cur_level[token]
+
+  def _SwitchAPI(self, api):
+    """Replace the registration of one version of an API with another.
+
+    This method will remove references to the previous version of the provided
+    API from self.parsers_by_collection, but leave self.parsers_by_url intact.
+
+    Args:
+      api: base_api.BaseApiClient, The client for a Google Cloud API.
+    """
+    # Clear out the old collections.
+    old_collections = []
+    for collection in self.parsers_by_collection:
+      [package, unused_version] = collection.split('.', 2)
+      # pylint:disable=protected-access
+      if package == api._PACKAGE:
+        old_collections.append(collection)
+    for collection in old_collections:
+      del self.parsers_by_collection[collection]
+    # TODO(user): Maybe remove the url parsers as well?
+
+    self.RegisterAPI(api)
+
+  def CloneAndSwitchAPIs(self, *apis):
+    reg = self._Clone()
+    for api in apis:
+      # pylint:disable=protected-access
+      reg._SwitchAPI(api)
+    return reg
 
   def SetParamDefault(self, api, collection, param, resolver):
     """Provide a function that will be used to fill in missing values.
@@ -534,7 +597,7 @@ class Registry(object):
           collection, line, params, resolve)
 
 
-_REGISTRY = Registry()
+REGISTRY = Registry()
 
 
 def RegisterAPI(api, urls_only=False):
@@ -545,7 +608,7 @@ def RegisterAPI(api, urls_only=False):
     urls_only: bool, True if this API should only be used to interpret URLs,
         and not to interpret collectionpaths.
   """
-  _REGISTRY.RegisterAPI(api, urls_only)
+  REGISTRY.RegisterAPI(api, urls_only)
 
 
 def SetParamDefault(api, collection, param, resolver):
@@ -561,15 +624,15 @@ def SetParamDefault(api, collection, param, resolver):
         exception that tells the user how to fix the problem, or the value
         itself.
   """
-  _REGISTRY.SetParamDefault(api, collection, param, resolver)
+  REGISTRY.SetParamDefault(api, collection, param, resolver)
 
 
 def _ClearAPIs():
   """For testing, clear out any APIs to start with a clean slate.
 
   """
-  global _REGISTRY
-  _REGISTRY = Registry()
+  global REGISTRY
+  REGISTRY = Registry()
 
 
 def Parse(line, params=None, collection=None, resolve=True):
@@ -593,5 +656,5 @@ def Parse(line, params=None, collection=None, resolve=True):
     UnknownCollectionException: If no collection is provided or can be inferred.
     WrongProtocolException: If the input was http:// instead of https://
   """
-  return _REGISTRY.Parse(
+  return REGISTRY.Parse(
       line=line, params=params, collection=collection, resolve=resolve)

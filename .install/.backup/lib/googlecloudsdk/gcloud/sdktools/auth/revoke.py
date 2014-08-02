@@ -1,8 +1,7 @@
 # Copyright 2013 Google Inc. All Rights Reserved.
 
-"""Revoke credentials being used by the CloudSDK.
+"""Revoke credentials being used by the CloudSDK."""
 
-"""
 
 from googlecloudsdk.calliope import base
 from googlecloudsdk.calliope import exceptions as c_exc

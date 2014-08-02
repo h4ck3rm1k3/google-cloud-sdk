@@ -100,7 +100,7 @@ class ComputeCmdsTest(unittest.TestCase):
 
     self.assertEqual(result, 0)
     self.assertEqual(
-        basic_cmds.version.__version__, '1.16.1')
+        basic_cmds.version.__version__, '1.16.4')
 
 
 if __name__ == '__main__':

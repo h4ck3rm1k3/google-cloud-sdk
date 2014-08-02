@@ -11,8 +11,9 @@ gcloud-compute-target-http-proxies-update \- Update a target HTTP proxy
 .nf
 \fBgcloud compute target\-http\-proxies update\fR
   NAME
+  [\-\-help]
   \-\-url\-map URL_MAP
-  [\-h, \-\-help]
+  [\-h]
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -25,12 +26,17 @@ The name of the target HTTP proxy\&.
 .RE
 .SH "FLAGS"
 .PP
+\fB\-\-help\fR
+.RS 4
+Display detailed help\&.
+.RE
+.PP
 \fB\-\-url\-map\fR \fIURL_MAP\fR
 .RS 4
 A reference to a URL map resource that will define the mapping of URLs to backend services\&. The URL map must exist and cannot be deleted while referenced by a target HTTP proxy\&.
 .RE
 .PP
-\fB\-\-help\fR
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE

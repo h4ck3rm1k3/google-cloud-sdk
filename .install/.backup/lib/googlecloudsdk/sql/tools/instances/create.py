@@ -63,6 +63,13 @@ class Create(base.Command):
         action='store_true',
         help='Specified if daily backup should be disabled.')
     parser.add_argument(
+        '--database-version',
+        required=False,
+        choices=['MYSQL_5_5', 'MYSQL_5_6'],
+        default='MYSQL_5_5',
+        help='The database engine type and version. Can be MYSQL_5_5 or '
+        'MYSQL_5_6.')
+    parser.add_argument(
         '--enable-bin-log',
         required=False,
         action='store_true',
@@ -159,6 +166,7 @@ class Create(base.Command):
     authorized_gae_apps = args.authorized_gae_apps
     authorized_networks = args.authorized_networks
     database_flags = args.database_flags
+    database_version = args.database_version
     enable_bin_log = args.enable_bin_log
     follow_gae_app = args.follow_gae_app
     gce_zone = args.gce_zone
@@ -182,10 +190,10 @@ class Create(base.Command):
     if gce_zone:
       location_preference['zone'] = gce_zone
     settings['locationPreference'] = location_preference
-    ip_configuration = [{'enabled': assign_ip,
-                         'requireSsl': require_ssl,
-                         'authorizedNetworks': authorized_networks}]
-    settings['ipConfiguration'] = ip_configuration
+    ip_configuration = {'enabled': assign_ip,
+                        'requireSsl': require_ssl,
+                        'authorizedNetworks': authorized_networks}
+    settings['ipConfiguration'] = [ip_configuration]
 
     if no_backup:
       if backup_start_time or enable_bin_log:
@@ -204,8 +212,9 @@ class Create(base.Command):
     if database_flags:
       self.SetDatabaseFlags(settings, database_flags)
 
+
     body = {'instance': instance_id, 'project': project_id, 'region': region,
-            'settings': settings}
+            'databaseVersion': database_version, 'settings': settings}
     request = sql.instances().insert(project=project_id,
                                      body=body)
     try:

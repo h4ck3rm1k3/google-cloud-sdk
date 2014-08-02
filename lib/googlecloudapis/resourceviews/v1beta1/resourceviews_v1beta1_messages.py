@@ -82,7 +82,7 @@ class ResourceView(messages.Message):
   Fields:
     creationTime: The creation time of the resource view.
     description: The detailed description of the resource view.
-    id: The ID of the resource view. For internal use only.
+    id: [Output Only] The ID of the resource view.
     kind: Type of the resource.
     labels: The labels for events.
     lastModified: The last modified time of the view. Not supported yet.
@@ -425,7 +425,7 @@ class ZoneViewsListResourcesResponse(messages.Message):
   """The response to a list resource request.
 
   Fields:
-    members: The resources in the view.
+    members: The full URL of resources in the view.
     nextPageToken: A token used for pagination.
   """
 

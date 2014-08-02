@@ -3,7 +3,9 @@ NAME
        along with any other components they might depend on.
 
 SYNOPSIS
-       gcloud components update [COMPONENT-IDS ...] [-h, --help]
+       gcloud components update
+         [COMPONENT-IDS ...]
+         [-h, --help]
 
 POSITIONAL ARGUMENTS
        [COMPONENT-IDS ...]

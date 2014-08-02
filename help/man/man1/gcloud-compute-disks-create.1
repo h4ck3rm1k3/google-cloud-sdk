@@ -12,16 +12,19 @@ gcloud-compute-disks-create \- Create Google Compute Engine persistent disks
 \fBgcloud compute disks create\fR
   NAME [NAME \&...]
   [\-\-description DESCRIPTION]
+  [\-\-help]
+  [\-\-image IMAGE | \-\-source\-snapshot SOURCE_SNAPSHOT]
+  [\-\-image\-project IMAGE_PROJECT]
   [\-\-size SIZE]
-  [\-\-source\-image SOURCE_IMAGE | \-\-source\-snapshot SOURCE_SNAPSHOT]
-  \-\-zone ZONE
-  [\-h, \-\-help]
+  [\-\-type TYPE]
+  [\-\-zone ZONE]
+  [\-h]
 .fi
 .SH "DESCRIPTION"
 .sp
 \fBgcloud compute disks create\fR creates one or more Google Compute Engine persistent disks\&. When creating virtual machine instances, disks can be attached to the instances through the \fIgcloud compute instances create\fR command\&. Disks can also be attached to instances that are already running using \fIgloud compute instances attach\-disk\fR\&.
 .sp
-Disks are zonal resources, so they reside in a particular zone for their entire lifetime\&. The contents of a disk can be moved to a different zone by snapshotting the disk (using \fIgcloud compute disks snapshot\fR) and creating a new disk using \(lq\-\-source\-snapshot\(rq in the desired zone\&.
+Disks are zonal resources, so they reside in a particular zone for their entire lifetime\&. The contents of a disk can be moved to a different zone by snapshotting the disk (using \fIgcloud compute disks snapshot\fR) and creating a new disk using \(lq\-\-source\-snapshot\(rq in the desired zone\&. The contents of a disk can also be moved across project or zone by creating an image (using \fIgcloud compute images create\fR) and creating a new disk using \(lq\-\-source\-image\(rq in the desired project and/or zone\&.
 .sp
 When creating disks, be sure to include the \(lq\-\-zone\(rq option:
 .sp
@@ -47,16 +50,16 @@ The names of the disks to create\&.
 An optional, textual description for the disks being created\&.
 .RE
 .PP
-\fB\-\-size\fR \fISIZE\fR
+\fB\-\-help\fR
 .RS 4
-Indicates the size of the disks\&. The value must be a whole number followed by a size unit of \(lqKB\(rq for kilobyte, \(lqMB\(rq for megabyte, \(lqGB\(rq for gigabyte, or \(lqTB\(rq for terabyte\&. For example, \(lq10GB\(rq will produce 10 gigabyte disks\&. If omitted, a default size of 200 GB is used\&. The minimum size a disk can have is 1 GB\&. Disk size must be a multiple of 1 GB\&.
+Display detailed help\&.
 .RE
 .PP
-\fB\-\-source\-image\fR \fISOURCE_IMAGE\fR
+\fB\-\-image\fR \fIIMAGE\fR
 .RS 4
-A source image to apply to the disks being created\&.
+An image to apply to the disks being created\&. When using this option, the size of the disks must be at least as large as the image size\&. Use \(lq\-\-size\(rq to adjust the size of the disks\&.
 .sp
-The value for this option can be the name of an image in the current project, a URI when referring to an image in another project, or an alias from the table below\&.
+The value for this option can be the name of an image or an alias from the table below\&.
 .TS
 tab(:);
 ltB ltB ltB ltB.
@@ -74,13 +77,24 @@ lt lt lt l
 lt lt lt l
 lt lt lt l
 lt lt lt l
+lt lt lt l
+lt lt lt l
 lt lt lt l.
 T{
 centos\-6
 T}:T{
 centos\-cloud
 T}:T{
-centos\-6\-v20140415
+centos\-6
+T}:T{
+\ \&
+T}
+T{
+coreos
+T}:T{
+coreos\-cloud
+T}:T{
+coreos\-beta
 T}:T{
 \ \&
 T}
@@ -89,7 +103,7 @@ debian\-7
 T}:T{
 debian\-cloud
 T}:T{
-debian\-7\-wheezy\-v20140415
+debian\-7\-wheezy
 T}:T{
 \ \&
 T}
@@ -98,7 +112,16 @@ debian\-7\-backports
 T}:T{
 debian\-cloud
 T}:T{
-backports\-debian\-7\-wheezy\-v20140415
+backports\-debian\-7\-wheezy
+T}:T{
+\ \&
+T}
+T{
+opensuse\-13
+T}:T{
+opensuse\-cloud
+T}:T{
+opensuse\-13\-1
 T}:T{
 \ \&
 T}
@@ -107,7 +130,7 @@ rhel\-6
 T}:T{
 rhel\-cloud
 T}:T{
-rhel\-6\-v20140415
+rhel\-6
 T}:T{
 \ \&
 T}
@@ -116,17 +139,27 @@ sles\-11
 T}:T{
 suse\-cloud
 T}:T{
-sles\-11\-sp3\-v20140306
+sles\-11
 T}:T{
 \ \&
 T}
 .TE
 .sp 1
-As new images are released, these aliases will be updated\&. If using this tool in a script where depending on a specific version of an image is necessary, then do not use the aliases\&. Instead, use the URI of the desired image\&.
+When the value is an alias, this tool will query the public image project that contains the image type to find the latest image matching the alias\&. The user\(cqs project is also queried for an image with the same name as the alias\&. If a conflict exists, the user will be prompted to resolve the conflict\&.
 .sp
-Aliases are expanded first, so avoid creating images in your project whose names are in the set of aliases\&. If you do create an image whose name matches an alias, you can refer to it by using its URI\&.
+To specify an image in another project for which there is no alias, use \(lq\-\-image\-project\(rq\&. When \(lq\-\-image\-project\(rq is present, no API calls are made to resolve the image\&. This property is useful for scripts\&.
 .sp
 This flag is mutually exclusive with \(lq\-\-source\-snapshot\(rq\&.
+.RE
+.PP
+\fB\-\-image\-project\fR \fIIMAGE_PROJECT\fR
+.RS 4
+The project against which all image references will be resolved\&. See \(lq\-\-image\(rq for more details\&.
+.RE
+.PP
+\fB\-\-size\fR \fISIZE\fR
+.RS 4
+Indicates the size of the disks\&. The value must be a whole number followed by a size unit of \(lqKB\(rq for kilobyte, \(lqMB\(rq for megabyte, \(lqGB\(rq for gigabyte, or \(lqTB\(rq for terabyte\&. For example, \(lq10GB\(rq will produce 10 gigabyte disks\&. If omitted, a default size of 500 GB is used for standard disks and 200GB for SSD disks\&. The minimum size a disk can have is 1 GB\&. Disk size must be a multiple of 10 GB\&.
 .RE
 .PP
 \fB\-\-source\-snapshot\fR \fISOURCE_SNAPSHOT\fR
@@ -134,15 +167,23 @@ This flag is mutually exclusive with \(lq\-\-source\-snapshot\(rq\&.
 A source snapshot used to create the disks\&. It is safe to delete a snapshot after a disk has been created from the snapshot\&. In such cases, the disks will no longer reference the deleted snapshot\&. To get a list of snapshots in your current project, run
 \fIgcloud compute snapshots list\fR\&. A snapshot from an existing disk can be created using the
 \fIgcloud compute disks snapshot\fR
-command\&. This flag is mutually exclusive with \(lq\-\-source\-image\(rq\&.
+command\&. This flag is mutually exclusive with \(lq\-\-image\(rq\&.
+.sp
+When using this option, the size of the disks must be at least as large as the snapshot size\&. Use \(lq\-\-size\(rq to adjust the size of the disks\&.
+.RE
+.PP
+\fB\-\-type\fR \fITYPE\fR
+.RS 4
+Specifies the type of disk to create\&. To get a list of available disk types, run
+\fIgcloud compute disk\-types list\fR\&. The default disk type is pd\-standard\&.
 .RE
 .PP
 \fB\-\-zone\fR \fIZONE\fR
 .RS 4
-The zone to create the disks in\&.
+The zone of the disks to create\&. If omitted and the arguments are not all URIs, you will be prompted to select a zone\&.
 .RE
 .PP
-\fB\-\-help\fR
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE

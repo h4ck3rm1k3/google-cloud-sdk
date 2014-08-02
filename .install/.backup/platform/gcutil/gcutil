@@ -43,10 +43,7 @@ def main():
   class of problems that can occur when the user's system has multiple
   versions of a library.
   """
-  python_bin = os.environ.get('CLOUDSDK_PYTHON', sys.executable)
-  if not python_bin:
-    sys.stderr.write('Could not find Python executable.')
-    sys.exit(1)
+  python_bin = sys.executable
 
   gcutil_main = os.path.join(
       os.path.dirname(os.path.realpath(__file__)),
@@ -56,10 +53,14 @@ def main():
       'gcutil')
 
   python_args = os.environ.get('CLOUDSDK_PYTHON_ARGS', '-S')
-  args = shlex.split(python_bin)
-  args.extend(shlex.split(python_args))
+  args = [python_bin]
+
+  posix = platform.system() != 'Windows'
+  args.extend(shlex.split(python_args, posix=posix))
+
   args.append(gcutil_main)
   args.extend(sys.argv[1:])
+
   if platform.system() == 'Windows':
     subprocess.Popen(args).wait()
   else:

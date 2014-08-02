@@ -1,7 +1,10 @@
 # Copyright 2014 Google Inc. All Rights Reserved.
 """Command for adding instances to target pools."""
 from googlecloudapis.compute.v1 import compute_v1_messages as messages
+from googlecloudsdk.calliope import exceptions as calliope_exceptions
 from googlecloudsdk.compute.lib import base_classes
+from googlecloudsdk.compute.lib import utils
+from googlecloudsdk.core import resources
 
 
 class AddInstances(base_classes.BaseAsyncMutator):
@@ -16,15 +19,10 @@ class AddInstances(base_classes.BaseAsyncMutator):
         nargs='+',
         required=True)
 
-    parser.add_argument(
-        '--region',
-        help='The region of the target pool.',
-        required=True)
-
-    parser.add_argument(
-        '--zone',
-        help='The zone of the instances.',
-        required=True)
+    utils.AddZoneFlag(
+        parser,
+        resource_type='instances',
+        operation_type='add to the target pool')
 
     parser.add_argument(
         'name',
@@ -39,19 +37,36 @@ class AddInstances(base_classes.BaseAsyncMutator):
     return 'AddInstance'
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'targetPools'
 
+  @property
+  def prompting_resource_type(self):
+    return 'instances'
+
   def CreateRequests(self, args):
-    instances = [messages.InstanceReference(
-        instance=self.context['uri-builder'].Build(
-            'zones', args.zone, 'instances', instance))
-                 for instance in args.instances]
+    instance_refs = self.CreateZonalReferences(args.instances, args.zone)
+
+    instances = [messages.InstanceReference(instance=instance_ref.SelfLink())
+                 for instance_ref in instance_refs]
+
+    unique_regions = set(utils.ZoneNameToRegionName(instance_ref.zone)
+                         for instance_ref in instance_refs)
+
+    # Check that all regions are the same.
+    if len(unique_regions) > 1:
+      raise calliope_exceptions.ToolException(
+          'Instances must all be in the same region as the target pool.')
+
+    target_pool_ref = resources.Parse(
+        args.name,
+        collection='compute.targetPools',
+        params={'region': unique_regions.pop()})
 
     request = messages.ComputeTargetPoolsAddInstanceRequest(
-        region=args.region,
+        region=target_pool_ref.region,
         project=self.context['project'],
-        targetPool=args.name,
+        targetPool=target_pool_ref.Name(),
         targetPoolsAddInstanceRequest=messages.TargetPoolsAddInstanceRequest(
             instances=instances))
     return [request]

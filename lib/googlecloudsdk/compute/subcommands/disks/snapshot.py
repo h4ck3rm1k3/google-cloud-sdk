@@ -4,6 +4,8 @@ from googlecloudapis.compute.v1 import compute_v1_messages as messages
 from googlecloudsdk.calliope import exceptions
 from googlecloudsdk.compute.lib import base_classes
 from googlecloudsdk.compute.lib import name_generator
+from googlecloudsdk.compute.lib import utils
+from googlecloudsdk.core import resources
 
 
 class SnapshotDisks(base_classes.BaseAsyncMutator):
@@ -35,15 +37,15 @@ class SnapshotDisks(base_classes.BaseAsyncMutator):
         """
 
     parser.add_argument(
-        '--zone',
-        help='The zone of the disks.',
-        required=True)
-
-    parser.add_argument(
         'disk_names',
         metavar='DISK_NAME',
         nargs='+',
         help='The names of the disks to snapshot.')
+
+    utils.AddZoneFlag(
+        parser,
+        resource_type='disks',
+        operation_type='snapshot')
 
   @property
   def service(self):
@@ -58,45 +60,51 @@ class SnapshotDisks(base_classes.BaseAsyncMutator):
     return 'CreateSnapshot'
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'snapshots'
+
+  @property
+  def prompting_resource_type(self):
+    return 'disks'
 
   def CreateRequests(self, args):
     """Returns a list of requests necessary for snapshotting disks."""
     if args.snapshot_names:
       if len(args.disk_names) != len(args.snapshot_names):
         raise exceptions.ToolException(
-            '--snapshot-names must have the same number of values as disks '
-            'being snapshotted')
-
-    if args.snapshot_names:
+            '[--snapshot-names] must have the same number of values as disks '
+            'being snapshotted.')
       snapshot_names = args.snapshot_names
     else:
       # Generates names like "d52jsqy3db4q".
-      snapshot_names = [
-          name_generator.GenerateRandomName()
-          for _ in args.disk_names]
+      snapshot_names = [name_generator.GenerateRandomName()
+                        for _ in args.disk_names]
+
+    snapshot_refs = [
+        resources.Parse(snapshot_name, collection='compute.snapshots')
+        for snapshot_name in snapshot_names]
 
     self._target_to_get_request = {}
 
     requests = []
-    for disk_name, snapshot_name in zip(args.disk_names, snapshot_names):
+    disk_refs = self.CreateZonalReferences(args.disk_names, args.zone)
+
+    for disk_ref, snapshot_ref in zip(disk_refs, snapshot_refs):
       request = messages.ComputeDisksCreateSnapshotRequest(
-          disk=disk_name,
+          disk=disk_ref.Name(),
           snapshot=messages.Snapshot(
-              name=snapshot_name,
+              name=snapshot_ref.Name(),
+              description=args.description,
           ),
           project=self.context['project'],
-          zone=args.zone)
+          zone=disk_ref.zone)
       requests.append(request)
 
-      target_link = self.context['uri-builder'].Build(
-          'zones', args.zone, 'disks', disk_name)
-      self._target_to_get_request[target_link] = (
+      self._target_to_get_request[disk_ref.SelfLink()] = (
+          snapshot_ref.SelfLink(),
           self.context['compute'].snapshots,
-          'Get',
           messages.ComputeSnapshotsGetRequest(
-              snapshot=snapshot_name,
+              snapshot=snapshot_ref.Name(),
               project=self.context['project']))
 
     return requests

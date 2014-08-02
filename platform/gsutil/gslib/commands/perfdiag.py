@@ -53,6 +53,7 @@ from gslib.hashing_helper import CalculateB64EncodedMd5FromContents
 from gslib.storage_url import StorageUrlFromString
 from gslib.third_party.storage_apitools import storage_v1_messages as apitools_messages
 from gslib.util import GetCloudApiInstance
+from gslib.util import GetMaxRetryDelay
 from gslib.util import HumanReadableToBytes
 from gslib.util import IS_LINUX
 from gslib.util import MakeBitsHumanReadable
@@ -60,7 +61,7 @@ from gslib.util import MakeHumanReadable
 from gslib.util import Percentile
 from gslib.util import ResumableThreshold
 
-_detailed_help_text = ("""
+_DETAILED_HELP_TEXT = ("""
 <B>SYNOPSIS</B>
   gsutil perfdiag [-i in.json] [-o out.json] [-n iterations] [-c processes]
   [-k threads] [-s size] [-t tests] url...
@@ -230,7 +231,7 @@ class PerfDiagCommand(Command):
       help_name_aliases=[],
       help_type='command_help',
       help_one_line_summary='Run performance diagnostic',
-      help_text=_detailed_help_text,
+      help_text=_DETAILED_HELP_TEXT,
       subcommand_help_text={},
   )
 
@@ -376,9 +377,8 @@ class PerfDiagCommand(Command):
           self.gsutil_api.DeleteObject(self.bucket_url.bucket_name,
                                        os.path.basename(f),
                                        provider=self.provider)
-        except NotFoundException as e:
-          if e.status != 404:
-            raise
+        except NotFoundException:
+          pass
 
       self._RunOperation(_Delete)
 
@@ -423,7 +423,7 @@ class PerfDiagCommand(Command):
     i = 0
     return_val = None
     while not success:
-      next_sleep = random.random() * (2 ** i) + 1
+      next_sleep = min(random.random() * (2 ** i) + 1, GetMaxRetryDelay())
       try:
         return_val = func()
         self.total_requests += 1
@@ -543,7 +543,7 @@ class PerfDiagCommand(Command):
 
     # Copy the file to remote location before reading.
     thru_url = StorageUrlFromString(str(self.bucket_url))
-    thru_url.object_name = self.thru_local_file
+    thru_url.object_name = os.path.basename(self.thru_local_file)
     thru_target = StorageUrlToUploadObjectMetadata(thru_url)
     thru_target.md5Hash = self.file_md5s[self.thru_local_file]
 
@@ -617,10 +617,16 @@ class PerfDiagCommand(Command):
     warmup_target = StorageUrlToUploadObjectMetadata(warmup_url)
 
     thru_url = StorageUrlFromString(str(self.bucket_url))
-    thru_url.object_name = self.thru_local_file
+    thru_url.object_name = os.path.basename(self.thru_local_file)
     thru_target = StorageUrlToUploadObjectMetadata(thru_url)
-    thru_tuple = UploadObjectTuple(
-        thru_target.bucket, thru_target.name, filepath=self.thru_local_file)
+    thru_tuples = []
+    for i in xrange(self.num_iterations):
+      # Create a unique name for each uploaded object.  Otherwise,
+      # the XML API would fail when trying to non-atomically get metadata
+      # for the object that gets blown away by the overwrite.
+      thru_tuples.append(UploadObjectTuple(
+          thru_target.bucket, thru_target.name + str(i),
+          filepath=self.thru_local_file))
 
     if self.processes == 1 and self.threads == 1:
       # Warm up the TCP connection.
@@ -633,7 +639,7 @@ class PerfDiagCommand(Command):
 
       times = []
 
-      def _Upload():
+      def _Upload(thru_tuple):
         """Uploads the write throughput measurement object."""
         upload_target = apitools_messages.Object(bucket=thru_tuple.bucket_name,
                                                  name=thru_tuple.object_name,
@@ -652,12 +658,12 @@ class PerfDiagCommand(Command):
 
         t1 = time.time()
         times.append(t1 - t0)
-      for _ in range(self.num_iterations):
-        self._RunOperation(_Upload)
+      for i in xrange(self.num_iterations):
+        self._RunOperation(_Upload(thru_tuples[i]))
       time_took = sum(times)
 
     else:
-      args = [thru_tuple] * self.num_iterations
+      args = thru_tuples
       t0 = time.time()
       self.Apply(_UploadWrapper,
                  args,

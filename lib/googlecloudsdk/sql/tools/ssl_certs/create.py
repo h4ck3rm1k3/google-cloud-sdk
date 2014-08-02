@@ -6,6 +6,7 @@ from apiclient import errors
 from googlecloudsdk.calliope import base
 from googlecloudsdk.calliope import exceptions
 from googlecloudsdk.core import log
+from googlecloudsdk.core import resources
 from googlecloudsdk.core.util import console_io
 from googlecloudsdk.core.util import files
 from googlecloudsdk.sql import util
@@ -23,6 +24,11 @@ class AddCert(base.Command):
           on the command line after this command. Positional arguments are
           allowed.
     """
+    parser.add_argument(
+        '--instance',
+        '-i',
+        required=True,
+        help='Cloud SQL instance ID.')
     parser.add_argument(
         'common_name',
         help='User supplied name. Constrained to [a-zA-Z.-_ ]+.')
@@ -51,10 +57,16 @@ class AddCert(base.Command):
     sql = self.context['sql']
     instance_id = util.GetInstanceIdWithoutProject(args.instance)
     project_id = util.GetProjectId(args.instance)
+    # TODO(user): as we deprecate P:I args, simplify the call to .Parse().
+    instance_ref = resources.Parse(
+        instance_id, collection='sql.instances',
+        params={'project': project_id})
+    # TODO(user): figure out how to rectify the common_name and the
+    # sha1fingerprint, so that things can work with the resource parser.
     common_name = args.common_name
     body = {'commonName': common_name}
-    request = sql.sslCerts().insert(project=project_id,
-                                    instance=instance_id,
+    request = sql.sslCerts().insert(project=instance_ref.project,
+                                    instance=instance_ref.instance,
                                     body=body)
     try:
       result = request.execute()

@@ -21,7 +21,8 @@ class SqladminV1beta3(base_api.BaseApiClient):
   def __init__(self, url='', credentials=None,
                get_credentials=True, http=None, model=None,
                log_request=False, log_response=False,
-               credentials_args=None, default_global_params=None):
+               credentials_args=None, default_global_params=None,
+               additional_http_headers=None):
     """Create a new sqladmin handle."""
     url = url or u'https://www.googleapis.com/sql/v1beta3/'
     super(SqladminV1beta3, self).__init__(
@@ -29,7 +30,8 @@ class SqladminV1beta3(base_api.BaseApiClient):
         get_credentials=get_credentials, http=http, model=model,
         log_request=log_request, log_response=log_response,
         credentials_args=credentials_args,
-        default_global_params=default_global_params)
+        default_global_params=default_global_params,
+        additional_http_headers=additional_http_headers)
     self.backupRuns = self.BackupRunsService(self)
     self.flags = self.FlagsService(self)
     self.instances = self.InstancesService(self)
@@ -39,6 +41,8 @@ class SqladminV1beta3(base_api.BaseApiClient):
 
   class BackupRunsService(base_api.BaseApiService):
     """Service class for the backupRuns resource."""
+
+    _NAME = u'backupRuns'
 
     def __init__(self, client):
       super(SqladminV1beta3.BackupRunsService, self).__init__(client)
@@ -101,6 +105,8 @@ class SqladminV1beta3(base_api.BaseApiClient):
   class FlagsService(base_api.BaseApiService):
     """Service class for the flags resource."""
 
+    _NAME = u'flags'
+
     def __init__(self, client):
       super(SqladminV1beta3.FlagsService, self).__init__(client)
       self._method_configs = {
@@ -136,6 +142,8 @@ class SqladminV1beta3(base_api.BaseApiClient):
 
   class InstancesService(base_api.BaseApiService):
     """Service class for the instances resource."""
+
+    _NAME = u'instances'
 
     def __init__(self, client):
       super(SqladminV1beta3.InstancesService, self).__init__(client)
@@ -473,6 +481,8 @@ class SqladminV1beta3(base_api.BaseApiClient):
   class OperationsService(base_api.BaseApiService):
     """Service class for the operations resource."""
 
+    _NAME = u'operations'
+
     def __init__(self, client):
       super(SqladminV1beta3.OperationsService, self).__init__(client)
       self._method_configs = {
@@ -533,6 +543,8 @@ class SqladminV1beta3(base_api.BaseApiClient):
 
   class SslCertsService(base_api.BaseApiService):
     """Service class for the sslCerts resource."""
+
+    _NAME = u'sslCerts'
 
     def __init__(self, client):
       super(SqladminV1beta3.SslCertsService, self).__init__(client)
@@ -644,6 +656,8 @@ class SqladminV1beta3(base_api.BaseApiClient):
 
   class TiersService(base_api.BaseApiService):
     """Service class for the tiers resource."""
+
+    _NAME = u'tiers'
 
     def __init__(self, client):
       super(SqladminV1beta3.TiersService, self).__init__(client)

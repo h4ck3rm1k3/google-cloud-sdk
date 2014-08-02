@@ -13,11 +13,12 @@ gcloud-compute-firewalls-create \- Create a Google Compute Engine firewall rule
   NAME
   \-\-allow PROTOCOL[:PORT[\-PORT]] [PROTOCOL[:PORT[\-PORT]] \&...]
   [\-\-description DESCRIPTION]
+  [\-\-help]
   [\-\-network NETWORK; default="default"]
   [\-\-source\-ranges CIDR_RANGE [CIDR_RANGE \&...]]
   [\-\-source\-tags TAG [TAG \&...]]
   [\-\-target\-tags TAG [TAG \&...]]
-  [\-h, \-\-help]
+  [\-h]
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -62,6 +63,11 @@ TCP and UDP rules must include a port or port range\&.
 An optional, textual description for the firewall\&.
 .RE
 .PP
+\fB\-\-help\fR
+.RS 4
+Display detailed help\&.
+.RE
+.PP
 \fB\-\-network\fR \fINETWORK\fR
 .RS 4
 The network to which this rule is attached\&. If omitted, the rule is attached to the \(lqdefault\(rq network\&.
@@ -87,7 +93,7 @@ A list of instance tags indicating the set of instances on the network which may
 Tags can be assigned to instances during instance creation\&.
 .RE
 .PP
-\fB\-\-help\fR
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE

@@ -3,6 +3,7 @@
 from googlecloudapis.compute.v1 import compute_v1_messages as messages
 from googlecloudsdk.calliope import arg_parsers
 from googlecloudsdk.compute.lib import base_classes
+from googlecloudsdk.core import resources
 
 
 class CreateHttpHealthCheck(base_classes.BaseAsyncMutator):
@@ -102,14 +103,18 @@ class CreateHttpHealthCheck(base_classes.BaseAsyncMutator):
     return 'Insert'
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'httpHealthChecks'
 
   def CreateRequests(self, args):
     """Returnst the request necessary for adding the health check."""
+
+    health_check_ref = resources.Parse(
+        args.name, collection='compute.httpHealthChecks')
+
     request = messages.ComputeHttpHealthChecksInsertRequest(
         httpHealthCheck=messages.HttpHealthCheck(
-            name=args.name,
+            name=health_check_ref.Name(),
             host=args.host,
             port=args.port,
             description=args.description,

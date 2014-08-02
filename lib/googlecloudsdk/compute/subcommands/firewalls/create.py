@@ -4,6 +4,7 @@
 from googlecloudapis.compute.v1 import compute_v1_messages as messages
 from googlecloudsdk.compute.lib import base_classes
 from googlecloudsdk.compute.lib import firewalls_utils
+from googlecloudsdk.core import resources
 
 
 class CreateFirewall(base_classes.BaseAsyncMutator):
@@ -114,7 +115,7 @@ class CreateFirewall(base_classes.BaseAsyncMutator):
     return 'Insert'
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'firewalls'
 
   def CreateRequests(self, args):
@@ -124,13 +125,15 @@ class CreateFirewall(base_classes.BaseAsyncMutator):
 
     allowed = firewalls_utils.ParseAllowed(args.allow)
 
-    network_uri = self.context['uri-builder'].Build(
-        'global', 'networks', args.network)
+    network_ref = resources.Parse(args.network, collection='compute.networks')
+    network_uri = network_ref.SelfLink()
+
+    firewall_ref = resources.Parse(args.name, collection='compute.firewalls')
 
     request = messages.ComputeFirewallsInsertRequest(
         firewall=messages.Firewall(
             allowed=allowed,
-            name=args.name,
+            name=firewall_ref.Name(),
             description=args.description,
             network=network_uri,
             sourceRanges=args.source_ranges,

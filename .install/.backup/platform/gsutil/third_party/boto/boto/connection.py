@@ -45,6 +45,7 @@ Handles basic connections to AWS
 
 from __future__ import with_statement
 import base64
+from datetime import datetime
 import errno
 import httplib
 import os
@@ -373,7 +374,7 @@ class HTTPRequest(object):
             val = self.headers[key]
             if isinstance(val, unicode):
                 safe = '!"#$%&\'()*+,/:;<=>?@[\\]^`{|}~'
-                self.headers[key] = urllib.quote_plus(val.encode('utf-8'), safe)
+                self.headers[key] = urllib.quote(val.encode('utf-8'), safe)
 
         connection._auth_handler.add_auth(self, **kwargs)
 
@@ -423,7 +424,7 @@ class AWSAuthConnection(object):
                  https_connection_factory=None, path='/',
                  provider='aws', security_token=None,
                  suppress_consec_slashes=True,
-                 validate_certs=True):
+                 validate_certs=True, profile_name=None):
         """
         :type host: str
         :param host: The host to make the connection to
@@ -468,6 +469,10 @@ class AWSAuthConnection(object):
         :type validate_certs: bool
         :param validate_certs: Controls whether SSL certificates
             will be validated or not.  Defaults to True.
+
+        :type profile_name: str
+        :param profile_name: Override usual Credentials section in config
+            file to use a named set of keys instead.
         """
         self.suppress_consec_slashes = suppress_consec_slashes
         self.num_retries = 6
@@ -489,8 +494,11 @@ class AWSAuthConnection(object):
                     "support this feature are not available. Certificate "
                     "validation is only supported when running under Python "
                     "2.6 or later.")
-        self.ca_certificates_file = config.get_value(
+        certs_file = config.get_value(
                 'Boto', 'ca_certificates_file', DEFAULT_CA_CERTS_FILE)
+        if certs_file == 'system':
+            certs_file = None
+        self.ca_certificates_file = certs_file
         if port:
             self.port = port
         else:
@@ -546,7 +554,8 @@ class AWSAuthConnection(object):
             self.provider = Provider(self._provider_type,
                                      aws_access_key_id,
                                      aws_secret_access_key,
-                                     security_token)
+                                     security_token,
+                                     profile_name)
 
         # Allow config file to override default host, port, and host header.
         if self.provider.host:
@@ -563,6 +572,7 @@ class AWSAuthConnection(object):
               host, config, self.provider, self._required_auth_capability())
         if getattr(self, 'AuthServiceName', None) is not None:
             self.auth_service_name = self.AuthServiceName
+        self.request_hook = None
 
     def __repr__(self):
         return '%s:%s' % (self.__class__.__name__, self.host)
@@ -602,6 +612,10 @@ class AWSAuthConnection(object):
     aws_secret_access_key = property(aws_secret_access_key)
     gs_secret_access_key = aws_secret_access_key
     secret_key = aws_secret_access_key
+
+    def profile_name(self):
+        return self.provider.profile_name
+    profile_name = property(profile_name)
 
     def get_path(self, path='/'):
         # The default behavior is to suppress consecutive slashes for reasons
@@ -810,9 +824,12 @@ class AWSAuthConnection(object):
         h = httplib.HTTPConnection(host)
 
         if self.https_validate_certificates and HAVE_HTTPS_CONNECTION:
-            boto.log.debug("wrapping ssl socket for proxied connection; "
-                           "CA certificate file=%s",
-                           self.ca_certificates_file)
+            msg = "wrapping ssl socket for proxied connection; "
+            if self.ca_certificates_file:
+                msg += "CA certificate file=%s" %self.ca_certificates_file
+            else:
+                msg += "using system provided SSL certs"
+            boto.log.debug(msg)
             key_file = self.http_connection_kwargs.get('key_file', None)
             cert_file = self.http_connection_kwargs.get('cert_file', None)
             sslSock = ssl.wrap_socket(sock, keyfile=key_file,
@@ -850,6 +867,9 @@ class AWSAuthConnection(object):
                 self._auth_handler.host_header(self.host, request)
         except AttributeError:
             request.headers['Host'] = self.host.split(':', 1)[0]
+
+    def set_request_hook(self, hook):
+        self.request_hook = hook
 
     def _mexe(self, request, sender=None, override_num_retries=None,
               retry_handler=None):
@@ -891,8 +911,9 @@ class AWSAuthConnection(object):
                 # the port info. All others should be now be up to date and
                 # not include the port.
                 if 's3' not in self._required_auth_capability():
-                    self.set_host_header(request)
-
+                    if not getattr(self, 'anon', False):
+                        self.set_host_header(request)
+                request.start_time = datetime.now()
                 if callable(sender):
                     response = sender(connection, request.method, request.path,
                                       request.body, request.headers)
@@ -933,6 +954,8 @@ class AWSAuthConnection(object):
                     else:
                         self.put_http_connection(request.host, request.port,
                                                  self.is_secure, connection)
+                    if self.request_hook is not None:
+                        self.request_hook.handle_request_data(request, response)
                     return response
                 else:
                     scheme, request.host, request.path, \
@@ -973,6 +996,8 @@ class AWSAuthConnection(object):
         # and stil haven't succeeded.  So, if we have a response object,
         # use it to raise an exception.
         # Otherwise, raise the exception that must have already happened.
+        if self.request_hook is not None:
+            self.request_hook.handle_request_data(request, response, error=True)
         if response:
             raise BotoServerError(response.status, response.reason, body)
         elif e:
@@ -1037,14 +1062,15 @@ class AWSQueryConnection(AWSAuthConnection):
                  is_secure=True, port=None, proxy=None, proxy_port=None,
                  proxy_user=None, proxy_pass=None, host=None, debug=0,
                  https_connection_factory=None, path='/', security_token=None,
-                 validate_certs=True):
+                 validate_certs=True, profile_name=None):
         super(AWSQueryConnection, self).__init__(host, aws_access_key_id,
                                    aws_secret_access_key,
                                    is_secure, port, proxy,
                                    proxy_port, proxy_user, proxy_pass,
                                    debug, https_connection_factory, path,
                                    security_token=security_token,
-                                   validate_certs=validate_certs)
+                                   validate_certs=validate_certs,
+                                   profile_name=profile_name)
 
     def _required_auth_capability(self):
         return []

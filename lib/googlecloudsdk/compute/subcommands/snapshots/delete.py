@@ -3,7 +3,7 @@
 from googlecloudsdk.compute.lib import base_classes
 
 
-class DeleteSnapshots(base_classes.GlobalDeleter):
+class Delete(base_classes.GlobalDeleter):
   """Delete Google Compute Engine snapshots."""
 
   @property
@@ -11,11 +11,11 @@ class DeleteSnapshots(base_classes.GlobalDeleter):
     return self.context['compute'].snapshots
 
   @property
-  def collection(self):
+  def resource_type(self):
     return 'snapshots'
 
 
-DeleteSnapshots.detailed_help = {
+Delete.detailed_help = {
     'brief': 'Delete Google Compute Engine snapshots',
     'DESCRIPTION': """\
         *{command}* deletes one or more Google Compute Engine

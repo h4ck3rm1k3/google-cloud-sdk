@@ -178,6 +178,8 @@ class MoveInstancesBase(command_base.GoogleComputeCommand):
       raise gcutil_errors.UnsupportedCommand(
           'Moving instances is supported only in service version v1.')
 
+    self._project = utils.GetProjectId(self._project, self.api)
+
     self._project_resource = self.api.projects.get(
         project=self._project).execute()
     if self.api.addresses:
@@ -243,6 +245,13 @@ class MoveInstancesBase(command_base.GoogleComputeCommand):
 
     if not self._PresentSafetyPrompt('Proceed', True):
       raise gcutil_errors.CommandError('Move aborted.')
+
+  def _GetPersistentDiskDeviceName(self, instance):
+    res = []
+    for disk in instance.get('disks', []):
+      if disk['type'] == 'PERSISTENT':
+        res.append(disk['deviceName'])
+    return res
 
   def _TurnOffAutoDeleteForDisks(self, instances, zone):
     """Auto-Delete must be switched off for all instances.
@@ -1110,13 +1119,6 @@ class MoveInstances(MoveInstancesBase):
           res.append(disk['source'].split('/')[-1])
     return res
 
-  def _GetPersistentDiskDeviceName(self, instance):
-    res = []
-    for disk in instance.get('disks', []):
-      if disk['type'] == 'PERSISTENT':
-        res.append(disk['deviceName'])
-    return res
-
   def _CheckDestinationZone(self):
     """Raises an exception if the destination zone is not valid."""
     print 'Checking destination zone...'
@@ -1290,7 +1292,7 @@ class ResumeMove(MoveInstancesBase):
     self._Confirm(instances_to_mv, instances_to_ignore,
                   disks_to_mv, dest_zone, src_zone)
 
-    self._TurnOffAutoDeleteForDisks(instances_to_mv, src_zone)
+    self._TurnOffAutoDeleteForDisks(instances_to_delete, src_zone)
     self._DeleteInstances(instances_to_delete, src_zone)
     self._CreateSnapshots(snapshot_mappings_for_unmoved_disks,
                           src_zone, dest_zone)

@@ -5,10 +5,11 @@ NAME
 SYNOPSIS
        gcloud compute forwarding-rules set-target
          NAME
+         [--help]
          [--global | --region REGION]
          [--target-http-proxy TARGET_HTTP_PROXY | --target-instance TARGET_INSTANCE | --target-pool TARGET_POOL]
          [--target-instance-zone TARGET_INSTANCE_ZONE]
-         [-h, --help]
+         [-h]
 
 DESCRIPTION
        gcloud compute forwarding-rules set-target is used to set a new target
@@ -38,6 +39,9 @@ FLAGS
            If provided, assume the forwarding rules are global. A forwarding
            rule is global if it references a target HTTP proxy.
 
+       --help
+           Display detailed help.
+
        --region REGION
            The region of the forwarding rule. This is required for regional
            forwarding rules. A forwarding rule is regional if it references a
@@ -61,6 +65,6 @@ FLAGS
            be in the same region as the forwarding rule. Global forwarding
            rules may not direct traffic to target pools.
 
-       --help
+       -h
            Print a summary help and exit.
 

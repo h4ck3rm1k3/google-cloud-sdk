@@ -13,9 +13,10 @@ gcloud-compute-instances-add-access-config \- Create an access configuration for
   NAME
   [\-\-access\-config\-name ACCESS_CONFIG_NAME; default="external\-nat"]
   [\-\-address ADDRESS]
+  [\-\-help]
   [\-\-network\-interface NETWORK_INTERFACE; default="nic0"]
-  \-\-zone ZONE
-  [\-h, \-\-help]
+  [\-\-zone ZONE]
+  [\-h]
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -38,6 +39,11 @@ Specifies the name of the new access configuration\&. \(lqexternal\-nat\(rq is u
 Specifies the external IP address of the new access configuration\&. If this is not specified, then the service will choose an available ephemeral IP address\&. If an explicit IP address is given, then that IP address must be reserved by the project and not be in use by another resource\&.
 .RE
 .PP
+\fB\-\-help\fR
+.RS 4
+Display detailed help\&.
+.RE
+.PP
 \fB\-\-network\-interface\fR \fINETWORK_INTERFACE\fR
 .RS 4
 Specifies the name of the network interface on which to add the new access configuration\&. If this is not provided, then "nic0" is used as the default\&.
@@ -45,10 +51,10 @@ Specifies the name of the network interface on which to add the new access confi
 .PP
 \fB\-\-zone\fR \fIZONE\fR
 .RS 4
-The zone of the instance\&.
+The zone of the instance to add an access config to\&. If omitted and the arguments are not all URIs, you will be prompted to select a zone\&.
 .RE
 .PP
-\fB\-\-help\fR
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE

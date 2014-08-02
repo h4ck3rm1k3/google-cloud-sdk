@@ -27,13 +27,13 @@ import random
 import re
 import socket
 import tempfile
+import textwrap
 import time
 import xml
 from xml.dom.minidom import parseString as XmlParseString
 from xml.sax import _exceptions as SaxExceptions
 
 import boto
-from boto import config
 from boto import handler
 from boto.exception import ResumableDownloadException as BotoResumableDownloadException
 from boto.exception import ResumableTransferDisposition
@@ -57,7 +57,6 @@ from gslib.cloud_api import ServiceException
 from gslib.cloud_api_helper import ValidateDstObjectMetadata
 from gslib.exception import CommandException
 from gslib.exception import InvalidUrlError
-from gslib.hashing_helper import MD5_REGEX
 from gslib.project_id import GOOG_PROJ_ID_HDR
 from gslib.project_id import PopulateProjectId
 from gslib.storage_url import StorageUrlFromString
@@ -74,15 +73,17 @@ from gslib.translation_helper import HeadersFromObjectMetadata
 from gslib.translation_helper import LifecycleTranslation
 from gslib.translation_helper import REMOVE_CORS_CONFIG
 from gslib.translation_helper import S3MarkerAclFromObjectMetadata
-from gslib.util import CALLBACK_PER_X_BYTES
 from gslib.util import ConfigureNoOpAuthIfNeeded
 from gslib.util import DEFAULT_FILE_BUFFER_SIZE
 from gslib.util import GetFileSize
+from gslib.util import GetMaxRetryDelay
+from gslib.util import GetNumRetries
 from gslib.util import MultiprocessingIsAvailable
 from gslib.util import S3_DELETE_MARKER_GUID
+from gslib.util import TWO_MB
 from gslib.util import UnaryDictToXml
 from gslib.util import UTF8
-
+from gslib.util import XML_PROGRESS_CALLBACKS
 
 TRANSLATABLE_BOTO_EXCEPTIONS = (boto.exception.BotoServerError,
                                 boto.exception.InvalidUriError,
@@ -97,6 +98,8 @@ boto_auth_initialized = False
 
 NON_EXISTENT_OBJECT_REGEX = re.compile(r'.*non-\s*existent\s*object',
                                        flags=re.DOTALL)
+# Determines whether an etag is a valid MD5.
+MD5_REGEX = re.compile(r'^"*[a-fA-F0-9]{32}"*$')
 
 
 def InitializeMultiprocessingVariables():
@@ -393,7 +396,7 @@ class BotoTranslation(CloudApi):
 
     # Since in most cases we already made a call to get the object metadata,
     # here we avoid an extra HTTP call by unpickling the key.  This is coupled
-    # with the impelmentation in _BotoKeyToObject.
+    # with the implementation in _BotoKeyToObject.
     if serialization_data:
       serialization_dict = json.loads(serialization_data)
       key = pickle.loads(binascii.a2b_base64(serialization_dict['url']))
@@ -413,7 +416,11 @@ class BotoTranslation(CloudApi):
 
     if download_strategy is CloudApi.DownloadStrategy.RESUMABLE:
       try:
-        num_progress_callbacks = (total_size / CALLBACK_PER_X_BYTES) + 1
+        if total_size:
+          num_progress_callbacks = max(int(total_size) / TWO_MB,
+                                       XML_PROGRESS_CALLBACKS)
+        else:
+          num_progress_callbacks = XML_PROGRESS_CALLBACKS
         self._PerformResumableDownload(
             download_stream, key, headers=headers, callback=progress_callback,
             num_callbacks=num_progress_callbacks, hash_algs=hash_algs)
@@ -478,7 +485,8 @@ class BotoTranslation(CloudApi):
       key.get_contents_to_file(download_stream, headers=headers)
 
   def _PerformResumableDownload(self, fp, key, headers=None, callback=None,
-                                num_callbacks=0, hash_algs=None):
+                                num_callbacks=XML_PROGRESS_CALLBACKS,
+                                hash_algs=None):
     """Downloads bytes from key to fp, resuming as needed.
 
     Args:
@@ -509,7 +517,7 @@ class BotoTranslation(CloudApi):
 
     debug = key.bucket.connection.debug
 
-    num_retries = config.getint('Boto', 'num_retries', 6)
+    num_retries = GetNumRetries()
     progress_less_iterations = 0
 
     while True:  # Retry as long as we're making progress.
@@ -590,7 +598,8 @@ class BotoTranslation(CloudApi):
       except httplib.IncompleteRead:
         pass
 
-      sleep_time_secs = random.random() * (2 ** progress_less_iterations)
+      sleep_time_secs = min(random.random() * (2 ** progress_less_iterations),
+                            GetMaxRetryDelay())
       if debug >= 1:
         self.logger.info('Got retryable failure (%d progress-less in a row).\n'
                          'Sleeping %d seconds before re-trying' %
@@ -718,6 +727,36 @@ class BotoTranslation(CloudApi):
                                         object_metadata.name)
     return headers, dst_uri
 
+  def _HandleSuccessfulUpload(self, dst_uri, object_metadata, fields=None):
+    """Set ACLs on an uploaded object and return its metadata.
+
+    Args:
+      dst_uri: Generation-specific StorageUri describing the object.
+      object_metadata: Metadata for the object, including an ACL if applicable.
+      fields: If present, return only these Object metadata fields.
+
+    Returns:
+      gsutil Cloud API Object metadata.
+
+    Raises:
+      CommandException if the object was overwritten / deleted concurrently.
+    """
+    try:
+      # The XML API does not support if-generation-match for GET requests.
+      # Therefore, if the object gets overwritten before the ACL and get_key
+      # operations, the best we can do is warn that it happened.
+      self._SetObjectAcl(object_metadata, dst_uri)
+      return self._BotoKeyToObject(dst_uri.get_key(), fields=fields)
+    except boto.exception.InvalidUriError as e:
+      check_for_str = 'Attempt to get key for "%s" failed.' % dst_uri.uri
+      if check_for_str in e.message:
+        raise CommandException('\n'.join(textwrap.wrap(
+            'Uploaded object (%s) was deleted or overwritten immediately '
+            'after it was uploaded. This can happen if you attempt to upload '
+            'to the same object multiple times concurrently.' % dst_uri.uri)))
+      else:
+        raise
+
   def _SetObjectAcl(self, object_metadata, dst_uri):
     """Sets the ACL (if present in object_metadata) on an uploaded object."""
     if object_metadata.acl:
@@ -750,10 +789,8 @@ class BotoTranslation(CloudApi):
                                    serialization_data=serialization_data,
                                    progress_callback=progress_callback,
                                    headers=headers)
-      self._SetObjectAcl(object_metadata, dst_uri)
-      new_key = dst_uri.get_key()
-
-      return self._BotoKeyToObject(new_key, fields=fields)
+      return self._HandleSuccessfulUpload(dst_uri, object_metadata,
+                                          fields=fields)
     except TRANSLATABLE_BOTO_EXCEPTIONS, e:
       self._TranslateExceptionAndRaise(e, bucket_name=object_metadata.bucket,
                                        object_name=object_metadata.name)
@@ -769,11 +806,8 @@ class BotoTranslation(CloudApi):
       self._PerformStreamingUpload(
           dst_uri, upload_stream, canned_acl=canned_acl,
           progress_callback=progress_callback, headers=headers)
-      self._SetObjectAcl(object_metadata, dst_uri)
-
-      new_key = dst_uri.get_key()
-
-      return self._BotoKeyToObject(new_key, fields=fields)
+      return self._HandleSuccessfulUpload(dst_uri, object_metadata,
+                                          fields=fields)
     except TRANSLATABLE_BOTO_EXCEPTIONS, e:
       self._TranslateExceptionAndRaise(e, bucket_name=object_metadata.bucket,
                                        object_name=object_metadata.name)
@@ -797,11 +831,8 @@ class BotoTranslation(CloudApi):
                                 canned_acl=canned_acl,
                                 progress_callback=progress_callback,
                                 headers=headers)
-      self._SetObjectAcl(object_metadata, dst_uri)
-
-      new_key = dst_uri.get_key()
-
-      return self._BotoKeyToObject(new_key, fields=fields)
+      return self._HandleSuccessfulUpload(dst_uri, object_metadata,
+                                          fields=fields)
     except TRANSLATABLE_BOTO_EXCEPTIONS, e:
       self._TranslateExceptionAndRaise(e, bucket_name=object_metadata.bucket,
                                        object_name=object_metadata.name)
@@ -992,6 +1023,10 @@ class BotoTranslation(CloudApi):
     if list_fields:
       get_fields = set()
       for field in list_fields:
+        if field in ['kind', 'nextPageToken', 'prefixes']:
+          # These are not actually object / bucket metadata fields.
+          # They are fields specific to listing, so we don't consider them.
+          continue
         get_fields.add(re.sub(r'items/', '', field))
       return get_fields
 

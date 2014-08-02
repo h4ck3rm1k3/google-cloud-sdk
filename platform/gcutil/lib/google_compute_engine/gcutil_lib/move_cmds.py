@@ -53,7 +53,7 @@ class DependencyDownloader(object):
   """Downloads all resource dependencies and their replacements.
 
   Starting with a set of instances, will download their dependencies (images,
-  kernels, machine types) and all replacements for any deprecated resources.
+  machine types) and all replacements for any deprecated resources.
   """
 
   BATCH_SIZE = 10
@@ -74,7 +74,6 @@ class DependencyDownloader(object):
 
   def AddInstance(self, instance):
     self._Add(instance.get('image'))
-    self._Add(instance.get('kernel'))
     self._Add(instance.get('machineType'))
 
   def _Add(self, url):
@@ -88,10 +87,7 @@ class DependencyDownloader(object):
     if kind == 'compute#instance':
       self.AddInstance(resource)
     else:
-      if kind == 'compute#image':
-        # For images, download preferred kernel, too
-        self._Add(resource.get('preferredKernel'))
-      # For all, check for deprecation replacement
+      # Check for deprecation replacement
       self._AddReplacement(resource)
 
   def _AddReplacement(self, resource):
@@ -240,7 +236,9 @@ class MoveInstancesBase(command_base.GoogleComputeCommand):
     else:
       self._common_region = self.DenormalizeResourceName(
           src_zone_resource['region'])
-
+    print 'WARNING: Do not attempt to move instances to zones that cannot'
+    print '  support the current instances (e.g. Moving instances using SSDs'
+    print '  to zones that do not support SSD, Windows to non-Windows, etc.)'
     print '*** Be prepared to recover manually in the event of failure ***'
 
     if not self._PresentSafetyPrompt('Proceed', True):
@@ -543,7 +541,8 @@ class MoveInstancesBase(command_base.GoogleComputeCommand):
           utils.ListStrings(exceptions))
     self._VerifyOperations(self.MakeListResult(results, 'operationList'))
 
-  def _CreateDisksFromSnapshots(self, snapshot_mappings, dest_zone):
+  def _CreateDisksFromSnapshots(self, snapshot_mappings, disktype_mappings,
+                                dest_zone):
     """Creates disks in the destination zone from the given snapshots.
 
     Args:
@@ -561,6 +560,7 @@ class MoveInstancesBase(command_base.GoogleComputeCommand):
     for disk_name, snapshot_name in snapshot_mappings.iteritems():
       disk_resource = {
           'name': disk_name,
+          'type': disktype_mappings[disk_name],
           'sourceSnapshot': self.NormalizeGlobalResourceName(
               self._project, 'snapshots', snapshot_name)}
       requests.append(self.api.disks.insert(
@@ -825,9 +825,7 @@ class MoveInstancesBase(command_base.GoogleComputeCommand):
         instance: The instance resource to apply changes to.
         *fields: List of field specifiers. Each specifier is a tuple
                  (name, default value). Default value is used if resource
-                 doesn't have property with a given name. This is used for
-                 kernels which don't have to be specified in the instance but
-                 instead, preferredKernel of the image is used.
+                 doesn't have property with a given name.
 
       Returns:
           Dictionary for collecting error information.
@@ -856,18 +854,9 @@ class MoveInstancesBase(command_base.GoogleComputeCommand):
       instance = copy.deepcopy(instance)
       updated.append(instance)
 
-      # Unless the instance has overriden kernel, it boots using the
-      # preferred kernel of the instance's image.
-      default_kernel = None
-      instance_image = instance.get('image')
-      if instance_image:
-        image_resource = resources.get(instance_image, {})
-        default_kernel = image_resource.get('preferredKernel')
-
       error = Apply(
           instance,
           ('image', None),
-          ('kernel', default_kernel),
           ('machineType', None))
 
       if error:
@@ -1000,6 +989,8 @@ class MoveInstances(MoveInstancesBase):
 
     log_path = self._GenerateLogPath()
     snapshot_mappings = self._GenerateSnapshotNames(disks_to_mv)
+    disktype_mappings = self._GetDiskTypes(disks_to_mv, self._flags.source_zone,
+                                           self._flags.destination_zone)
 
     try:
       self._WriteLog(log_path, instances_to_mv, snapshot_mappings)
@@ -1014,7 +1005,7 @@ class MoveInstances(MoveInstancesBase):
                             self._flags.source_zone,
                             self._flags.destination_zone)
       self._DeleteDisks(disks_to_mv, self._flags.source_zone)
-      self._CreateDisksFromSnapshots(snapshot_mappings,
+      self._CreateDisksFromSnapshots(snapshot_mappings, disktype_mappings,
                                      self._flags.destination_zone)
       self._CreateInstances(instances_to_mv,
                             self._flags.source_zone,
@@ -1049,6 +1040,28 @@ class MoveInstances(MoveInstancesBase):
       A dict with the mapping.
     """
     return dict((name, 'snapshot-' + str(uuid.uuid4())) for name in disk_names)
+
+  def _GetDiskTypes(self, disk_names, src_zone, dest_zone):
+    """Returns a dict mapping each disk name to its type.
+
+    The type will be the type of the disk in the destination zone.
+
+    Args:
+      disk_names: an array of all the disk names to be moved.
+      src_zone: the source zone.
+      dest_zone: the destination zone.
+
+    Returns:
+      A dict with the mapping.
+    """
+
+    all_disks = [
+        d for d in utils.All(self.api.disks.list, self._project,
+                             None, None, zone=src_zone)['items']
+        if d['name'] in disk_names]
+
+    return dict((d['name'], d['type'].replace(
+        '/zones/'+ src_zone, '/zones/' + dest_zone)) for d in all_disks)
 
   def _CheckInstancePreconditions(self, instances_to_mv, instances_in_dest):
     if not instances_to_mv:
@@ -1183,7 +1196,7 @@ class ResumeMove(MoveInstancesBase):
   failures.
 
   WARNING: Instances that are moved will lose ALL of their transient
-  state (i.e., scratch disks, ephemeral IP addresses, and memory).
+  state (i.e., ephemeral IP addresses, and memory).
   """
 
   positional_args = '<log-path>'
@@ -1271,6 +1284,8 @@ class ResumeMove(MoveInstancesBase):
         self.api.disks.list, self._project, zone=src_zone))
 
     disks_to_mv = set(snapshot_mappings.keys()) & disks_in_src
+    disktype_mappings = self._GetDiskTypes(
+        self, disks_to_mv, src_zone, dest_zone)
 
     instances_to_delete = self._Intersect(instances_to_mv, instances_in_source)
 
@@ -1305,7 +1320,8 @@ class ResumeMove(MoveInstancesBase):
     for disk, snapshot in snapshot_mappings.iteritems():
       if snapshot in all_snapshots and disk not in disks_in_dest:
         disks_to_create[disk] = snapshot
-    self._CreateDisksFromSnapshots(disks_to_create, dest_zone)
+    self._CreateDisksFromSnapshots(disks_to_create,
+                                   disktype_mappings, dest_zone)
 
     self._CreateInstances(instances_to_mv, src_zone, dest_zone)
 

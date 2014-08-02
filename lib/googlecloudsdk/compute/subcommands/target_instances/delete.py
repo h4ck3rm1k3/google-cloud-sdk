@@ -11,7 +11,7 @@ class Delete(base_classes.ZonalDeleter):
     return self.context['compute'].targetInstances
 
   @property
-  def collection(self):
+  def resource_type(self):
     return 'targetInstances'
 
 

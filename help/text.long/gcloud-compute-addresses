@@ -5,24 +5,28 @@ NAME
 SYNOPSIS
        gcloud compute addresses
          COMMAND
-         [-h, --help]
+         [--help]
+         [-h]
 
 FLAGS
        --help
+           Display detailed help.
+
+       -h
            Print a summary help and exit.
 
 COMMANDS
        COMMAND is one of the following.
+
+       create
+           Reserve IP addresses.
+
+       delete
+           Release reserved IP addresses.
 
        get
            Get Google Compute Engine static addresses.
 
        list
            List Google Compute Engine addresses.
-
-       release
-           Release reserved IP addresses.
-
-       reserve
-           Reserve IP addresses.
 

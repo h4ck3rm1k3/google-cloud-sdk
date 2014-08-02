@@ -136,7 +136,7 @@ class AddressCmdsTest(gcutil_unittest.GcutilTestCase):
     data = command.GetDetailRow({'users': ['fr-1', 'fr-2']})
 
     expected_data = {
-        'v1beta16': [
+        'v1': [
             ('users', ['fr-1', 'fr-2'])
             ],
         }
@@ -159,7 +159,7 @@ class AddressCmdsTest(gcutil_unittest.GcutilTestCase):
     data = command.GetDetailRow({'users': []})
 
     expected_data = {
-        'v1beta16': [
+        'v1': [
             ('users', [])
             ],
         }

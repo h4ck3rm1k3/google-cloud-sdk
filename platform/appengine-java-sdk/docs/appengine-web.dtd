@@ -1,4 +1,4 @@
-<!ELEMENT appengine-web-app (application, version?, source-language?, server?,
+<!ELEMENT appengine-web-app (application?, version?, source-language?, server?,
                              instance-class?, automatic-scaling?,
                              manual-scaling?, basic-scaling?, static-files?,
                              resource-files?, system-properties?, vm-settings?,

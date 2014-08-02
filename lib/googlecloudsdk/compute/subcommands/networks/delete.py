@@ -3,7 +3,7 @@
 from googlecloudsdk.compute.lib import base_classes
 
 
-class DeleteNetworks(base_classes.GlobalDeleter):
+class Delete(base_classes.GlobalDeleter):
   """Delete Google Compute Engine networks."""
 
   @property
@@ -11,11 +11,11 @@ class DeleteNetworks(base_classes.GlobalDeleter):
     return self.context['compute'].networks
 
   @property
-  def collection(self):
+  def resource_type(self):
     return 'networks'
 
 
-DeleteNetworks.detailed_help = {
+Delete.detailed_help = {
     'brief': 'Delete Google Compute Engine networks',
     'DESCRIPTION': """\
         *{command}* deletes one or more Google Compute Engine

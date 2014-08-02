@@ -13,8 +13,9 @@ gcloud-compute-instances-set-disk-auto-delete \- Set auto\-delete behavior for d
   INSTANCE
   [\-\-auto\-delete | \-\-no\-auto\-delete]
   [\-\-device\-name DEVICE_NAME | \-\-disk DISK]
-  \-\-zone ZONE
-  [\-h, \-\-help]
+  [\-\-help]
+  [\-\-zone ZONE]
+  [\-h]
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -42,6 +43,11 @@ Specifies a disk to set auto\-delete for by its device name, which is the name t
 Specifies a disk to set auto\-delete for by its resource name\&. If you specify a disk to set auto\-delete for by persistent disk name, then you must not specify its device name using the \(lq\-\-device\-name\(rq flag\&.
 .RE
 .PP
+\fB\-\-help\fR
+.RS 4
+Display detailed help\&.
+.RE
+.PP
 \fB\-\-no\-auto\-delete\fR
 .RS 4
 Set auto\-delete for the given disk to false\&.
@@ -49,10 +55,10 @@ Set auto\-delete for the given disk to false\&.
 .PP
 \fB\-\-zone\fR \fIZONE\fR
 .RS 4
-The zone of the instance\&.
+The zone of the instance to configure disk auto\-delete for\&. If omitted and the arguments are not all URIs, you will be prompted to select a zone\&.
 .RE
 .PP
-\fB\-\-help\fR
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE

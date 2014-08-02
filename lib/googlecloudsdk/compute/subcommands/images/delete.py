@@ -3,7 +3,7 @@
 from googlecloudsdk.compute.lib import base_classes
 
 
-class DeleteImages(base_classes.GlobalDeleter):
+class Delete(base_classes.GlobalDeleter):
   """Delete Google Compute Engine images."""
 
   @property
@@ -11,11 +11,11 @@ class DeleteImages(base_classes.GlobalDeleter):
     return self.context['compute'].images
 
   @property
-  def collection(self):
+  def resource_type(self):
     return 'images'
 
 
-DeleteImages.detailed_help = {
+Delete.detailed_help = {
     'brief': 'Delete Google Compute Engine images',
     'DESCRIPTION': """\
         *{command}* deletes one or more Google Compute Engine images.

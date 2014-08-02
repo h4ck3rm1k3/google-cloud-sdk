@@ -12,8 +12,9 @@ gcloud-compute-instances-remove-metadata \- Remove instance metadata
 \fBgcloud compute instances remove\-metadata\fR
   NAME
   [\-\-all | \-\-keys KEY [KEY \&...]]
-  \-\-zone ZONE
-  [\-h, \-\-help]
+  [\-\-help]
+  [\-\-zone ZONE]
+  [\-h]
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -31,6 +32,11 @@ The name of the instance whose metadata should be modified\&.
 If provided, all metadata entries are removed\&.
 .RE
 .PP
+\fB\-\-help\fR
+.RS 4
+Display detailed help\&.
+.RE
+.PP
 \fB\-\-keys\fR \fIKEY [KEY \&...]\fR
 .RS 4
 The keys of the entries to remove\&.
@@ -38,10 +44,10 @@ The keys of the entries to remove\&.
 .PP
 \fB\-\-zone\fR \fIZONE\fR
 .RS 4
-The zone of the instance\&.
+The zone of the instance to set metadata on\&. If omitted and the arguments are not all URIs, you will be prompted to select a zone\&.
 .RE
 .PP
-\fB\-\-help\fR
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE

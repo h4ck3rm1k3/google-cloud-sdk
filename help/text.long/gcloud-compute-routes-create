@@ -6,12 +6,13 @@ SYNOPSIS
          NAME
          [--description DESCRIPTION]
          --destination-range DESTINATION_RANGE
+         [--help]
          [--network NETWORK; default="default"]
          [--next-hop-address NEXT_HOP_ADDRESS | --next-hop-gateway NEXT_HOP_GATEWAY | --next-hop-instance NEXT_HOP_INSTANCE]
          [--next-hop-instance-zone NEXT_HOP_INSTANCE_ZONE]
          [--priority PRIORITY; default="1000"]
          [--tags TAG [TAG ...]]
-         [-h, --help]
+         [-h]
 
 DESCRIPTION
        gcloud compute routes create is used to create routes. A route is a
@@ -42,6 +43,9 @@ FLAGS
        --destination-range DESTINATION_RANGE
            The destination range of outgoing packets that the route will apply
            to. To match all traffic, use "0.0.0.0/0".
+
+       --help
+           Display detailed help.
 
        --network NETWORK
            Specifies the network to which the route will be applied.
@@ -74,6 +78,6 @@ FLAGS
            no tags are provided, the route will apply to all instances in the
            network.
 
-       --help
+       -h
            Print a summary help and exit.
 

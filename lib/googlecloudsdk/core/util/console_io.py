@@ -6,6 +6,8 @@ import logging
 import string
 import sys
 import textwrap
+import threading
+import time
 
 from googlecloudsdk.core import log
 from googlecloudsdk.core import properties
@@ -235,23 +237,20 @@ def _DoWrap(message):
 def _RawInput(prompt=None):
   """A simple redirect to the built-in raw_input function.
 
-  If the prompt is given, it is correctly line wrapped.  If there is no stdin
-  available, this returns None.
+  If the prompt is given, it is correctly line wrapped.
 
   Args:
     prompt: str, An optional prompt.
 
   Returns:
-    The input from stdin, or None if there is no stdin available.
+    The input from stdin.
   """
+  if prompt:
+    sys.stderr.write(_DoWrap(prompt))
+
   try:
-    # Prompt is a positional arg.  It should not be passed if prompt is None,
-    # because it results in 'None' actually getting printed as a prompt.
-    if prompt:
-      return raw_input(_DoWrap(prompt))
     return raw_input()
   except EOFError:
-    # There is no stdin stream, or the steam has been exhausted.
     return None
 
 
@@ -272,19 +271,19 @@ def PromptContinue(message=None, prompt_string=None):
   if not prompt_string:
     prompt_string = 'Do you want to continue'
   if message:
-    sys.stdout.write(_DoWrap(message) + '\n\n')
+    sys.stderr.write(_DoWrap(message) + '\n\n')
 
-  sys.stdout.write(_DoWrap(prompt_string + ' (Y/n)?  '))
+  sys.stderr.write(_DoWrap(prompt_string + ' (Y/n)?  '))
   while True:
     answer = _RawInput()
     if not answer or answer.lower() in ['y', 'yes']:
-      sys.stdout.write('\n')
+      sys.stderr.write('\n')
       return True
     elif answer.lower() in ['n', 'no']:
-      sys.stdout.write('\n')
+      sys.stderr.write('\n')
       return False
     else:
-      sys.stdout.write("Please enter 'y' or 'n':  ")
+      sys.stderr.write("Please enter 'y' or 'n':  ")
 
 
 def PromptResponse(message):
@@ -302,7 +301,7 @@ def PromptResponse(message):
   return response
 
 
-def PromptChoice(options, default=0, message=None, prompt_string=None):
+def PromptChoice(options, default=None, message=None, prompt_string=None):
   """Prompt the user to select a choice from a list of items.
 
   Args:
@@ -319,13 +318,13 @@ def PromptChoice(options, default=0, message=None, prompt_string=None):
       available options.
 
   Returns:
-    The index of the item in the list that was chosen, or the deafult if prompts
+    The index of the item in the list that was chosen, or the default if prompts
     are disabled.
   """
   if not options:
     raise ValueError('You must provide at least one option.')
   maximum = len(options)
-  if default < 0 or default >= maximum:
+  if default is not None and not 0 <= default < maximum:
     raise ValueError(
         'Default option [{default}] is not a valid index for the options list '
         '[{maximum} options given]'.format(default=default, maximum=maximum))
@@ -333,29 +332,35 @@ def PromptChoice(options, default=0, message=None, prompt_string=None):
     return default
 
   if message:
-    sys.stdout.write(_DoWrap(message) + '\n')
+    sys.stderr.write(_DoWrap(message) + '\n')
   for i, option in enumerate(options):
-    sys.stdout.write('  [{index}]  {option}\n'.format(
+    sys.stderr.write('  [{index}]  {option}\n'.format(
         index=i + 1, option=str(option)))
 
   if not prompt_string:
     prompt_string = 'Please enter your numeric choice'
-  sys.stdout.write(_DoWrap(prompt_string + ' ({default}):  '.format(
-      default=default + 1)))
+  if default is None:
+    suffix_string = ':  '
+  else:
+    suffix_string = ' ({default}):  '.format(default=default + 1)
+  sys.stderr.write(_DoWrap(prompt_string + suffix_string))
   while True:
     answer = _RawInput()
-    if not answer:
-      sys.stdout.write('\n')
+    if answer is None or (answer is '' and default is not None):
+      # Return default if we failed to read from stdin
+      # Return default if the user hit enter and there is a valid default
+      # Prompt again otherwise
+      sys.stderr.write('\n')
       return default
     try:
       num_choice = int(answer)
       if num_choice < 1 or num_choice > maximum:
         raise ValueError('Choice must be between 1 and {maximum}'.format(
             maximum=maximum))
-      sys.stdout.write('\n')
+      sys.stderr.write('\n')
       return num_choice - 1
     except ValueError:
-      sys.stdout.write('Please enter a value between 1 and {maximum}:  '
+      sys.stderr.write('Please enter a value between 1 and {maximum}:  '
                        .format(maximum=maximum))
 
 
@@ -376,3 +381,104 @@ def LazyFormat(s, *args, **kwargs):
     def __missing__(self, key):
       return '{' + key + '}'
   return string.Formatter().vformat(s, args, SafeDict(kwargs))
+
+
+def PrintExtendedList(items, col_fetchers):
+  """Print a properly formated extended list for some set of resources.
+
+  If items is a generator, this function may elect to only request those rows
+  that it is ready to display.
+
+  Args:
+    items: [resource] or a generator producing resources, The objects
+        representing cloud resources.
+    col_fetchers: [(string, func(resource))], A list of tuples, one for each
+        column, in the order that they should appear. The string is the title
+        of that column which will be printed in a header. The func is a function
+        that will fetch a row-value for that column, given the resource
+        corresponding to the row.
+  """
+
+  total_items = 0
+
+  rows = [[title for (title, unused_func) in col_fetchers]]
+  for item in items:
+    total_items += 1
+    row = []
+    for (unused_title, func) in col_fetchers:
+      value = func(item)
+      if value is None:
+        row.append('-')
+      else:
+        row.append(value)
+    rows.append(row)
+
+  max_col_widths = [0] * len(col_fetchers)
+  for row in rows:
+    for col in range(len(row)):
+      max_col_widths[col] = max(max_col_widths[col], len(str(row[col]))+2)
+
+  for row in rows:
+    for col in range(len(row)):
+      width = max_col_widths[col]
+      item = str(row[col])
+      if len(item) < width and col != len(row)-1:
+        item += ' ' * (width - len(item))
+      log.out.write(item)
+    log.out.write('\n')
+
+  log.status.write('Listed {items} item{s}.\n'.format(
+      items=total_items, s='s' if total_items != 1 else ''))
+
+
+class ProgressTracker(object):
+  """A context manager for telling the user about long-running progress."""
+
+  SPIN_MARKS = [
+      '|',
+      '/',
+      '-',
+      '\\',
+  ]
+
+  def __init__(self, message, autotick=True):
+    self._message = message
+    self._prefix = message + '...'
+    self._ticks = 0
+    self._autotick = autotick
+    self._done = False
+    self._lock = threading.Lock()
+
+  def __enter__(self):
+    log.file_only_logger.info(self._prefix)
+    sys.stderr.write(self._prefix)
+
+    if self._autotick:
+      def Ticker():
+        while True:
+          time.sleep(1)
+          if self.Tick():
+            return
+      threading.Thread(target=Ticker).start()
+
+    return self
+
+  def Tick(self):
+    """Give a visual indication to the user that some progress has been made."""
+    with self._lock:
+      if not self._done:
+        self._ticks += 1
+        self._Print()
+        sys.stderr.write(
+            ProgressTracker.SPIN_MARKS[
+                self._ticks % len(ProgressTracker.SPIN_MARKS)])
+      return self._done
+
+  def _Print(self):
+    sys.stderr.write('\r' + self._prefix)
+
+  def __exit__(self, unused_type, unused_value, unused_traceback):
+    with self._lock:
+      self._done = True
+      self._Print()
+    sys.stderr.write('done.\n')

@@ -11,48 +11,36 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Implementation of config command for creating a gsutil configuration file."""
 
 from __future__ import absolute_import
 
 import datetime
+from httplib import ResponseNotReady
 import multiprocessing
 import os
 import platform
 import signal
 import stat
 import sys
+import textwrap
 import time
 import webbrowser
 
 import boto
 from boto.provider import Provider
+from httplib2 import ServerNotFoundError
+from oauth2client.client import HAS_CRYPTO
+
 import gslib
 from gslib.command import Command
-from gslib.command import COMMAND_NAME
-from gslib.command import COMMAND_NAME_ALIASES
-from gslib.command import FILE_URIS_OK
-from gslib.command import MAX_ARGS
-from gslib.command import MIN_ARGS
-from gslib.command import PROVIDER_URIS_OK
-from gslib.command import SUPPORTED_SUB_ARGS
-from gslib.command import URIS_START_ARG
 from gslib.commands.compose import MAX_COMPONENT_COUNT
 from gslib.cred_types import CredTypes
 from gslib.exception import AbortException
 from gslib.exception import CommandException
-from gslib.help_provider import HELP_NAME
-from gslib.help_provider import HELP_NAME_ALIASES
-from gslib.help_provider import HELP_ONE_LINE_SUMMARY
-from gslib.help_provider import HELP_TEXT
-from gslib.help_provider import HELP_TYPE
-from gslib.help_provider import HelpType
 from gslib.util import IS_WINDOWS
 from gslib.util import TWO_MB
-from httplib import ResponseNotReady
-from httplib2 import ServerNotFoundError
-from oauth2client.client import HAS_CRYPTO
-import textwrap
-from textwrap import TextWrapper
+
 
 _detailed_help_text = ("""
 <B>SYNOPSIS</B>
@@ -94,7 +82,6 @@ _detailed_help_text = ("""
   [Credentials] section after creating the initial configuration file.
 
 
-
 <B>CONFIGURING SERVICE ACCOUNT CREDENTIALS</B>
   You can configure credentials for service accounts using the gsutil config -e
   option. Service accounts are useful for authenticating on behalf of a service
@@ -102,17 +89,15 @@ _detailed_help_text = ("""
 
   When you run gsutil config -e, you will be prompted for your service account
   email address and the path to your private key file. To get these data, visit
-  the `Google Cloud Console <https://cloud.google.com/console#/project>`_, click
-  on the project you are using, then click "APIs & auth", then click "Registered
-  apps", then click on the name of the registered app. (Note: for service
-  accounts created via the older API Developer's Console, the name will be
-  something like "Service Account-<service account id>".) This page lists
-  the email address of your service account. From this page you can also click
-  Generate New Key, to generate and download the private key file. Save this
-  file somewhere accessible from the machine where you run gsutil. Make sure
-  to set its protection so only the users you want to be able to authenticate
-  as have access.
-
+  the `Google Developers Console <https://cloud.google.com/console#/project>`_,
+  click on the project you are using, then click "APIs & auth", then click
+  "Credentials", then click "CREATE NEW CLIENT ID"; on the pop-up dialog box
+  select "Service account" and click "Create Client ID". This will download
+  a private key file, which you should move to somewhere
+  accessible from the machine where you run gsutil. Make sure to set its
+  protection so only the users you want to be able to authenticate have
+  access.
+  
   Note that your service account will NOT be considered an Owner for the
   purposes of API access (see "gsutil help creds" for more information about
   this). See https://developers.google.com/accounts/docs/OAuth2ServiceAccount
@@ -164,42 +149,54 @@ _detailed_help_text = ("""
 
   The currently supported settings, are, by section:
 
+    [Credentials]
+      aws_access_key_id
+      aws_secret_access_key
+      gs_access_key_id
+      gs_host
+      gs_json_host
+      gs_json_port 
+      gs_oauth2_refresh_token
+      gs_port
+      gs_secret_access_key
+      s3_host
+      s3_port
+
     [Boto]
       proxy
       proxy_port
       proxy_user
       proxy_pass
       http_socket_timeout
-      is_secure
       https_validate_certificates
       debug
       num_retries
 
     [GSUtil]
-      resumable_threshold
-      resumable_tracker_dir
-      software_update_check_period
-      parallel_process_count
-      parallel_thread_count
-      parallel_composite_upload_threshold
-      parallel_composite_upload_component_size
-      use_magicfile
-      content_language
       check_hashes
+      content_language
       default_api_version
       default_project_id
-      discovery_service_url
       json_api_version
+      parallel_composite_upload_component_size
+      parallel_composite_upload_threshold
+      parallel_process_count
+      parallel_thread_count
+      prefer_api
+      resumable_threshold
+      resumable_tracker_dir
+      rsync_buffer_lines
+      software_update_check_period
+      use_magicfile
 
     [OAuth2]
-      token_cache
-      token_cache
       client_id
       client_secret
-      provider_label
-      provider_authorization_uri
-      provider_token_uri
       oauth2_refresh_retries
+      provider_authorization_uri
+      provider_label
+      provider_token_uri
+      token_cache
 
 
 <B>UPDATING TO THE LATEST CONFIGURATION FILE</B>
@@ -245,7 +242,7 @@ _detailed_help_text = ("""
 
 
 try:
-  from gslib.third_party.oauth2_plugin import oauth2_helper
+  from gcs_oauth2_boto_plugin import oauth2_helper  # pylint: disable=g-import-not-at-top
 except ImportError:
   pass
 
@@ -297,19 +294,6 @@ CONFIG_BOTO_SECTION_CONTENT = """
 # to True in production environments, especially when using OAuth2 bearer token
 # authentication with Google Cloud Storage.
 
-# Set 'is_secure' to False to cause boto to connect using HTTP instead of the
-# default HTTPS. This is useful if you want to capture/analyze traffic
-# (e.g., with tcpdump).
-# WARNING: This option should always be set to True (the default value) in
-# production environments, for several reasons:
-#   1. OAuth2 refresh and access tokens are bearer tokens, so must be
-#      protected from exposure on the wire.
-#   2. Resumable upload IDs are bearer tokens, so similarly must be protected.
-#   3. The gsutil update command needs to run over HTTPS to guard against
-#      man-in-the-middle attacks on code updates.
-#   4. User data shouldn't be sent in the clear.
-#is_secure = True
-
 # Set 'https_validate_certificates' to False to disable server certificate
 # checking. The default for this option in the boto library is currently
 # 'False' (to avoid breaking apps that depend on invalid certificates); it is
@@ -335,6 +319,27 @@ CONFIG_INPUTLESS_GSUTIL_SECTION_CONTENT = """
 # resumable Google Cloud Storage transfers are attempted. The default is 2097152
 # (2 MiB).
 #resumable_threshold = %(resumable_threshold)d
+
+# 'rsync_buffer_lines' specifies the number of lines of bucket or directory
+# listings saved in each temp file during sorting. (The complete set is
+# split across temp files and separately sorted/merged, to avoid needing to
+# fit everything in memory at once.) If you are trying to synchronize very
+# large directories/buckets (e.g., containing millions or more objects),
+# having too small a value here can cause gsutil to run out of open file
+# handles. If that happens, you can try to increase the number of open file
+# handles your system allows (e.g., see 'man ulimit' on Linux; see also
+# http://docs.python.org/2/library/resource.html). If you can't do that (or
+# if you're already at the upper limit), increasing rsync_buffer_lines will
+# cause gsutil to use fewer file handles, but at the cost of more memory. With
+# rsync_buffer_lines set to 32000 and assuming a typical URL is 100 bytes
+# long, gsutil will require approximately 10MB of memory while building
+# the synchronization state, and will require approximately 60 open file
+# descriptors to build the synchronization state over all 1M source and 1M
+# destination URLs. Memory and file descriptors are only consumed while
+# building the state; once the state is built, it resides in two temp files that
+# are read and processed incrementally during the actual copy/delete
+# operations.
+#rsync_buffer_lines = 32000
 
 # 'resumable_tracker_dir' specifies the base location where resumable
 # transfer tracker files are saved. By default they're in ~/.gsutil
@@ -368,6 +373,9 @@ CONFIG_INPUTLESS_GSUTIL_SECTION_CONTENT = """
 # %(max_component_count)d.
 # If 'parallel_composite_upload_threshold' is set to 0, then automatic parallel
 # uploads will never occur.
+# Setting an extremely low threshold is unadvisable. The vast majority of
+# environments will see degraded performance for thresholds below 80M, and it
+# is almost never advantageous to have a threshold below 20M.
 # 'parallel_composite_upload_component_size' specifies the ideal size of a
 # component in bytes, which will act as an upper bound to the size of the
 # components if ceil(file_size / parallel_composite_upload_component_size) is
@@ -409,20 +417,24 @@ content_language = en
 # download performance can be significantly degraded by the digest computation.
 #check_hashes = if_fast_else_fail
 
-# The ability to specify an alternative discovery service URL is primarily for
-# cloud storage service developers.
-#discovery_service_url = https://www.googleapis.com/discovery/v1/apis/{api}/{apiVersion}/rest
 # The ability to specify an alternative JSON API version is primarily for cloud
 # storage service developers.
-#json_api_version = v1beta2
+#json_api_version = v1
+
+# Specifies the API to use when interacting with cloud storage providers.  If
+# the gsutil command supports this API for the provider, it will be used
+# instead of the default.
+# Commands typically default to XML for S3 and JSON for GCS.
+#prefer_api = json
+#prefer_api = xml
 
 """ % {'resumable_threshold': TWO_MB,
        'parallel_process_count': DEFAULT_PARALLEL_PROCESS_COUNT,
        'parallel_thread_count': DEFAULT_PARALLEL_THREAD_COUNT,
        'parallel_composite_upload_threshold': (
-          DEFAULT_PARALLEL_COMPOSITE_UPLOAD_THRESHOLD),
+           DEFAULT_PARALLEL_COMPOSITE_UPLOAD_THRESHOLD),
        'parallel_composite_upload_component_size': (
-          DEFAULT_PARALLEL_COMPOSITE_UPLOAD_COMPONENT_SIZE),
+           DEFAULT_PARALLEL_COMPOSITE_UPLOAD_COMPONENT_SIZE),
        'max_component_count': MAX_COMPONENT_COUNT}
 
 CONFIG_OAUTH2_CONFIG_CONTENT = """
@@ -478,37 +490,27 @@ CONFIG_OAUTH2_CONFIG_CONTENT = """
 class ConfigCommand(Command):
   """Implementation of gsutil config command."""
 
-  # Command specification (processed by parent class).
-  command_spec = {
-      # Name of command.
-      COMMAND_NAME: 'config',
-      # List of command name aliases.
-      COMMAND_NAME_ALIASES: ['cfg', 'conf', 'configure'],
-      # Min number of args required by this command.
-      MIN_ARGS: 0,
-      # Max number of args required by this command, or NO_MAX.
-      MAX_ARGS: 0,
-      # Getopt-style string specifying acceptable sub args.
-      SUPPORTED_SUB_ARGS: 'habefwrs:o:',
-      # True if file URIs acceptable for this command.
-      FILE_URIS_OK: False,
-      # True if provider-only URIs acceptable for this command.
-      PROVIDER_URIS_OK: False,
-      # Index in args of first URI arg.
-      URIS_START_ARG: 0,
-  }
-  help_spec = {
-      # Name of command or auxiliary help info for which this help applies.
-      HELP_NAME: 'config',
-      # List of help name aliases.
-      HELP_NAME_ALIASES: ['cfg', 'conf', 'configure', 'proxy', 'aws', 's3'],
-      # Type of help:
-      HELP_TYPE: HelpType.COMMAND_HELP,
-      # One line summary of this help.
-      HELP_ONE_LINE_SUMMARY: 'Obtain credentials and create configuration file',
-      # The full help text.
-      HELP_TEXT: _detailed_help_text,
-  }
+  # Command specification. See base class for documentation.
+  command_spec = Command.CreateCommandSpec(
+      'config',
+      command_name_aliases=['cfg', 'conf', 'configure'],
+      min_args=0,
+      max_args=0,
+      supported_sub_args='habefwrs:o:',
+      file_url_ok=False,
+      provider_url_ok=False,
+      urls_start_arg=0,
+  )
+  # Help specification. See help_provider.py for documentation.
+  help_spec = Command.HelpSpec(
+      help_name='config',
+      help_name_aliases=['cfg', 'conf', 'configure', 'proxy', 'aws', 's3'],
+      help_type='command_help',
+      help_one_line_summary=(
+          'Obtain credentials and create configuration file'),
+      help_text=_detailed_help_text,
+      subcommand_help_text={},
+  )
 
   def _OpenConfigFile(self, file_path):
     """Creates and opens a configuration file for writing.
@@ -529,7 +531,7 @@ class ConfigCommand(Command):
           when the file already exists).
     """
     flags = os.O_RDWR | os.O_CREAT | os.O_EXCL
-    # Accommodate Windows; stolen from python2.6/tempfile.py.
+    # Accommodate Windows; copied from python2.6/tempfile.py.
     if hasattr(os, 'O_NOINHERIT'):
       flags |= os.O_NOINHERIT
     try:
@@ -547,7 +549,7 @@ class ConfigCommand(Command):
     and offer to fix the permissions.
 
     Args:
-      filename: The name of the private key file.
+      file_path: The name of the private key file.
     """
     if IS_WINDOWS:
       # For Windows, this check doesn't work (it actually just checks whether
@@ -572,7 +574,7 @@ class ConfigCommand(Command):
               'modified.'
               '\nThe only access allowed is readability by the user '
               '(permissions 0400 in chmod).')
-        except Exception as e:
+        except Exception, _:  # pylint: disable=broad-except
           self.logger.warn(
               '\nWe were unable to modify the permissions on your file.\n'
               'If you would like to fix this yourself, consider running:\n'
@@ -584,8 +586,7 @@ class ConfigCommand(Command):
             '"sudo chmod 400 </path/to/key>" for improved security.')
 
   def _PromptForProxyConfigVarAndMaybeSaveToBotoConfig(self, varname, prompt):
-    """Prompts user for one proxy configuration line, and saves to boto.config
-       if not empty.
+    """Prompts for one proxy config line, saves to boto.config if not empty.
 
     Args:
       varname: The config variable name.
@@ -596,9 +597,7 @@ class ConfigCommand(Command):
       boto.config.set('Boto', varname, value)
 
   def _PromptForProxyConfig(self):
-    """
-    Prompts user for proxy configuration data, and loads non-empty values into
-    boto.config.
+    """Prompts for proxy config data, loads non-empty values into boto.config.
     """
     self._PromptForProxyConfigVarAndMaybeSaveToBotoConfig(
         'proxy', 'What is your proxy host? ')
@@ -610,15 +609,17 @@ class ConfigCommand(Command):
         'proxy_pass', 'What is your proxy pass (leave blank if not used)? ')
 
   def _WriteConfigLineMaybeCommented(self, config_file, name, value, desc):
-    """Writes proxy name/value pair to config file if value is not None, else
-       writes comment line.
+    """Writes proxy name/value pair or comment line to config file.
+
+    Writes proxy name/value pair if value is not None.  Otherwise writes
+    comment line.
 
     Args:
+      config_file: File object to which the resulting config file will be
+          written.
       name: The config variable name.
       value: The value, or None.
       desc: Human readable description (for comment).
-      config_file: File object to which the resulting config file will be
-          written.
     """
     if not value:
       name = '#%s' % name
@@ -634,9 +635,9 @@ class ConfigCommand(Command):
     """
     config = boto.config
     config_file.write(
-"""# To use a proxy, edit and uncomment the proxy and proxy_port lines. If you
-# need a user/password with this proxy, edit and uncomment those lines as well.
-""")
+        '# To use a proxy, edit and uncomment the proxy and proxy_port lines.\n'
+        '# If you need a user/password with this proxy, edit and uncomment\n'
+        '# those lines as well.\n')
     self._WriteConfigLineMaybeCommented(
         config_file, 'proxy', config.get_value('Boto', 'proxy', None),
         'proxy host')
@@ -650,6 +651,7 @@ class ConfigCommand(Command):
         config_file, 'proxy_pass', config.get_value('Boto', 'proxy_pass', None),
         'proxy password')
 
+  # pylint: disable=dangerous-default-value,too-many-statements
   def _WriteBotoConfigFile(self, config_file, launch_browser=True,
                            oauth2_scopes=[SCOPE_FULL_CONTROL],
                            cred_type=CredTypes.OAUTH2_USER_ACCOUNT):
@@ -662,16 +664,17 @@ class ConfigCommand(Command):
     Args:
       config_file: File object to which the resulting config file will be
           written.
-      cred_type: There are three options:
-        - for HMAC, ask the user for access key and secret
-        - for OAUTH2_USER_ACCOUNT, walk the user through OAuth2 approval flow
-          and produce a config with an oauth2_refresh_token credential.
-        - for OAUTH2_SERVICE_ACCOUNT, prompt the user for OAuth2 for client ID,
-          and private key file (and password for the file)
       launch_browser: In the OAuth2 approval flow, attempt to open a browser
           window and navigate to the approval URL.
       oauth2_scopes: A list of OAuth2 scopes to request authorization for, when
           using OAuth2.
+      cred_type: There are three options:
+        - for HMAC, ask the user for access key and secret
+        - for OAUTH2_USER_ACCOUNT, walk the user through OAuth2 approval flow
+          and produce a config with an oauth2_refresh_token credential.
+        - for OAUTH2_SERVICE_ACCOUNT, prompt the user for OAuth2 for service
+          account email address and private key file (and password for that
+          file).
     """
     # Collect credentials
     provider_map = {'aws': 'aws', 'google': 'gs'}
@@ -685,8 +688,8 @@ class ConfigCommand(Command):
                                       'key file? ')
       gs_service_key_file_password = raw_input(
           '\n'.join(textwrap.wrap(
-              "What is the password for your service key file? If you haven't "
-              " set one explicitly, leave this line blank. ")))
+              'What is the password for your service key file [if you haven\'t '
+              'set one explicitly, leave this line blank]?')) + ' ')
       self._CheckPrivateKeyFilePermissions(gs_service_key_file)
     elif cred_type == CredTypes.OAUTH2_USER_ACCOUNT:
       oauth2_client = oauth2_helper.OAuth2ClientFromBotoConfig(boto.config,
@@ -694,7 +697,7 @@ class ConfigCommand(Command):
       try:
         oauth2_refresh_token = oauth2_helper.OAuth2ApprovalFlow(
             oauth2_client, oauth2_scopes, launch_browser)
-      except (ResponseNotReady, ServerNotFoundError) as e:
+      except (ResponseNotReady, ServerNotFoundError):
         # TODO: Determine condition to check for in the ResponseNotReady
         # exception so we only run proxy config flow if failure was caused by
         # request being blocked because it wasn't sent through proxy. (This
@@ -793,9 +796,16 @@ class ConfigCommand(Command):
       config_file.write(
           '# The ability to specify an alternate storage host and port\n'
           '# is primarily for cloud storage service developers.\n'
+          '# Setting a non-default gs_host only works if prefer_api=xml.\n'
           '#%s_host = <alternate storage host address>\n'
-          '#%s_port = <alternate storage host port>\n\n'
+          '#%s_port = <alternate storage host port>\n'
           % (host_key, host_key))
+      if host_key == 'gs':
+        config_file.write(
+            '#%s_json_host = <alternate JSON API storage host address>\n'
+            '#%s_json_port = <alternate JSON API storage host port>\n\n'
+            % (host_key, host_key))
+      config_file.write('\n')
 
     # Write the config file Boto section.
     config_file.write('%s\n' % CONFIG_BOTO_SECTION_CONTENT)
@@ -806,7 +816,7 @@ class ConfigCommand(Command):
 
     # Write the default API version.
     config_file.write("""
-# 'default_api_version' specifies the default Google Cloud Storage API
+# 'default_api_version' specifies the default Google Cloud Storage XML API
 # version to use. If not set below gsutil defaults to API version 1.
 """)
     api_version = 2
@@ -859,8 +869,8 @@ class ConfigCommand(Command):
     # Write the config file OAuth2 section.
     config_file.write(CONFIG_OAUTH2_CONFIG_CONTENT)
 
-  # Command entry point.
   def RunCommand(self):
+    """Command entry point for the config command."""
     scopes = []
     cred_type = CredTypes.OAUTH2_USER_ACCOUNT
     launch_browser = False
@@ -901,7 +911,7 @@ class ConfigCommand(Command):
       scopes.append(SCOPE_FULL_CONTROL)
 
     default_config_path_bak = None
-    if output_file_name is None:
+    if not output_file_name:
       # Check to see if a default config file name is requested via
       # environment variable. If so, use it, otherwise use the hard-coded
       # default file. Then use the default config file name, if it doesn't
@@ -927,7 +937,7 @@ class ConfigCommand(Command):
                 'Backing up existing config file "%s" to "%s"...\n'
                 % (default_config_path, default_config_path_bak))
             os.rename(default_config_path, default_config_path_bak)
-          except e:
+          except Exception, e:
             raise CommandException(
                 'Failed to back up existing config '
                 'file ("%s" -> "%s"): %s.'
@@ -938,13 +948,13 @@ class ConfigCommand(Command):
       output_file = sys.stdout
     else:
       output_file = self._OpenConfigFile(output_file_name)
-      sys.stderr.write(
-          'This script will create a boto config file at\n%s\ncontaining your '
-          'credentials, based on your responses to the following questions.\n\n'
-          % output_file_name)
+      sys.stderr.write('\n'.join(textwrap.wrap(
+          'This command will create a boto config file at %s containing your '
+          'credentials, based on your responses to the following questions.'
+          % output_file_name)) + '\n')
 
     # Catch ^C so we can restore the backup.
-    signal.signal(signal.SIGINT, cleanup_handler)
+    signal.signal(signal.SIGINT, CleanupHandler)
     try:
       self._WriteBotoConfigFile(output_file, launch_browser=launch_browser,
                                 oauth2_scopes=scopes, cred_type=cred_type)
@@ -980,5 +990,5 @@ class ConfigCommand(Command):
     return 0
 
 
-def cleanup_handler(signalnum, handler):
+def CleanupHandler(unused_signalnum, unused_handler):
   raise AbortException('User interrupted config command')

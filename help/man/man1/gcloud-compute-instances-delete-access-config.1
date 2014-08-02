@@ -12,9 +12,10 @@ gcloud-compute-instances-delete-access-config \- Delete an access configuration 
 \fBgcloud compute instances delete\-access\-config\fR
   NAME
   [\-\-access\-config\-name ACCESS_CONFIG_NAME; default="external\-nat"]
+  [\-\-help]
   [\-\-network\-interface NETWORK_INTERFACE; default="nic0"]
   \-\-zone ZONE
-  [\-h, \-\-help]
+  [\-h]
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -32,6 +33,11 @@ The name of the instance from which to delete the access configuration\&.
 Specifies the name of the access configuration to delete\&. \(lqexternal\-nat\(rq is used as the default if this flag is not provided\&.
 .RE
 .PP
+\fB\-\-help\fR
+.RS 4
+Display detailed help\&.
+.RE
+.PP
 \fB\-\-network\-interface\fR \fINETWORK_INTERFACE\fR
 .RS 4
 Specifies the name of the network interface from which to delete the access configuration\&. If this is not provided, then \(lqnic0\(rq is used as the default\&.
@@ -42,7 +48,7 @@ Specifies the name of the network interface from which to delete the access conf
 The zone of the instance from which to delete the access configuration\&.
 .RE
 .PP
-\fB\-\-help\fR
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE

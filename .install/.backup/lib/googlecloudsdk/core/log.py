@@ -2,7 +2,6 @@
 
 """Module with logging related functionality for calliope."""
 
-import collections
 import datetime
 import errno
 import logging
@@ -21,14 +20,17 @@ DEFAULT_USER_OUTPUT_ENABLED = False
 # set in the properties before it was changed by running commands.
 INITIAL_USER_OUTPUT_ENABLED = (properties.VALUES.core.user_output_enabled
                                .GetBool())
-VALID_VERBOSITY_STRINGS = collections.OrderedDict([
+VERBOSITY_LEVELS = [
     ('debug', logging.DEBUG),
     ('info', logging.INFO),
     ('warning', logging.WARNING),
     ('error', logging.ERROR),
     ('critical', logging.CRITICAL),
-    ('none', logging.CRITICAL + 10)])
+    ('none', logging.CRITICAL + 10)]
+VALID_VERBOSITY_STRINGS = dict(VERBOSITY_LEVELS)
 LOG_FILE_EXTENSION = '.log'
+# datastore upload and download creates temporary sql3 files in the log dir.
+_KNOWN_LOG_FILE_EXTENSIONS = [LOG_FILE_EXTENSION, '.sql3']
 
 
 class _NullHandler(logging.Handler, object):
@@ -296,6 +298,7 @@ class _LogManager(object):
       return
     self.logs_dirs.append(logs_dir)
     # A handler to write DEBUG and above to log files in the given directory
+    self._CleanLogsDir(logs_dir)
     log_file = self._SetupLogsDir(logs_dir)
     self.current_log_file = log_file
     file_handler = logging.FileHandler(log_file)
@@ -303,6 +306,57 @@ class _LogManager(object):
     file_handler.setFormatter(self.file_formatter)
     self.logger.addHandler(file_handler)
     self.file_only_logger.addHandler(file_handler)
+
+  def _CleanLogsDir(self, logs_dir):
+    """Cleans up old log files form the given logs directory.
+
+    Args:
+      logs_dir: str, The path to the logs directory.
+    """
+    now_seconds = time.time()
+
+    # First delete log files in this directory that are older than MAX_AGE.
+    for (dirpath, dirnames, filenames) in os.walk(logs_dir, topdown=True):
+      # We skip any directories with a too-new st_mtime. This skipping can
+      # result in some false negatives, but that's ok since the files in the
+      # skipped directory are at most one day too old.
+      to_process = []
+      for dirname in dirnames:
+        logdirpath = os.path.join(dirpath, dirname)
+        if self._ShouldDelete(now_seconds, logdirpath):
+          to_process.append(dirname)
+      dirnames[:] = to_process
+
+      for filename in filenames:
+        # Skip if filename is not formatted like a log file.
+        unused_non_ext, ext = os.path.splitext(filename)
+        if ext not in _KNOWN_LOG_FILE_EXTENSIONS:
+          continue
+
+        # Remove if the file is older than MAX_AGE.
+        filepath = os.path.join(dirpath, filename)
+        if self._ShouldDelete(now_seconds, filepath):
+          os.remove(filepath)
+
+    # Second, delete any log directories that are now empty.
+    for (dirpath, dirnames, filenames) in os.walk(logs_dir, topdown=False):
+      # Since topdown is false, we get the children before the parents.
+      if not filenames and not dirnames:
+        # Delete if empty.
+        os.rmdir(dirpath)
+
+  def _ShouldDelete(self, now_seconds, path):
+    """Determines if the file or directory is old enough to be deleted.
+
+    Args:
+      now_seconds: int, The current time in seconds.
+      path: str, The file or directory path to check.
+
+    Returns:
+      bool, True if it should be deleted, False otherwise.
+    """
+    stat_info = os.stat(path)
+    return now_seconds - stat_info.st_mtime > _LogManager.MAX_AGE
 
   def _SetupLogsDir(self, logs_dir):
     """Creates the necessary log directories and get the file name to log to.
@@ -319,47 +373,6 @@ class _LogManager(object):
       str, The path to the file to log to
     """
     now = datetime.datetime.now()
-    nowseconds = time.time()
-
-    # First delete log files in this directory that are older than MAX_AGE.
-    for (dirpath, dirnames, filenames) in os.walk(logs_dir, topdown=True):
-      # We skip any directories with a too-new st_mtime. This skipping can
-      # result in some false negatives, but that's ok since the files in the
-      # skipped directory are at most one day too old.
-      dirnames_include = []
-      for dirname in dirnames:
-        logdirpath = os.path.join(dirpath, dirname)
-        stat_info = os.stat(logdirpath)
-        age = nowseconds - stat_info.st_mtime
-        if age < _LogManager.MAX_AGE:
-          dirnames_include.append(dirname)
-      dirnames[:] = dirnames_include
-
-      for filename in filenames:
-        # Skip if filename is not formatted like a log file.
-        unused_non_ext, ext = os.path.splitext(filename)
-        if ext != LOG_FILE_EXTENSION:
-          continue
-
-        filepath = os.path.join(dirpath, filename)
-        # Skip if the file is younger than MAX_AGE.
-        stat_info = os.stat(filepath)
-        age = nowseconds - stat_info.st_mtime
-        if age < _LogManager.MAX_AGE:
-          continue
-
-        # This log file is too old.
-        os.remove(filepath)
-
-    # Second, delete any log directories that are now empty.
-    for (dirpath, dirnames, filenames) in os.walk(logs_dir, topdown=False):
-      # Since topdown is false, we get the children before the parents.
-      if filenames or dirnames:
-        continue
-
-      # Nothing in it, so it's safe to delete.
-      os.rmdir(dirpath)
-
     day_dir_name = now.strftime('%Y.%m.%d')
     day_dir_path = os.path.join(logs_dir, day_dir_name)
     try:
@@ -441,7 +454,7 @@ def SetVerbosity(verbosity):
   Returns:
     int, The current verbosity.
   """
-  _log_manager.SetVerbosity(verbosity)
+  return _log_manager.SetVerbosity(verbosity)
 
 
 def GetVerbosity():
@@ -464,6 +477,11 @@ def GetVerbosityName():
     if current == num:
       return name
   return None
+
+
+def OrderedVerbosityNames():
+  """Gets all the valid verbosity names from most verbose to least verbose."""
+  return [name for name, _ in VERBOSITY_LEVELS]
 
 
 def SetUserOutputEnabled(enabled):

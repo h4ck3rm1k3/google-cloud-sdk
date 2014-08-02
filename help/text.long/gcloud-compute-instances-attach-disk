@@ -6,9 +6,10 @@ SYNOPSIS
          INSTANCE
          [--device-name DEVICE_NAME]
          --disk DISK
+         [--help]
          [--mode MODE; default="rw"]
-         --zone ZONE
-         [-h, --help]
+         [--zone ZONE]
+         [-h]
 
 DESCRIPTION
        gcloud compute instances attach-disk is used to attach a disk to an
@@ -32,6 +33,9 @@ FLAGS
        --disk DISK
            The name of the disk to attach to the instance.
 
+       --help
+           Display detailed help.
+
        --mode MODE
            Specifies the mode of the disk. Supported options are "ro" for
            read-only and "rw" for read-write. If omitted, "rw" is used as a
@@ -39,8 +43,9 @@ FLAGS
            than one instance.
 
        --zone ZONE
-           The zone in which the instance and disk reside.
+           The zone of the instance to attach a disk to. If omitted and the
+           arguments are not all URIs, you will be prompted to select a zone.
 
-       --help
+       -h
            Print a summary help and exit.
 

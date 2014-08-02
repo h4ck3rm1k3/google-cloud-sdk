@@ -3,18 +3,48 @@
 """The command to install/update gcloud components."""
 
 import argparse
+import textwrap
 
 from googlecloudsdk.calliope import base
-from googlecloudsdk.calliope import exceptions
-from googlecloudsdk.core.updater import update_manager
 
 
 class Update(base.Command):
-  """Command to update existing or install new components.
+  """Update or install one or more Cloud SDK components or packages.
 
-  Download and install Cloud SDK components, along with any other components
-  they might depend on.
+  Ensure that the latest version of each specified component, and the latest
+  version of all components upon which the specified components directly or
+  indirectly depend, is installed on the local workstation. If the command
+  includes one or more names of components or packages, the specified components
+  are the named components and the components contained in the named packages;
+  if the command does not name any components or packages, the specified
+  components are all installed components.
   """
+  detailed_help = {
+      'DESCRIPTION': textwrap.dedent("""\
+          Download the lastest version of each listed item, and the latest
+          version of all components upon which the listed items directly or
+          indirectly depend, if that version is not already installed on the
+          local workstation. The items may be individual components or
+          preconfigured packages. If a downloaded component was not previously
+          installed, the downloaded version is installed. If an earlier version
+          of the component was previously installed, that version is replaced by
+          the downloaded version.
+
+          If, for example, the component `unicorn-factory` depends on the
+          component `horn-factory`, installing the latest version of
+          `unicorn-factory` will cause the version of `horn-factory` upon which
+          it depends to be installed as well, if it is not already installed.
+          The command lists all components it is about to install, and asks for
+          confirmation before proceeding.
+      """),
+      'EXAMPLES': textwrap.dedent("""\
+          The following command ensures that the latest version is installed for
+          `component-1`, `component-2`, and all components that depend, directly
+          or indirectly, on either `component-1` or `component-2`:
+
+            $ gcloud components update component-1 component-2
+      """),
+  }
 
   @staticmethod
   def Args(parser):
@@ -22,16 +52,14 @@ class Update(base.Command):
         'component_ids',
         metavar='COMPONENT-IDS',
         nargs='*',
-        help='The component IDs to update or install.')
+        help='The IDs of the components to be updated or installed.')
     parser.add_argument(
         '--allow-no-backup',
         required=False,
         action='store_true',
         help=argparse.SUPPRESS)
 
-  @exceptions.RaiseToolExceptionInsteadOf(update_manager.Error)
   def Run(self, args):
     """Runs the list command."""
-
     self.group.update_manager.Update(
         args.component_ids, allow_no_backup=args.allow_no_backup)

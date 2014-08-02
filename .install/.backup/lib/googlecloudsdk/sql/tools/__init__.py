@@ -6,6 +6,8 @@ The fact that this is a directory with
 an __init__.py in it makes it a command group. The methods written below will
 all be called by calliope (though they are all optional).
 """
+import os
+import re
 
 import apiclient.discovery as discovery
 
@@ -21,6 +23,7 @@ from googlecloudsdk.sql import util as util
 
 class SQL(base.Group):
   """Manage Cloud SQL databases."""
+
 
   @exceptions.RaiseToolExceptionInsteadOf(c_store.Error)
   def Filter(self, context, unused_args):
@@ -40,6 +43,7 @@ class SQL(base.Group):
         'v1beta3',
         http=http,
         discoveryServiceUrl=discovery_url)
+
     context['sql'] = sql
 
     return context

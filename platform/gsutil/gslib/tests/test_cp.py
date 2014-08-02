@@ -42,10 +42,10 @@ from gslib.tests.util import ObjectToURI as suri
 from gslib.tests.util import PerformsFileToObjectUpload
 from gslib.tests.util import SetBotoConfigForTest
 from gslib.tests.util import unittest
-from gslib.util import CALLBACK_PER_X_BYTES
 from gslib.util import IS_WINDOWS
 from gslib.util import ONE_KB
 from gslib.util import Retry
+from gslib.util import START_CALLBACK_PER_BYTES
 from gslib.util import UTF8
 
 
@@ -54,7 +54,7 @@ class TestCp(testcase.GsUtilIntegrationTestCase):
 
   # For tests that artificially halt, we need to ensure at least one callback
   # occurs.
-  halt_size = CALLBACK_PER_X_BYTES * 2
+  halt_size = START_CALLBACK_PER_BYTES * 2
 
   def _get_test_file(self, name):
     contents = pkgutil.get_data('gslib', 'tests/test_data/%s' % name)
@@ -299,7 +299,7 @@ class TestCp(testcase.GsUtilIntegrationTestCase):
     fpath = self._get_test_file('test.gif')
 
     self.RunGsUtil(['-h', 'Cache-Control:public,max-age=12',
-                    '-h', 'x-goog-meta-1:abcd', 'cp',
+                    '-h', 'x-%s-meta-1:abcd' % self.provider_custom_meta, 'cp',
                     fpath, dsturi])
 
     # Use @Retry as hedge against bucket listing eventual consistency.
@@ -553,6 +553,11 @@ class TestCp(testcase.GsUtilIntegrationTestCase):
     gs_key = self.CreateObject(bucket_uri=gs_bucket, contents='b'*1024*1024)
     self.RunGsUtil(['cp', suri(s3_key), suri(gs_bucket)])
     self.RunGsUtil(['cp', suri(gs_key), suri(s3_bucket)])
+    with SetBotoConfigForTest([
+        ('GSUtil', 'resumable_threshold', str(ONE_KB)),
+        ('GSUtil', 'json_resumable_chunk_size', str(ONE_KB * 256))]):
+      # Ensure copy also works across json upload chunk boundaries.
+      self.RunGsUtil(['cp', suri(s3_key), suri(gs_bucket)])
 
   @unittest.skip('This test is slow due to creating many objects, '
                  'but remains here for debugging purposes.')
@@ -585,7 +590,8 @@ class TestCp(testcase.GsUtilIntegrationTestCase):
     # presereved by daisy-chain copy.
     self.RunGsUtil(['setmeta', '-h', 'Cache-Control:public,max-age=12',
                     '-h', 'Content-Type:image/gif',
-                    '-h', 'x-goog-meta-1:abcd', suri(key_uri)])
+                    '-h', 'x-%s-meta-1:abcd' % self.provider_custom_meta,
+                    suri(key_uri)])
     # Set public-read (non-default) ACL so we can verify that cp -D -p works.
     self.RunGsUtil(['acl', 'set', 'public-read', suri(key_uri)])
     acl_json = self.RunGsUtil(['acl', 'get', suri(key_uri)], return_stdout=True)
@@ -748,6 +754,34 @@ class TestCp(testcase.GsUtilIntegrationTestCase):
                                     'obj1'), dir_list[1])
     _CopyAndCheck()
 
+  def test_recursive_download_with_leftover_dir_placeholder(self):
+    """Tests that we correctly handle leftover dir placeholders."""
+    src_bucket_uri = self.CreateBucket()
+    dst_dir = self.CreateTempDir()
+    self.CreateObject(bucket_uri=src_bucket_uri, object_name='obj0',
+                      contents='abc')
+    self.CreateObject(bucket_uri=src_bucket_uri, object_name='obj1',
+                      contents='def')
+
+    # Create a placeholder like what can be left over by web GUI tools.
+    key_uri = src_bucket_uri.clone_replace_name('/')
+    key_uri.set_contents_from_string('')
+    self.AssertNObjectsInBucket(src_bucket_uri, 3)
+
+    stderr = self.RunGsUtil(['cp', '-R', suri(src_bucket_uri), dst_dir],
+                            return_stderr=True)
+    self.assertIn('Skipping cloud sub-directory placeholder object', stderr)
+    dir_list = []
+    for dirname, _, filenames in os.walk(dst_dir):
+      for filename in filenames:
+        dir_list.append(os.path.join(dirname, filename))
+    dir_list = sorted(dir_list)
+    self.assertEqual(len(dir_list), 2)
+    self.assertEqual(os.path.join(dst_dir, src_bucket_uri.bucket_name,
+                                  'obj0'), dir_list[0])
+    self.assertEqual(os.path.join(dst_dir, src_bucket_uri.bucket_name,
+                                  'obj1'), dir_list[1])
+
   def test_copy_quiet(self):
     bucket_uri = self.CreateBucket()
     key_uri = self.CreateObject(bucket_uri=bucket_uri, contents='foo')
@@ -872,6 +906,12 @@ class TestCp(testcase.GsUtilIntegrationTestCase):
                             return_stderr=True)
     self.assertIn('Copying file:', stderr)
 
+  # Note: We originally one time implemented a test
+  # (test_copy_invalid_unicode_filename) that invalid unicode filenames were
+  # skipped, but it turns out os.walk() on MacOS doesn't have problems with
+  # such files (so, failed that test). Given that, we decided to remove the
+  # test.
+
   def test_gzip_upload_and_download(self):
     bucket_uri = self.CreateBucket()
     contents = 'x' * 10000
@@ -883,6 +923,7 @@ class TestCp(testcase.GsUtilIntegrationTestCase):
     # files, and test that including whitespace in the extension list works.
     self.RunGsUtil(['cp', '-z', 'js, html',
                     os.path.join(tmpdir, 'test.*'), suri(bucket_uri)])
+    self.AssertNObjectsInBucket(bucket_uri, 3)
     uri1 = suri(bucket_uri, 'test.html')
     uri2 = suri(bucket_uri, 'test.js')
     uri3 = suri(bucket_uri, 'test.txt')
@@ -924,6 +965,9 @@ class TestCp(testcase.GsUtilIntegrationTestCase):
 
   def test_cp_without_read_access(self):
     """Tests that cp fails without read access to the object."""
+    # TODO: With 401's triggering retries in apitools, this test will take
+    # a long time.  Ideally, make apitools accept a num_retries config for this
+    # until we stop retrying the 401's.
     bucket_uri = self.CreateBucket()
     object_uri = self.CreateObject(bucket_uri=bucket_uri, contents='foo')
 

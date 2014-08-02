@@ -1,14 +1,25 @@
 # Copyright 2014 Google Inc. All Rights Reserved.
 """Utilities for waiting on Compute Engine operations."""
 import httplib
-import logging
 
 from googlecloudsdk.compute.lib import batch_helper
 from googlecloudsdk.compute.lib import path_simplifier
 from googlecloudsdk.compute.lib import time_utils
+from googlecloudsdk.core import log
 
 _POLLING_TIMEOUT_SEC = 60 * 5
 _MAX_TIME_BETWEEN_POLLS_SEC = 5
+
+# The set of possible operation types is {insert, delete, update} +
+# all verbs. For example, Instances.setMetadata's operation type is
+# "setMetadata". In our status reporting, we use the following
+# mapping. Anything not in the map is reported as "Updated".
+_HUMAN_FRIENDLY_OPERATION_TYPES = {
+    'createSnapshot': 'Created',
+    'insert': 'Created',
+    'delete': 'Deleted',
+    'update': 'Updated'
+}
 
 
 def _RecordProblems(operation, warnings, errors):
@@ -72,7 +83,7 @@ def WaitForOperations(operations, project, operation_service, resource_service,
     resource_requests = []
     operation_requests = []
 
-    logging.debug('Operations to inspect: %s', operations)
+    log.debug('Operations to inspect: %s', operations)
     for operation in operations:
       if operation.status == operation_type.StatusValueValuesEnum.DONE:
         # The operation has reached the DONE state, so we record any
@@ -95,14 +106,16 @@ def WaitForOperations(operations, project, operation_service, resource_service,
         if operation.error:
           continue
 
-        # We shouldn't get the target resource if the operation type
-        # is delete because there will be no resource left.
-        if operation.operationType == 'delete':
-          continue
+        target_link = operation.targetLink
 
         if custom_get_requests:
-          resource_requests.append(custom_get_requests[operation.targetLink])
-        else:
+          target_link, service, request_protobuf = (
+              custom_get_requests[operation.targetLink])
+          resource_requests.append((service, 'Get', request_protobuf))
+
+        # We shouldn't get the target resource if the operation type
+        # is delete because there will be no resource left.
+        elif operation.operationType != 'delete':
           request = resource_service.GetRequestType('Get')(project=project)
           if operation.zone:
             request.zone = path_simplifier.Name(operation.zone)
@@ -113,6 +126,11 @@ def WaitForOperations(operations, project, operation_service, resource_service,
           setattr(request, name_field,
                   path_simplifier.Name(operation.targetLink))
           resource_requests.append((resource_service, 'Get', request))
+
+        log.status.write('{0} [{1}].\n'.format(
+            _HUMAN_FRIENDLY_OPERATION_TYPES.get(
+                operation.operationType, 'Updated'),
+            target_link))
 
       else:
         # The operation has not reached the DONE state, so we add a
@@ -150,11 +168,11 @@ def WaitForOperations(operations, project, operation_service, resource_service,
     # Did we time out? If so, record the operations that timed out so
     # they can be reported to the user.
     if time_utils.CurrentTimeSec() - start > timeout:
-      logging.debug('Timeout of %ss reached.', timeout)
+      log.debug('Timeout of %ss reached.', timeout)
       _RecordUnfinishedOperations(operations, errors)
       break
 
     # Sleeps before trying to poll the operations again.
     sleep_sec += 1
-    logging.debug('Sleeping for %ss.', sleep_sec)
+    log.debug('Sleeping for %ss.', sleep_sec)
     time_utils.Sleep(min(sleep_sec, _MAX_TIME_BETWEEN_POLLS_SEC))

@@ -21,9 +21,6 @@ class Gcloud(base.Group):
     parser.add_argument(
         '--project',
         help='Google Cloud Platform project to use for this invocation.')
-    parser.add_argument(
-        '--api-host',
-        help=argparse.SUPPRESS)
     # Must have a None default so properties are not always overridden when the
     # arg is not provided.
     quiet_arg = parser.add_argument(

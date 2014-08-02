@@ -4,7 +4,7 @@
  "id": "compute:v1beta16",
  "name": "compute",
  "version": "v1beta16",
- "revision": "20140313",
+ "revision": "20140612",
  "title": "Compute Engine API",
  "description": "API for the Google Compute Engine service.",
  "ownerDomain": "google.com",
@@ -1134,7 +1134,12 @@
       "containerType": {
        "type": "string",
        "description": "The format used to encode and transmit the block device. Should be TAR. This is just a container and transmission format and not a runtime format. Provided by the client when the disk image is created.",
-       "default": "TAR"
+       "enum": [
+        "TAR"
+       ],
+       "enumDescriptions": [
+        ""
+       ]
       },
       "sha1Checksum": {
        "type": "string",
@@ -1165,12 +1170,7 @@
      ],
      "enumDescriptions": [
       ""
-     ],
-     "annotations": {
-      "required": [
-       "compute.images.insert"
-      ]
-     }
+     ]
     },
     "status": {
      "type": "string",
@@ -5747,6 +5747,33 @@
      },
      "scopes": [
       "https://www.googleapis.com/auth/compute"
+     ]
+    },
+    "setUsageExportBucket": {
+     "id": "compute.projects.setUsageExportBucket",
+     "path": "{project}/setUsageExportBucket",
+     "httpMethod": "POST",
+     "description": "Sets usage export location",
+     "parameters": {
+      "project": {
+       "type": "string",
+       "description": "Name of the project scoping this request.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project"
+     ],
+     "response": {
+      "$ref": "Operation"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/compute",
+      "https://www.googleapis.com/auth/devstorage.full_control",
+      "https://www.googleapis.com/auth/devstorage.read_only",
+      "https://www.googleapis.com/auth/devstorage.read_write"
      ]
     }
    }

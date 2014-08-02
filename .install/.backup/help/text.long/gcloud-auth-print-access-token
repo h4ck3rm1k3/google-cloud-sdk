@@ -2,7 +2,9 @@ NAME
        gcloud-auth-print-access-token - ==SUPPRESS==
 
 SYNOPSIS
-       gcloud auth print-access-token [ACCOUNT] [-h, --help]
+       gcloud auth print-access-token
+         [ACCOUNT]
+         [-h, --help]
 
 POSITIONAL ARGUMENTS
        [ACCOUNT]

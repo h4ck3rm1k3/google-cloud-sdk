@@ -7,7 +7,10 @@ import os
 import sys
 
 
+from protorpc import messages
 import yaml
+
+from googlecloudapis.apitools.base.py import encoding
 
 
 _INDENTATION = 2
@@ -39,6 +42,14 @@ class ResourcePrinter(object):
   def Finish(self):
     """Prints the results for formats that cannot stream their output."""
 
+  def PrintSingleRecord(self, record):
+    """Print one record by itself.
+
+    Args:
+      record: A record to print. This can be any Python object that can
+        be serialized to the format that the subclass requires.
+    """
+
 
 class JsonPrinter(ResourcePrinter):
   """Prints all records as a JSON list."""
@@ -57,12 +68,19 @@ class JsonPrinter(ResourcePrinter):
     Args:
       record: A JSON-serializable Python object.
     """
+    if isinstance(record, messages.Message):
+      record = encoding.MessageToDict(record)
     self._records.append(record)
 
   def Finish(self):
     """Prints the JSON list to the output stream."""
+    self.PrintSingleRecord(self._records)
+
+  def PrintSingleRecord(self, record):
+    if isinstance(record, messages.Message):
+      record = encoding.MessageToDict(record)
     json.dump(
-        self._records,
+        record,
         fp=self._out,
         indent=_INDENTATION,
         sort_keys=True,
@@ -88,6 +106,13 @@ class YamlPrinter(ResourcePrinter):
       - x: bye
   """
 
+  def __init__(self, *args, **kwargs):
+    super(YamlPrinter, self).__init__(*args, **kwargs)
+    yaml.add_representer(
+        collections.OrderedDict,
+        yaml.dumper.SafeRepresenter.represent_dict,
+        Dumper=yaml.dumper.SafeDumper)
+
   def AddRecord(self, record):
     """Immediately prints the given record as YAML.
 
@@ -97,16 +122,24 @@ class YamlPrinter(ResourcePrinter):
     Args:
       record: A YAML-serializable Python object.
     """
-    yaml.add_representer(
-        collections.OrderedDict,
-        yaml.dumper.SafeRepresenter.represent_dict,
-        Dumper=yaml.dumper.SafeDumper)
+    if isinstance(record, messages.Message):
+      record = encoding.MessageToDict(record)
     yaml.safe_dump(
         record,
         stream=self._out,
         default_flow_style=False,
         indent=_INDENTATION,
         explicit_start=True)
+
+  def PrintSingleRecord(self, record):
+    if isinstance(record, messages.Message):
+      record = encoding.MessageToDict(record)
+    yaml.safe_dump(
+        record,
+        stream=self._out,
+        default_flow_style=False,
+        indent=_INDENTATION,
+        explicit_start=False)
 
 
 def _Flatten(obj):
@@ -195,6 +228,12 @@ class DetailPrinter(ResourcePrinter):
       record: A JSON-serializable object.
     """
     self._out.write('---\n')
+    self.PrintSingleRecord(record)
+
+  def PrintSingleRecord(self, record):
+    """Print just one record as a flattened JSON object."""
+    if isinstance(record, messages.Message):
+      record = encoding.MessageToDict(record)
     flattened_record = sorted(_Flatten(record).items())
     max_key_len = max(len(key) for key, _ in flattened_record)
 
@@ -280,13 +319,16 @@ def Print(resources, print_format, out=None):
   formatter = formatter_class(out=out)
   formatter.PrintHeader()
 
-  # resources may be a generator and since generators can raise
-  # exceptions, we have to call Finish() in the finally block to make
-  # sure that the resources we've been able to pull out of the
-  # generator are printed before control is given to the
-  # exception-handling code.
-  try:
-    for resource in resources:
-      formatter.AddRecord(resource)
-  finally:
-    formatter.Finish()
+  if isinstance(resources, collections.Iterator) or type(resources) == list:
+    # resources may be a generator and since generators can raise
+    # exceptions, we have to call Finish() in the finally block to make
+    # sure that the resources we've been able to pull out of the
+    # generator are printed before control is given to the
+    # exception-handling code.
+    try:
+      for resource in resources:
+        formatter.AddRecord(resource)
+    finally:
+      formatter.Finish()
+  else:
+    formatter.PrintSingleRecord(resources)

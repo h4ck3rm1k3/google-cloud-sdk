@@ -11,10 +11,11 @@ gcloud-compute-forwarding-rules-set-target \- Modify a forwarding rule to direct
 .nf
 \fBgcloud compute forwarding\-rules set\-target\fR
   NAME
+  [\-\-help]
   [\-\-global | \-\-region REGION]
   [\-\-target\-http\-proxy TARGET_HTTP_PROXY | \-\-target\-instance TARGET_INSTANCE | \-\-target\-pool TARGET_POOL]
   [\-\-target\-instance\-zone TARGET_INSTANCE_ZONE]
-  [\-h, \-\-help]
+  [\-h]
 .fi
 .SH "DESCRIPTION"
 .sp
@@ -36,6 +37,11 @@ The name of the forwarding rule\&.
 \fB\-\-global\fR
 .RS 4
 If provided, assume the forwarding rules are global\&. A forwarding rule is global if it references a target HTTP proxy\&.
+.RE
+.PP
+\fB\-\-help\fR
+.RS 4
+Display detailed help\&.
 .RE
 .PP
 \fB\-\-region\fR \fIREGION\fR
@@ -63,7 +69,7 @@ The zone of the target instance\&.
 The target pool that will receive the traffic\&. The target pool must be in the same region as the forwarding rule\&. Global forwarding rules may not direct traffic to target pools\&.
 .RE
 .PP
-\fB\-\-help\fR
+\fB\-h\fR
 .RS 4
 Print a summary help and exit\&.
 .RE

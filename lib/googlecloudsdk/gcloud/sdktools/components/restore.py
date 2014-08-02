@@ -3,23 +3,24 @@
 """The command to restore a backup of a Cloud SDK installation."""
 
 from googlecloudsdk.calliope import base
-from googlecloudsdk.calliope import exceptions
-from googlecloudsdk.core.updater import update_manager
 
 
 class Restore(base.Command):
-  """Command to restore a backup of a Cloud SDK installation.
+  """Restore the Cloud SDK installation to its previous state.
 
-  Restore the state of the Cloud SDK as it was before the most recent components
-  update, or removal. Can only backtrack one step.
+  This is an undo operation, which restores the Cloud SDK installation on the
+  local workstation to the state it was in just before the most recent
+  `[{parent_command}] update` or `[{parent_command}] remove` command. Only the
+  state before the most recent such state is remembered, so it is impossible
+  to restore the state that existed before the two most recent `update`
+  commands, for example. A `restore` command does not undo a previous `restore`
+  command.
   """
 
   @staticmethod
   def Args(_):
     pass
 
-  @exceptions.RaiseToolExceptionInsteadOf(update_manager.Error)
   def Run(self, unused_args):
     """Runs the list command."""
-
     self.group.update_manager.Restore()

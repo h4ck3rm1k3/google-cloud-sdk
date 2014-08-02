@@ -3,7 +3,7 @@
 from googlecloudsdk.compute.lib import base_classes
 
 
-class GetInstances(base_classes.ZonalGetter):
+class Get(base_classes.ZonalGetter):
   """Get Google Compute Engine virtual machine instances."""
 
   @staticmethod
@@ -16,11 +16,11 @@ class GetInstances(base_classes.ZonalGetter):
     return self.context['compute'].instances
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'instances'
 
 
-GetInstances.detailed_help = {
+Get.detailed_help = {
     'brief': 'Get Google Compute Engine virtual machine instances',
     'DESCRIPTION': """\
         *{command}* displays all data associated with Google Compute

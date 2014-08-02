@@ -5,6 +5,7 @@ from apiclient import errors
 
 from googlecloudsdk.calliope import base
 from googlecloudsdk.calliope import exceptions
+from googlecloudsdk.core import resources
 from googlecloudsdk.sql import util
 
 
@@ -49,19 +50,23 @@ class RestoreBackup(base.Command):
     sql = self.context['sql']
     instance_id = util.GetInstanceIdWithoutProject(args.instance)
     project_id = util.GetProjectId(args.instance)
+    # TODO(user): as we deprecate P:I args, simplify the call to .Parse().
+    instance_ref = resources.Parse(
+        instance_id, collection='sql.instances',
+        params={'project': project_id})
     due_time = args.due_time
     instance = self.command.ParentGroup().ParentGroup().instances.get(
-        instance=instance_id)
+        instance=instance_ref.instance)
     # At this point we support only one backup-config. So, we just use that id.
     backup_config = instance['settings']['backupConfiguration'][0]['id']
     request = sql.instances().restoreBackup(
-        project=project_id, instance=instance_id,
+        project=instance_ref.project, instance=instance_ref.instance,
         backupConfiguration=backup_config, dueTime=due_time)
     try:
       result = request.execute()
-      operations = self.command.ParentGroup().ParentGroup().operations(
-          instance=instance_id)
-      operation = operations.get(operation=result['operation'])
+      operations = self.command.ParentGroup().ParentGroup().operations()
+      operation = operations.get(instance=str(instance_ref),
+                                 operation=result['operation'])
       return operation
     except errors.HttpError as error:
       raise exceptions.HttpException(util.GetError(error))

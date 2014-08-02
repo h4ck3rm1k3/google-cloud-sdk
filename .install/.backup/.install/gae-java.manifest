@@ -8,7 +8,7 @@ platform/appengine-java-sdk/COPYING
 platform/appengine-java-sdk/ABOUT
 platform/appengine-java-sdk/src/
 platform/appengine-java-sdk/src/user/
-platform/appengine-java-sdk/src/user/appengine-api-1.0-sdk-1.9.4-src.zip
+platform/appengine-java-sdk/src/user/appengine-api-1.0-sdk-1.9.6-src.zip
 platform/appengine-java-sdk/src/orm/
 platform/appengine-java-sdk/src/orm/jdo2-api-2.3-SNAPSHOT-src.zip
 platform/appengine-java-sdk/src/orm/datanucleus-jpa-1.1.5-src.zip
@@ -38,9 +38,9 @@ platform/appengine-java-sdk/lib/appengine-remote-api.jar
 platform/appengine-java-sdk/lib/user/
 platform/appengine-java-sdk/lib/user/libservice.jar
 platform/appengine-java-sdk/lib/user/jsr107cache-1.1.jar
-platform/appengine-java-sdk/lib/user/appengine-jsr107cache-1.9.4.jar
-platform/appengine-java-sdk/lib/user/appengine-api-labs-1.9.4.jar
-platform/appengine-java-sdk/lib/user/appengine-api-1.0-sdk-1.9.4.jar
+platform/appengine-java-sdk/lib/user/appengine-jsr107cache-1.9.6.jar
+platform/appengine-java-sdk/lib/user/appengine-api-labs-1.9.6.jar
+platform/appengine-java-sdk/lib/user/appengine-api-1.0-sdk-1.9.6.jar
 platform/appengine-java-sdk/lib/user/orm/
 platform/appengine-java-sdk/lib/user/orm/jdo2-api-2.3-eb.jar
 platform/appengine-java-sdk/lib/user/orm/geronimo-jta_1.1_spec-1.1.1.jar
@@ -84,7 +84,7 @@ platform/appengine-java-sdk/lib/opt/user/
 platform/appengine-java-sdk/lib/opt/user/jsr107/
 platform/appengine-java-sdk/lib/opt/user/jsr107/v1/
 platform/appengine-java-sdk/lib/opt/user/jsr107/v1/jsr107cache-1.1.jar
-platform/appengine-java-sdk/lib/opt/user/jsr107/v1/appengine-jsr107cache-1.9.4.jar
+platform/appengine-java-sdk/lib/opt/user/jsr107/v1/appengine-jsr107cache-1.9.6.jar
 platform/appengine-java-sdk/lib/opt/user/datanucleus/
 platform/appengine-java-sdk/lib/opt/user/datanucleus/v2/
 platform/appengine-java-sdk/lib/opt/user/datanucleus/v2/jta-1.1.jar
@@ -131,6 +131,9 @@ platform/appengine-java-sdk/lib/opt/tools/datanucleus/v1/asm-4.1.jar
 platform/appengine-java-sdk/lib/opt/tools/appengine-local-endpoints/
 platform/appengine-java-sdk/lib/opt/tools/appengine-local-endpoints/v1/
 platform/appengine-java-sdk/lib/opt/tools/appengine-local-endpoints/v1/appengine-local-endpoints.jar
+platform/appengine-java-sdk/lib/opt/tools/appengine-datastore/
+platform/appengine-java-sdk/lib/opt/tools/appengine-datastore/v1/
+platform/appengine-java-sdk/lib/opt/tools/appengine-datastore/v1/appengine-datastore-filter.jar
 platform/appengine-java-sdk/lib/impl/
 platform/appengine-java-sdk/lib/impl/google_sql.jar
 platform/appengine-java-sdk/lib/impl/appengine-local-runtime.jar
@@ -727,6 +730,7 @@ platform/appengine-java-sdk/docs/javadoc/com/google/appengine/api/search/DeleteE
 platform/appengine-java-sdk/docs/javadoc/com/google/appengine/api/search/DateUtil.html
 platform/appengine-java-sdk/docs/javadoc/com/google/appengine/api/search/Cursor.html
 platform/appengine-java-sdk/docs/javadoc/com/google/appengine/api/search/Cursor.Builder.html
+platform/appengine-java-sdk/docs/javadoc/com/google/appengine/api/search/AdminSearchServiceFactory.html
 platform/appengine-java-sdk/docs/javadoc/com/google/appengine/api/search/query/
 platform/appengine-java-sdk/docs/javadoc/com/google/appengine/api/search/query/package-tree.html
 platform/appengine-java-sdk/docs/javadoc/com/google/appengine/api/search/query/package-summary.html
@@ -1088,6 +1092,7 @@ platform/appengine-java-sdk/docs/endpoints/javadoc/com/google/api/server/spi/con
 platform/appengine-java-sdk/docs/endpoints/javadoc/com/google/api/server/spi/config/package-summary.html
 platform/appengine-java-sdk/docs/endpoints/javadoc/com/google/api/server/spi/config/package-frame.html
 platform/appengine-java-sdk/docs/endpoints/javadoc/com/google/api/server/spi/config/Transformer.html
+platform/appengine-java-sdk/docs/endpoints/javadoc/com/google/api/server/spi/config/PeerAuthenticator.html
 platform/appengine-java-sdk/docs/endpoints/javadoc/com/google/api/server/spi/config/DefaultValue.html
 platform/appengine-java-sdk/docs/endpoints/javadoc/com/google/api/server/spi/config/Authenticator.html
 platform/appengine-java-sdk/docs/endpoints/javadoc/com/google/api/server/spi/config/AuthLevel.html

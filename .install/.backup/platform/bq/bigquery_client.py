@@ -318,6 +318,9 @@ class BigqueryHttp(http_request.HttpRequest):
              'Http response status: %s\n'
              'Http response content:\n%s') % (
                  e.resp.get('status', '(unexpected)'), e.content))
+    except (httplib2.HttpLib2Error, IOError), e:
+      raise BigqueryCommunicationError(
+          'Could not connect with BigQuery server due to: %r' % (e,))
 
 
 class JobIdGenerator(object):
@@ -478,11 +481,14 @@ class BigqueryClient(object):
               discoveryServiceUrl=self.GetDiscoveryUrl(),
               model=bigquery_model,
               requestBuilder=bigquery_http)
-        except (httplib2.ServerNotFoundError, apiclient.errors.HttpError), e:
+        except (httplib2.HttpLib2Error, apiclient.errors.HttpError), e:
           # We can't find the specified server.
           raise BigqueryCommunicationError(
-              'Cannot contact server. Please try again.\nError: %s'
-              '\nContent: %s' % (str(e), e.content))
+              'Cannot contact server. Please try again.\nError: %r'
+              '\nContent: %s' % (e, e.content))
+        except IOError, e:
+          raise BigqueryCommunicationError(
+              'Cannot contact server. Please try again.\nError: %r' % (e,))
         except apiclient.errors.UnknownApiNameOrVersion, e:
           # We can't resolve the discovery url for the given server.
           raise BigqueryCommunicationError(
@@ -1915,6 +1921,7 @@ class BigqueryClient(object):
             dry_run=None,
             use_cache=None,
             min_completion_ratio=None,
+            flatten_results=None,
             **kwds):
     # pylint: disable=g-doc-args
     """Execute the given query, returning the created job.
@@ -1944,6 +1951,8 @@ class BigqueryClient(object):
       min_completion_ratio: Optional. Specifies the the minimum fraction of
           data that must be scanned before a query returns. This value should be
           between 0.0 and 1.0 inclusive.
+      flatten_results: Whether to flatten nested and repeated fields in the
+        result schema. If not set, the default behavior is to flatten.
       **kwds: Passed on to self.ExecuteJob.
 
     Raises:
@@ -2043,7 +2052,7 @@ class BigqueryClient(object):
 
   def Extract(self, source_table, destination_uris,
               print_header=None, field_delimiter=None,
-              destination_format=None,
+              destination_format=None, compression=None,
               **kwds):
     """Extract the given table from BigQuery.
 
@@ -2056,8 +2065,10 @@ class BigqueryClient(object):
          separated by commas.
       print_header: Optional. Whether to print out a header row in the results.
       field_delimiter: Optional. Specifies the single byte field delimiter.
-      destination_format: Optional. Format to extract table to. May be "CSV"
-         or "NEWLINE_DELIMITED_JSON".
+      destination_format: Optional. Format to extract table to. May be "CSV",
+         "AVRO", or "NEWLINE_DELIMITED_JSON".
+      compression: Optional. The compression type to use for exported files.
+        Possible values include "GZIP" and "NONE". The default value is NONE.
       **kwds: Passed on to self.ExecuteJob.
 
     Returns:
@@ -2076,7 +2087,8 @@ class BigqueryClient(object):
     _ApplyParameters(
         extract_config, destination_uris=uris,
         destination_format=destination_format,
-        print_header=print_header, field_delimiter=field_delimiter)
+        print_header=print_header, field_delimiter=field_delimiter,
+        compression=compression)
     return self.ExecuteJob(configuration={'extract': extract_config}, **kwds)
 
 

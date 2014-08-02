@@ -3,6 +3,8 @@
 from googlecloudapis.compute.v1 import compute_v1_messages as messages
 from googlecloudsdk.calliope import exceptions as calliope_exceptions
 from googlecloudsdk.compute.lib import base_classes
+from googlecloudsdk.compute.lib import utils
+from googlecloudsdk.core import resources
 
 
 class SetBackup(base_classes.BaseAsyncMutator):
@@ -17,10 +19,12 @@ class SetBackup(base_classes.BaseAsyncMutator):
               'If this flag is provided without a value, the existing '
               'backup pool is removed.'),
         required=True)
-    parser.add_argument(
-        '--region',
-        help='The region of the target pool.',
-        required=True)
+
+    utils.AddRegionFlag(
+        parser,
+        resource_type='target pool',
+        operation_type='set a backup pool for')
+
     parser.add_argument(
         '--failover-ratio',
         type=float,
@@ -40,34 +44,38 @@ class SetBackup(base_classes.BaseAsyncMutator):
     return 'SetBackup'
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'targetPools'
 
   def CreateRequests(self, args):
     """Returns a request necessary for setting a backup target pool."""
 
+    target_pool_ref = self.CreateRegionalReference(args.name, args.region)
+
     if args.backup_pool:
-      backup_pool_uri = self.context['uri-builder'].Build(
-          'regions', args.region, 'targetPools', args.backup_pool)
+      backup_pool_ref = resources.Parse(
+          args.backup_pool,
+          collection='compute.targetPools',
+          params={'region': target_pool_ref.region})
       target_reference = messages.TargetReference(
-          target=backup_pool_uri)
+          target=backup_pool_ref.SelfLink())
     else:
       target_reference = messages.TargetReference()
 
     if args.backup_pool and args.failover_ratio is None:
       raise calliope_exceptions.ToolException(
-          '--failover-ratio must be provided when setting a backup pool')
+          '[--failover-ratio] must be provided when setting a backup pool.')
 
     if args.failover_ratio is not None and (
         args.failover_ratio < 0 or args.failover_ratio > 1):
       raise calliope_exceptions.ToolException(
-          '--failover-ratio must be a number between 0 and 1, inclusive')
+          '[--failover-ratio] must be a number between 0 and 1, inclusive.')
 
     request = messages.ComputeTargetPoolsSetBackupRequest(
-        targetPool=args.name,
+        targetPool=target_pool_ref.Name(),
         targetReference=target_reference,
         failoverRatio=args.failover_ratio,
-        region=args.region,
+        region=target_pool_ref.region,
         project=self.context['project'])
 
     return [request]

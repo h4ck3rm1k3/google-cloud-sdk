@@ -5,8 +5,9 @@ NAME
 SYNOPSIS
        gcloud compute instances delete
          NAME [NAME ...]
-         --zone ZONE
-         [-h, --help]
+         [--help]
+         [--zone ZONE]
+         [-h]
 
 DESCRIPTION
        gcloud compute instances delete deletes one or more Google Compute
@@ -17,9 +18,13 @@ POSITIONAL ARGUMENTS
            The resources to delete.
 
 FLAGS
-       --zone ZONE
-           The zone of the resources to delete.
-
        --help
+           Display detailed help.
+
+       --zone ZONE
+           The zone of the resources to delete. If omitted and the arguments
+           are not all URIs, you will be prompted to select a zone.
+
+       -h
            Print a summary help and exit.
 

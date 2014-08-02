@@ -3,7 +3,7 @@
 from googlecloudsdk.compute.lib import base_classes
 
 
-class ListDisks(base_classes.ZonalLister):
+class List(base_classes.ZonalLister):
   """List Google Compute Engine persistent disks."""
 
   @property
@@ -11,5 +11,5 @@ class ListDisks(base_classes.ZonalLister):
     return self.context['compute'].disks
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'disks'

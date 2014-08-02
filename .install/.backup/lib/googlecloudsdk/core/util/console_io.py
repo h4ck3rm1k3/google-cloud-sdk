@@ -3,6 +3,7 @@
 """General console printing utilities used by the Cloud SDK."""
 
 import logging
+import string
 import sys
 import textwrap
 
@@ -231,6 +232,29 @@ def _DoWrap(message):
   return '\n'.join([TEXTWRAP.fill(line) for line in message.splitlines()])
 
 
+def _RawInput(prompt=None):
+  """A simple redirect to the built-in raw_input function.
+
+  If the prompt is given, it is correctly line wrapped.  If there is no stdin
+  available, this returns None.
+
+  Args:
+    prompt: str, An optional prompt.
+
+  Returns:
+    The input from stdin, or None if there is no stdin available.
+  """
+  try:
+    # Prompt is a positional arg.  It should not be passed if prompt is None,
+    # because it results in 'None' actually getting printed as a prompt.
+    if prompt:
+      return raw_input(_DoWrap(prompt))
+    return raw_input()
+  except EOFError:
+    # There is no stdin stream, or the steam has been exhausted.
+    return None
+
+
 def PromptContinue(message=None, prompt_string=None):
   """Prompts the user a yes or no question and asks if they want to continue.
 
@@ -252,11 +276,11 @@ def PromptContinue(message=None, prompt_string=None):
 
   sys.stdout.write(_DoWrap(prompt_string + ' (Y/n)?  '))
   while True:
-    answer = raw_input()
-    if not answer or answer in ['y', 'Y']:
+    answer = _RawInput()
+    if not answer or answer.lower() in ['y', 'yes']:
       sys.stdout.write('\n')
       return True
-    elif answer in ['n', 'N']:
+    elif answer.lower() in ['n', 'no']:
       sys.stdout.write('\n')
       return False
     else:
@@ -274,7 +298,7 @@ def PromptResponse(message):
   """
   if properties.VALUES.core.disable_prompts.GetBool():
     return None
-  response = raw_input(_DoWrap(message))
+  response = _RawInput(message)
   return response
 
 
@@ -312,14 +336,14 @@ def PromptChoice(options, default=0, message=None, prompt_string=None):
     sys.stdout.write(_DoWrap(message) + '\n')
   for i, option in enumerate(options):
     sys.stdout.write('  [{index}]  {option}\n'.format(
-        index=i+1, option=str(option)))
+        index=i + 1, option=str(option)))
 
   if not prompt_string:
     prompt_string = 'Please enter your numeric choice'
   sys.stdout.write(_DoWrap(prompt_string + ' ({default}):  '.format(
-      default=default+1)))
+      default=default + 1)))
   while True:
-    answer = raw_input()
+    answer = _RawInput()
     if not answer:
       sys.stdout.write('\n')
       return default
@@ -333,3 +357,22 @@ def PromptChoice(options, default=0, message=None, prompt_string=None):
     except ValueError:
       sys.stdout.write('Please enter a value between 1 and {maximum}:  '
                        .format(maximum=maximum))
+
+
+def LazyFormat(s, *args, **kwargs):
+  """Format a string, allowing unresolved parameters to remain unresolved.
+
+  Args:
+    s: str, The string to format.
+    *args: [str], A list of strings for numerical parameters.
+    **kwargs: {str:str}, A dict of strings for named parameters.
+
+  Returns:
+    str, The lazily-formatted string.
+  """
+
+  class SafeDict(dict):
+
+    def __missing__(self, key):
+      return '{' + key + '}'
+  return string.Formatter().vformat(s, args, SafeDict(kwargs))

@@ -2,8 +2,8 @@
 
 import base64
 import collections
+import datetime
 import json
-import logging
 
 
 from protorpc import messages
@@ -19,6 +19,7 @@ __all__ = [
     'MessageToDict',
     'PyValueToMessage',
     'MessageToPyValue',
+    'MessageToRepr',
 ]
 
 
@@ -103,6 +104,88 @@ def MessageToPyValue(message):
   return json.loads(MessageToJson(message))
 
 
+def MessageToRepr(msg, multiline=False, **kwargs):
+  """Return a repr-style string for a protorpc message.
+
+  protorpc.Message.__repr__ does not return anything that could be considered
+  python code. Adding this function lets us print a protorpc message in such
+  a way that it could be pasted into code later, and used to compare against
+  other things.
+
+  Args:
+    msg: protorpc.Message, the message to be repr'd.
+    multiline: bool, True if the returned string should have each field
+        assignment on its own line.
+    **kwargs: {str:str}, Additional flags for how to format the string.
+
+  Known **kwargs:
+    shortstrings: bool, True if all string values should be truncated at
+        100 characters, since when mocking the contents typically don't matter
+        except for IDs, and IDs are usually less than 100 characters.
+
+  Returns:
+    str, A string of valid python (assuming the right imports have been made)
+    that recreates the message passed into this function.
+  """
+
+  # TODO(user): craigcitro suggests a pretty-printer from apitools/gen.
+
+  indent = kwargs.get('indent', 0)
+
+  def IndentKwargs(kwargs):
+    kwargs = dict(kwargs)
+    kwargs['indent'] = kwargs.get('indent', 0) + 4
+    return kwargs
+
+  if isinstance(msg, list):
+    s = '['
+    for item in msg:
+      if multiline:
+        s += '\n' + ' '*(indent + 4)
+      s += MessageToRepr(
+          item, multiline=multiline, **IndentKwargs(kwargs)) + ','
+    if multiline:
+      s += '\n' + ' '*indent
+    s += ']'
+    return s
+
+  if isinstance(msg, messages.Message):
+    s = msg.__module__ + '.' + type(msg).__name__ + '('
+    names = sorted([field.name for field in msg.all_fields()])
+    for name in names:
+      field = msg.field_by_name(name)
+      if multiline:
+        s += '\n' + ' '*(indent + 4)
+      value = getattr(msg, field.name)
+      s += field.name + '=' + MessageToRepr(
+          value, multiline=multiline, **IndentKwargs(kwargs)) + ','
+    if multiline:
+      s += '\n'+' '*indent
+    s += ')'
+    return s
+
+  if isinstance(msg, basestring):
+    if kwargs.get('shortstrings') and len(msg) > 100:
+      msg = msg[:100]
+
+  if isinstance(msg, datetime.datetime):
+
+    class SpecialTZInfo(datetime.tzinfo):
+
+      def __init__(self, offset):
+        super(SpecialTZInfo, self).__init__()
+        self.offset = offset
+
+      def __repr__(self):
+        return 'protorpc.util.TimeZoneOffset(' + repr(self.offset) + ')'
+
+    msg = datetime.datetime(
+        msg.year, msg.month, msg.day, msg.hour, msg.minute, msg.second,
+        msg.microsecond, SpecialTZInfo(msg.tzinfo.utcoffset(0)))
+
+  return repr(msg)
+
+
 def _IncludeFields(encoded_message, message, include_fields):
   """Add the requested fields to the encoded message."""
   if include_fields is None:
@@ -142,6 +225,8 @@ class _ProtoJsonApiTools(protojson.ProtoJson):
       return _CUSTOM_MESSAGE_CODECS[message_type].decoder(encoded_message)
     result = super(_ProtoJsonApiTools, self).decode_message(
         message_type, encoded_message)
+    result = _ProcessUnknownEnums(result, encoded_message)
+    result = _ProcessUnknownMessages(result, encoded_message)
     return _DecodeUnknownFields(result, encoded_message)
 
   def decode_field(self, field, value):  # pylint: disable=g-bad-name
@@ -165,8 +250,8 @@ class _ProtoJsonApiTools(protojson.ProtoJson):
       try:
         field_value = super(_ProtoJsonApiTools, self).decode_field(field, value)
       except messages.DecodeError:
-        # TODO(user): Make "ignore_unknown_enums" a global option.
-        logging.debug('Ignoring unknown enum value: %s', value)
+        if not isinstance(value, basestring):
+          raise
         field_value = None
     else:
       field_value = super(_ProtoJsonApiTools, self).decode_field(field, value)
@@ -305,6 +390,63 @@ def _SafeDecodeBytes(unused_field, value):
     result = value
     complete = False
   return CodecResult(value=result, complete=complete)
+
+
+def _ProcessUnknownEnums(message, encoded_message):
+  """Add unknown enum values from encoded_message as unknown fields.
+
+  ProtoRPC diverges from the usual protocol buffer behavior here and
+  doesn't allow unknown fields. Throwing on unknown fields makes it
+  impossible to let servers add new enum values and stay compatible
+  with older clients, which isn't reasonable for us. We simply store
+  unrecognized enum values as unknown fields, and all is well.
+
+  Args:
+    message: Proto message we've decoded thus far.
+    encoded_message: JSON string we're decoding.
+
+  Returns:
+    message, with any unknown enums stored as unrecognized fields.
+  """
+  if not encoded_message:
+    return message
+  decoded_message = json.loads(encoded_message)
+  for field in message.all_fields():
+    if (isinstance(field, messages.EnumField) and
+        field.name in decoded_message and
+        message.get_assigned_value(field.name) is None):
+      message.set_unrecognized_field(field.name, decoded_message[field.name],
+                                     messages.Variant.ENUM)
+  return message
+
+
+def _ProcessUnknownMessages(message, encoded_message):
+  """Store any remaining unknown fields as strings.
+
+  ProtoRPC currently ignores unknown values for which no type can be
+  determined (and logs a "No variant found" message). For the purposes
+  of reserializing, this is quite harmful (since it throws away
+  information). Here we simply add those as unknown fields of type
+  string (so that they can easily be reserialized).
+
+  Args:
+    message: Proto message we've decoded thus far.
+    encoded_message: JSON string we're decoding.
+
+  Returns:
+    message, with any remaining unrecognized fields saved.
+  """
+  if not encoded_message:
+    return message
+  decoded_message = json.loads(encoded_message)
+  message_fields = [x.name for x in message.all_fields()] + list(
+      message.all_unrecognized_fields())
+  missing_fields = [x for x in decoded_message.iterkeys()
+                    if x not in message_fields]
+  for field_name in missing_fields:
+    message.set_unrecognized_field(field_name, decoded_message[field_name],
+                                   messages.Variant.STRING)
+  return message
 
 
 RegisterFieldTypeCodec(_SafeEncodeBytes, _SafeDecodeBytes)(messages.BytesField)

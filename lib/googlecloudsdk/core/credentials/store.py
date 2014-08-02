@@ -80,6 +80,12 @@ class RevokeError(Error):
   """Exception for when there was a problem revoking."""
 
 
+def _Http(*args, **kwargs):
+  no_validate = properties.VALUES.auth.disable_ssl_validation.GetBool()
+  kwargs['disable_ssl_certificate_validation'] = no_validate
+  return httplib2.Http(*args, **kwargs)
+
+
 def _StorageForAccount(account):
   """Get the oauth2client.multistore_file storage.
 
@@ -224,7 +230,7 @@ def Refresh(creds, http=None):
   if creds and (not client.HAS_CRYPTO or
                 type(creds) != client.SignedJwtAssertionCredentials):
     try:
-      creds.refresh(http or httplib2.Http())
+      creds.refresh(http or _Http())
     except (client.AccessTokenRefreshError, httplib2.ServerNotFoundError) as e:
       raise RefreshError(e)
 
@@ -288,7 +294,7 @@ def Revoke(account=None):
   # revoking SignedJwtAssertionCredentials.
   if creds and (not client.HAS_CRYPTO or
                 type(creds) != client.SignedJwtAssertionCredentials):
-    creds.revoke(httplib2.Http())
+    creds.revoke(_Http())
   store = _StorageForAccount(account)
   if store:
     store.delete()
@@ -327,12 +333,10 @@ def AcquireFromWebFlow(launch_browser=True,
       token_uri=token_uri,
       prompt='select_account')
 
-  no_validate = properties.VALUES.auth.disable_ssl_validation.GetBool()
-
   try:
     cred = flow.Run(
         webflow, launch_browser=launch_browser,
-        http=httplib2.Http(disable_ssl_certificate_validation=no_validate))
+        http=_Http())
   except flow.Error as e:
     raise FlowError(e)
   return cred

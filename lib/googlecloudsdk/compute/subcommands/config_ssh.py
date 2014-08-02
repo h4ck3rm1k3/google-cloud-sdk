@@ -56,16 +56,6 @@ def _CreateAlias(instance_resource):
   return '.'.join(parts)
 
 
-def _GetExternalIPAddress(instance_resource):
-  """Returns the external IP address of the instance or None."""
-  if instance_resource.networkInterfaces:
-    access_configs = instance_resource.networkInterfaces[0].accessConfigs
-    if access_configs:
-      return access_configs[0].natIP
-
-  return None
-
-
 def _ReadFile(file_path):
   """Returns the contents of the file or ''."""
   try:
@@ -75,7 +65,7 @@ def _ReadFile(file_path):
     if e.errno == errno.ENOENT:
       return ''
     else:
-      raise exceptions.ToolException('there was a problem reading {0}: {1}'
+      raise exceptions.ToolException('There was a problem reading [{0}]: {1}'
                                      .format(file_path, e.message))
 
 
@@ -94,12 +84,17 @@ def _BuildComputeSection(instances, private_key_file):
     buf.write('\n')
 
   for instance in instances:
-    external_ip_address = _GetExternalIPAddress(instance)
+    external_ip_address = (
+        ssh_utils.GetExternalIPAddress(instance, no_raise=True))
+
     if external_ip_address:
       buf.write(textwrap.dedent("""\
           Host {alias}
               HostName {external_ip_address}
               IdentityFile {private_key_file}
+              UserKnownHostsFile=/dev/null
+              CheckHostIP=no
+              StrictHostKeyChecking=no
 
           """.format(alias=_CreateAlias(instance),
                      external_ip_address=external_ip_address,
@@ -153,7 +148,7 @@ class ConfigSSH(ssh_utils.BaseSSHCommand):
 
     if errors:
       base_classes.RaiseToolException(
-          errors, error_message='could not fetch all instances:')
+          errors, error_message='Could not fetch all instances:')
     return instances
 
   def Run(self, args):
@@ -201,10 +196,10 @@ class ConfigSSH(ssh_utils.BaseSSHCommand):
 
       else:
         raise exceptions.ToolException(
-            'found more than one Google Compute Engine section in {0}; '
-            'you can either delete {0} and let this command recreate it for '
+            'Found more than one Google Compute Engine section in [{0}]. '
+            'You can either delete [{0}] and let this command recreate it for '
             'you or you can manually delete all sections marked with '
-            '"{1}" and "{2}"'
+            '[{1}] and [{2}].'
             .format(ssh_config_file, _BEGIN_MARKER, _END_MARKER))
 
     else:
@@ -212,25 +207,26 @@ class ConfigSSH(ssh_utils.BaseSSHCommand):
 
     if args.dry_run:
       log.out.write(new_content or '')
-    else:
-      if new_content != existing_content:
-        with open(ssh_config_file, 'w') as f:
-          f.write(new_content)
+      return
 
-      if compute_section:
-        log.out.write(textwrap.dedent("""\
-            You should now be able to use ssh/scp with your instances. For
-            example, try running:
+    if new_content != existing_content:
+      with open(ssh_config_file, 'w') as f:
+        f.write(new_content)
 
-              ssh {alias}
+    if compute_section:
+      log.out.write(textwrap.dedent("""\
+          You should now be able to use ssh/scp with your instances.
+          For example, try running:
 
-            """.format(alias=_CreateAlias(instances[0]))))
+            ssh {alias}
 
-      elif not instances and not args.remove:
-        log.warn(
-            'no host aliases were added to your SSH configs because you do not '
-            'have any instances; try running this command again after creating '
-            'some instances')
+          """.format(alias=_CreateAlias(instances[0]))))
+
+    elif not instances and not args.remove:
+      log.warn(
+          'No host aliases were added to your SSH configs because you do not '
+          'have any instances. Try running this command again after creating '
+          'some instances.')
 
 
 ConfigSSH.detailed_help = {

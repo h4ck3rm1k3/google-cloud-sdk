@@ -7,7 +7,8 @@ SYNOPSIS
          PROPERTY
          VALUE
          [--global-only]
-         [-h, --help]
+         [--help]
+         [-h]
 
 POSITIONAL ARGUMENTS
        PROPERTY
@@ -21,5 +22,8 @@ FLAGS
            Set the option in the global properties file.
 
        --help
+           Display detailed help.
+
+       -h
            Print a summary help and exit.
 

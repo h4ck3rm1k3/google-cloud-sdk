@@ -6,7 +6,8 @@ NAME
 SYNOPSIS
        gcloud help
          [COMMAND ...]
-         [-h, --help]
+         [--help]
+         [-h]
 
 POSITIONAL ARGUMENTS
        [COMMAND ...]
@@ -14,5 +15,8 @@ POSITIONAL ARGUMENTS
 
 FLAGS
        --help
+           Display detailed help.
+
+       -h
            Print a summary help and exit.
 

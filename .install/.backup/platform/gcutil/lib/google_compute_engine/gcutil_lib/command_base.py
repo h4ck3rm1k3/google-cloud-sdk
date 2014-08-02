@@ -32,6 +32,7 @@ from apiclient import errors
 import httplib2
 import iso8601
 import oauth2client.client as oauth2_client
+import yaml
 
 
 from google.apputils import app
@@ -91,13 +92,14 @@ flags.DEFINE_bool(
     'Output JSON instead of tabular format. Deprecated, use --format=json.')
 gcutil_flags.DEFINE_case_insensitive_enum(
     'format', 'table',
-    ('table', 'sparse', 'json', 'csv', 'names'),
+    ('table', 'sparse', 'json', 'csv', 'names', 'yaml'),
     'Format for command output. Options include:'
     '\n table: formatted table output'
     '\n sparse: simpler table output'
     '\n json: raw json output (formerly --print_json)'
     '\n csv: csv format with header'
-    '\n names: list of resource names only, no header')
+    '\n names: list of resource names only, no header'
+    '\n yaml: output formatted as YAML')
 flags.DEFINE_bool(
     'respect_terminal_width',
     True,
@@ -155,7 +157,8 @@ WINDOWS_IMAGE_PROJECTS = ['windows-cloud']
 STANDARD_IMAGE_PROJECTS = ['debian-cloud',
                            'centos-cloud',
                            'rhel-cloud',
-                           'suse-cloud'] + WINDOWS_IMAGE_PROJECTS
+                           'suse-cloud',
+                           'opensuse-cloud'] + WINDOWS_IMAGE_PROJECTS
 STANDARD_KERNEL_PROJECTS = ['google']
 
 
@@ -178,7 +181,8 @@ def NewestResourcesFilter(resource_list):
       accepted_selflinks.add(resource['selfLink'])
       continue
 
-    base_name = match.group(1)
+    # Strip the -v from the base name since some images do not have this.
+    base_name = match.group(1).rstrip('v').rstrip('-')
     resource_date = match.group(2)
 
     # Remove the date from the resource to group them.  Remember only
@@ -2050,6 +2054,19 @@ class GoogleComputeCommand(appcommands.Cmd):
       print json.dumps(result, sort_keys=True, indent=2)
       return
 
+    if self._flags.format == 'yaml':
+      yaml.add_representer(
+          collections.OrderedDict,
+          yaml.dumper.SafeRepresenter.represent_dict,
+          Dumper=yaml.dumper.SafeDumper)
+      yaml.safe_dump(
+          result,
+          stream=sys.stdout,
+          default_flow_style=False,
+          indent=2,
+          explicit_start=True)
+      return
+
     if result:
       # Warn the user about errors.
       self._WarnAboutErrors(result)
@@ -2063,11 +2080,14 @@ class GoogleComputeCommand(appcommands.Cmd):
       else:
         self._PrintDetail(result)
 
-  AGGREGATED_TYPES = {'compute#instanceAggregatedList': 'instances',
-                      'compute#machineTypeAggregatedList': 'machineTypes',
-                      'compute#operationAggregatedList': 'operations',
-                      'compute#addressAggregatedList': 'addresses',
-                      'compute#diskAggregatedList': 'disks'}
+  AGGREGATED_TYPES = {
+      'compute#instanceAggregatedList': 'instances',
+      'compute#machineTypeAggregatedList': 'machineTypes',
+      'compute#operationAggregatedList': 'operations',
+      'compute#addressAggregatedList': 'addresses',
+      'compute#diskAggregatedList': 'disks',
+      'compute#diskTypeAggregatedList': 'diskTypes',
+      }
 
   def _WarnAboutErrors(self, result):
     """Logs any errors that appear in the result."""
@@ -2361,7 +2381,7 @@ class GoogleComputeListCommand(GoogleComputeCommand):
           results, self._ListZoneLevelCollection(max_results))
 
     # Query region level collection if appropriate.
-    if (self.IsRegionLevelCollection()):
+    if self.IsRegionLevelCollection():
       results = utils.CombineListResults(
           results, self._ListRegionLevelCollection(max_results))
 
@@ -2386,7 +2406,7 @@ class GoogleComputeListCommand(GoogleComputeCommand):
       return True
 
     # Global and region-level collection
-    if (self.IsRegionLevelCollection()):
+    if self.IsRegionLevelCollection():
       # Global/Region collection and --global was specified.
       if 'global' in self._flags and self._flags['global'].value:
         return True

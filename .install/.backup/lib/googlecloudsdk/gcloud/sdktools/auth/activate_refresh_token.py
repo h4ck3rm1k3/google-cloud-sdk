@@ -25,10 +25,11 @@ class ActivateRefreshToken(base.Command):
   def Args(parser):
     """Set args for gcloud auth activate-refresh-token."""
     parser.add_argument(
-        'account', help='The account to associate with the refresh token.')
-    parser.add_argument('token', nargs='?',
-                        help=('OAuth2 refresh token. If blank, prompt for'
-                              ' value.'))
+        'account',
+        help='The account to associate with the refresh token.')
+    parser.add_argument(
+        'token', nargs='?',
+        help=('OAuth2 refresh token. If blank, prompt for value.'))
 
   @c_exc.RaiseToolExceptionInsteadOf(c_store.Error)
   def Run(self, args):
@@ -36,7 +37,7 @@ class ActivateRefreshToken(base.Command):
 
     token = args.token or console_io.PromptResponse('Refresh token: ')
     if not token:
-      raise c_exc.InvalidArgumentException('token', 'not provided.')
+      raise c_exc.InvalidArgumentException('token', 'No value provided.')
 
     creds = c_store.AcquireFromToken(token)
     account = args.account

@@ -3,6 +3,7 @@
 from googlecloudapis.compute.v1 import compute_v1_messages as messages
 from googlecloudsdk.compute.lib import base_classes
 from googlecloudsdk.compute.lib import constants
+from googlecloudsdk.compute.lib import utils
 
 
 class AddAccessConfigInstances(base_classes.BaseAsyncMutator):
@@ -46,10 +47,10 @@ class AddAccessConfigInstances(base_classes.BaseAsyncMutator):
         'name',
         help='The name of the instance to add the access configuration to.')
 
-    parser.add_argument(
-        '--zone',
-        help='The zone of the instance.',
-        required=True)
+    utils.AddZoneFlag(
+        parser,
+        resource_type='instance',
+        operation_type='add an access config to')
 
   @property
   def service(self):
@@ -60,20 +61,22 @@ class AddAccessConfigInstances(base_classes.BaseAsyncMutator):
     return 'AddAccessConfig'
 
   @property
-  def print_resource_type(self):
+  def resource_type(self):
     return 'instances'
 
   def CreateRequests(self, args):
     """Returns a list of request necessary for adding an access config."""
+    instance_ref = self.CreateZonalReference(args.name, args.zone)
+
     request = messages.ComputeInstancesAddAccessConfigRequest(
         accessConfig=messages.AccessConfig(
             name=args.access_config_name,
             natIP=args.address,
             type=messages.AccessConfig.TypeValueValuesEnum.ONE_TO_ONE_NAT),
-        instance=args.name,
+        instance=instance_ref.Name(),
         networkInterface=args.network_interface,
         project=self.context['project'],
-        zone=args.zone)
+        zone=instance_ref.zone)
 
     return [request]
 

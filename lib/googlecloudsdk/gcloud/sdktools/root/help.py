@@ -2,8 +2,8 @@
 
 """A calliope command that calls a help function."""
 
-from googlecloudsdk import calliope
 from googlecloudsdk.calliope import base
+from googlecloudsdk.calliope import cli as calliope
 from googlecloudsdk.calliope import exceptions as c_exc
 from googlecloudsdk.core import cli
 

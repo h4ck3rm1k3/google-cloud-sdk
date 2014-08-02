@@ -9,9 +9,10 @@ SYNOPSIS
          [--description DESCRIPTION]
          [--failover-ratio FAILOVER_RATIO]
          [--health-check HEALTH_CHECK]
-         --region REGION
+         [--help]
+         [--region REGION]
          [--session-affinity SESSION_AFFINITY; default="NONE"]
-         [-h, --help]
+         [-h]
 
 DESCRIPTION
        gcloud compute target-pools create is used to create a target pool. A
@@ -63,8 +64,13 @@ FLAGS
            appear as unhealthy as a warning that this target pool does not
            have a health check.
 
+       --help
+           Display detailed help.
+
        --region REGION
-           The region in which the forwarding rule will be created.
+           The region of the target pool to create. If omitted and the
+           arguments are not all URIs, you will be prompted to select a
+           region.
 
        --session-affinity SESSION_AFFINITY
            Specifies the session affinity option for the connection. If "NONE"
@@ -76,6 +82,6 @@ FLAGS
            will go to the same client pool. If not specified, then "NONE" is
            used as a default.
 
-       --help
+       -h
            Print a summary help and exit.
 

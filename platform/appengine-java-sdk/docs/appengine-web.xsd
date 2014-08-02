@@ -45,7 +45,7 @@
   </xs:complexType>
   <xs:complexType name="appengine-web-appType">
     <xs:all>
-      <xs:element type="xs:string" name="application"/>
+      <xs:element type="xs:string" name="application" minOccurs="0"/>
       <xs:element type="xs:string" name="version" minOccurs="0"/>
       <xs:element type="xs:string" name="source-language" minOccurs="0"/>
       <xs:element type="xs:string" name="module" minOccurs="0"/>
